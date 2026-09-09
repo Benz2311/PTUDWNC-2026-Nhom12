@@ -1,1 +1,16 @@
-# Culinary-Blog
+# Phát triển ứng dụng web nâng cao 
+# ##  Nhóm 12 thành viên gồm :
+Võ Hùng Mạnh - 2312687 - 2312687@dlu.edu.vn ( Nhóm trưởng )
+Lê Thị Ánh Nhung - 2312709 - 2312709@dlu.edu.vn
+Phạm Nguyễn Ngọc Phước - 2312718 - 2312718@dlu.edu.vn
+Nguyễn Văn Quốc - 2312729 - 2312729@dlu.edu.vn
+# ## Quy tắc làm việc
+1. Không push trực tiếp code chức năng lên `main`.
+2. Luôn pull code mới nhất trước khi bắt đầu làm việc.
+3. Mỗi task thực hiện trên branch riêng.
+4. Không tự ý thay đổi cấu trúc project chung.
+5. Không commit file `.env` chứa thông tin bí mật.
+6. Commit message phải mô tả rõ thay đổi.
+7. Kiểm tra code trước khi tạo Pull Request.
+8. Khi push lên nhớ tạo nhánh con từ nhánh cha ( nhớ ghi chức năng mình làm )
+# ## Task tuần đầu tiên
