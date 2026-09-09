@@ -1,9 +1,9 @@
 # Phát triển ứng dụng web nâng cao 
 # ##  Nhóm 12 thành viên gồm :
-Võ Hùng Mạnh - 2312687 - 2312687@dlu.edu.vn ( Nhóm trưởng )
-Lê Thị Ánh Nhung - 2312709 - 2312709@dlu.edu.vn
-Phạm Nguyễn Ngọc Phước - 2312718 - 2312718@dlu.edu.vn
-Nguyễn Văn Quốc - 2312729 - 2312729@dlu.edu.vn
+1. Võ Hùng Mạnh - 2312687 - 2312687@dlu.edu.vn ( Nhóm trưởng )
+2. Lê Thị Ánh Nhung - 2312709 - 2312709@dlu.edu.vn
+3. Phạm Nguyễn Ngọc Phước - 2312718 - 2312718@dlu.edu.vn
+4. Nguyễn Văn Quốc - 2312729 - 2312729@dlu.edu.vn
 # ## Quy tắc làm việc
 1. Không push trực tiếp code chức năng lên `main`.
 2. Luôn pull code mới nhất trước khi bắt đầu làm việc.
