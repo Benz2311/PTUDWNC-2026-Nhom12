@@ -1,0 +1,3 @@
+export default function RecipesPage() {
+  return <><div className="flow-kicker">Quản lý công thức</div><h1 className="flow-title">Kho công thức của Culinary Blog.</h1><p className="flow-description">Xem, tạo, chỉnh sửa và theo dõi trạng thái những công thức trong hệ thống.</p><div className="flow-panel-grid"><section className="flow-panel"><h2>Tất cả công thức</h2><p>Danh sách công thức có phân trang và bộ lọc.</p></section><section className="flow-panel"><h2>Công thức của tôi</h2><p>Quản lý bản nháp và những món đã xuất bản.</p></section><section className="flow-panel"><h2>Tạo công thức mới</h2><p>Thêm nguyên liệu, các bước nấu, ảnh và dinh dưỡng.</p><a className="flow-panel-link" href="/recipes/new">Bắt đầu tạo →</a></section></div></>;
+}

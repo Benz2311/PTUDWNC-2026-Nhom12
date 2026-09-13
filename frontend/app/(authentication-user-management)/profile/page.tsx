@@ -1,0 +1,3 @@
+export default function ProfilePage() {
+  return <><div className="flow-kicker">Quản lý người dùng</div><h1 className="flow-title">Hồ sơ cá nhân</h1><p className="flow-description">Không gian quản lý thông tin cá nhân, công thức đã tạo và những món ăn yêu thích.</p><div className="flow-panel-grid"><section className="flow-panel"><h2>Thông tin cá nhân</h2><p>Họ tên, email, ảnh đại diện và giới thiệu ngắn.</p></section><section className="flow-panel"><h2>Công thức của tôi</h2><p>Theo dõi những công thức bạn đã viết và xuất bản.</p></section><section className="flow-panel"><h2>Đã lưu</h2><p>Tập hợp các món ăn yêu thích để nấu lại sau.</p></section></div></>;
+}

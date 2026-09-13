@@ -1,0 +1,179 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
+
+:root {
+  --ink: #0d302d;
+  --ink-soft: #49645d;
+  --teal: #076b5b;
+  --teal-dark: #043f3a;
+  --mint: #cfe9dc;
+  --cream: #f5f6ee;
+  --paper: #fbfcf7;
+  --line: #c8ddd2;
+  --orange: #ee8a3d;
+  --yellow: #f6c453;
+  --shadow: 0 20px 55px rgba(7, 54, 44, 0.18);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: radial-gradient(circle at 85% 7%, rgba(187, 219, 198, .33), transparent 25rem), var(--cream);
+  color: var(--ink);
+  font-family: "DM Sans", sans-serif;
+}
+button, input { font: inherit; }
+button { cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+
+.flow-layout { min-height: 100vh; }
+.flow-header {
+  align-items: center;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding: 17px clamp(18px, 4vw, 64px);
+}
+.flow-header .brand-name { font-size: 21px; }
+.flow-header .brand-subtitle { display: block; }
+.flow-nav { display: flex; gap: 18px; margin-left: auto; }
+.flow-nav a { color: var(--ink-soft); font-size: 12px; font-weight: 700; }
+.flow-nav a:hover { color: var(--teal); }
+.flow-main { margin: 0 auto; max-width: 1240px; padding: 48px clamp(18px, 4vw, 64px) 80px; }
+.flow-kicker { color: var(--teal); font-size: 11px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; }
+.flow-title { font-family: "Fraunces", serif; font-size: clamp(34px, 5vw, 56px); letter-spacing: -1px; margin: 10px 0; }
+.flow-description { color: var(--ink-soft); line-height: 1.7; margin: 0; max-width: 620px; }
+.flow-panel-grid { display: grid; gap: 18px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 34px; }
+.flow-panel { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+.flow-panel h2 { font-family: "Fraunces", serif; font-size: 22px; margin: 0 0 8px; }
+.flow-panel p { color: var(--ink-soft); font-size: 13px; line-height: 1.6; margin: 0; }
+.flow-panel-link { color: var(--teal); display: inline-block; font-size: 12px; font-weight: 700; margin-top: 20px; }
+.admin-layout .flow-header { background: var(--teal-dark); border-color: rgba(255,255,255,.14); }
+.admin-layout .brand-name, .admin-layout .brand-subtitle, .admin-layout .flow-nav a { color: white; }
+.admin-layout .brand-mark { background: #f2a94a; }
+.admin-layout .flow-main { background: linear-gradient(180deg, rgba(207,233,220,.38), transparent 30rem); }
+
+@media (max-width: 760px) {
+  .flow-header { align-items: flex-start; flex-wrap: wrap; }
+  .flow-nav { margin-left: 0; order: 3; overflow-x: auto; width: 100%; }
+  .flow-panel-grid { grid-template-columns: 1fr; }
+}
+
+.site-shell { min-height: 100vh; overflow: hidden; }
+.topbar {
+  align-items: center;
+  display: flex;
+  gap: 28px;
+  justify-content: space-between;
+  margin: 0 auto;
+  max-width: 1240px;
+  padding: 22px 28px 14px;
+}
+.brand { align-items: center; display: flex; gap: 12px; }
+.brand-mark {
+  align-items: center;
+  background: var(--teal);
+  border-radius: 16px 16px 9px 9px;
+  color: white;
+  display: flex;
+  font-size: 25px;
+  height: 43px;
+  justify-content: center;
+  position: relative;
+  width: 43px;
+}
+.brand-mark::before { content: ""; background: var(--yellow); border-radius: 50%; height: 9px; position: absolute; right: 6px; top: -5px; width: 9px; }
+.brand-name { font-family: "Fraunces", serif; font-size: 25px; font-weight: 700; letter-spacing: -0.5px; }
+.brand-subtitle { color: var(--ink-soft); font-size: 11px; margin-top: 1px; }
+.main-nav { display: flex; gap: 25px; margin-left: auto; }
+.main-nav a { color: var(--ink-soft); font-size: 13px; font-weight: 600; }
+.main-nav a:hover { color: var(--teal); }
+.auth-actions { align-items: center; display: flex; gap: 9px; }
+.text-button, .primary-button, .outline-button { border: 0; border-radius: 999px; font-size: 13px; font-weight: 700; padding: 11px 17px; }
+.text-button { background: transparent; color: var(--ink); }
+.primary-button { background: var(--teal); color: white; box-shadow: 0 8px 18px rgba(8, 127, 106, 0.2); }
+.primary-button:hover { background: var(--teal-dark); transform: translateY(-1px); }
+.outline-button { background: transparent; border: 1px solid #a5c8b8; color: var(--teal-dark); }
+
+.hero-wrap { margin: 14px auto 0; max-width: 1240px; padding: 0 28px; }
+.hero {
+  background: linear-gradient(105deg, rgba(3, 39, 34, .98) 0%, rgba(4, 67, 56, .88) 47%, rgba(7, 61, 50, .28) 100%), url("https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1800&q=85") center/cover;
+  border-radius: 28px;
+  min-height: 475px;
+  overflow: hidden;
+  padding: 70px 74px;
+  position: relative;
+}
+.hero::after { border: 1px solid rgba(255,255,255,.25); border-radius: 21px; content: ""; inset: 12px; pointer-events: none; position: absolute; }
+.hero-content { max-width: 560px; position: relative; z-index: 1; }
+.eyebrow { align-items: center; color: #bcebd5; display: flex; font-size: 12px; font-weight: 700; gap: 9px; letter-spacing: 1.4px; text-transform: uppercase; }
+.eyebrow::before { background: var(--yellow); border-radius: 50%; content: ""; height: 8px; width: 8px; }
+.hero h1 { color: white; font-family: "Fraunces", serif; font-size: clamp(44px, 6vw, 76px); letter-spacing: -2px; line-height: .98; margin: 20px 0; max-width: 650px; }
+.hero h1 em { color: #f6d47a; font-style: normal; }
+.hero-copy { color: #e2f5e9; font-size: 16px; line-height: 1.7; max-width: 480px; }
+.search-bar { align-items: center; background: white; border-radius: 13px; display: flex; gap: 10px; margin-top: 29px; max-width: 465px; padding: 6px 7px 6px 17px; }
+.search-icon { color: var(--teal); font-size: 19px; }
+.search-bar input { border: 0; color: var(--ink); flex: 1; min-width: 0; outline: none; }
+.search-bar button { background: var(--orange); border: 0; border-radius: 9px; color: white; font-size: 12px; font-weight: 700; padding: 12px 16px; }
+.hero-note { align-items: center; color: #c0e1d4; display: flex; font-size: 12px; gap: 9px; margin-top: 17px; }
+.hero-note span { color: #ffd36b; font-size: 16px; }
+
+.content { margin: 0 auto; max-width: 1240px; padding: 70px 28px 90px; }
+.section-heading { align-items: flex-end; display: flex; justify-content: space-between; margin-bottom: 23px; }
+.section-heading h2 { font-family: "Fraunces", serif; font-size: 30px; letter-spacing: -.7px; margin: 0; }
+.section-heading p { color: var(--ink-soft); font-size: 13px; margin: 6px 0 0; }
+.section-link { color: var(--teal); font-size: 13px; font-weight: 700; }
+.category-row { display: flex; gap: 11px; margin-bottom: 45px; overflow-x: auto; padding-bottom: 5px; }
+.category { align-items: center; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; color: var(--ink-soft); display: flex; flex: 0 0 auto; font-size: 13px; gap: 8px; padding: 10px 16px; }
+.category:first-child { background: var(--teal); border-color: var(--teal); color: white; }
+.category-icon { font-size: 17px; }
+.recipe-grid { display: grid; gap: 21px; grid-template-columns: repeat(4, 1fr); }
+.recipe-card { background: var(--paper); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 6px 20px rgba(11, 59, 46, .05); overflow: hidden; transition: box-shadow .2s ease, transform .2s ease; }
+.recipe-card:hover { box-shadow: var(--shadow); transform: translateY(-4px); }
+.recipe-image { aspect-ratio: 1.22; background-position: center; background-size: cover; position: relative; }
+.recipe-image::after { background: linear-gradient(180deg, transparent 60%, rgba(0,0,0,.25)); content: ""; inset: 0; position: absolute; }
+.recipe-tag { background: rgba(255,255,255,.92); border-radius: 999px; color: var(--teal-dark); font-size: 10px; font-weight: 700; left: 12px; padding: 7px 10px; position: absolute; top: 12px; z-index: 1; }
+.recipe-body { padding: 16px 16px 17px; }
+.recipe-body h3 { font-family: "Fraunces", serif; font-size: 19px; line-height: 1.15; margin: 0 0 9px; }
+.recipe-body p { color: var(--ink-soft); font-size: 12px; line-height: 1.55; margin: 0 0 14px; }
+.recipe-meta { align-items: center; color: var(--ink-soft); display: flex; font-size: 11px; justify-content: space-between; }
+.rating { color: #d68b19; font-weight: 700; }
+
+.community-band { align-items: center; background: var(--mint); border-radius: 22px; display: flex; gap: 30px; justify-content: space-between; margin-top: 70px; overflow: hidden; padding: 34px 42px; }
+.community-band h2 { font-family: "Fraunces", serif; font-size: 28px; margin: 0 0 7px; }
+.community-band p { color: var(--ink-soft); font-size: 13px; margin: 0; }
+.community-actions { display: flex; flex: 0 0 auto; gap: 10px; }
+.footer { border-top: 1px solid var(--line); color: var(--ink-soft); display: flex; font-size: 12px; justify-content: space-between; margin-top: 65px; padding-top: 22px; }
+
+@media (max-width: 900px) {
+  .main-nav { display: none; }
+  .hero { padding: 58px 42px; }
+  .recipe-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .topbar { padding: 16px 18px 11px; }
+  .brand-name { font-size: 21px; }
+  .brand-subtitle { font-size: 9px; }
+  .auth-actions .text-button { display: none; }
+  .auth-actions .primary-button { font-size: 11px; padding: 9px 12px; }
+  .hero-wrap, .content { padding-left: 16px; padding-right: 16px; }
+  .hero { border-radius: 20px; min-height: 530px; padding: 42px 24px; }
+  .hero h1 { font-size: 51px; }
+  .hero-copy { font-size: 14px; }
+  .search-bar { align-items: stretch; background: transparent; flex-direction: column; padding: 0; }
+  .search-bar input { border-radius: 9px; padding: 13px 15px; }
+  .search-bar button { padding: 13px; }
+  .content { padding-top: 49px; }
+  .section-heading h2 { font-size: 25px; }
+  .section-link { font-size: 11px; }
+  .recipe-grid { gap: 12px; }
+  .recipe-body { padding: 12px; }
+  .recipe-body h3 { font-size: 16px; }
+  .recipe-body p { font-size: 11px; }
+  .community-band { align-items: flex-start; flex-direction: column; margin-top: 50px; padding: 27px 23px; }
+  .community-actions { width: 100%; }
+  .community-actions button { flex: 1; }
+  .footer { gap: 12px; flex-direction: column; }
+}
