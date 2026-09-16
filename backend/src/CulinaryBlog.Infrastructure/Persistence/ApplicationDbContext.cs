@@ -15,7 +15,6 @@ public class ApplicationDbContext : DbContext
     public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
     public DbSet<RecipeStep> RecipeSteps => Set<RecipeStep>();
     public DbSet<RecipeImage> RecipeImages => Set<RecipeImage>();
-    public DbSet<RecipeNutrition> RecipeNutritions => Set<RecipeNutrition>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -24,12 +23,15 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<ApplicationUser>(entity =>
         {
+            entity.ToTable("AspNetUsers");
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.FullName).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.UserName).HasMaxLength(100).IsRequired();
-            entity.Property(x => x.Email).HasMaxLength(255).IsRequired();
+            entity.Property(x => x.FullName).HasColumnName("DisplayName").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.UserName).HasMaxLength(256);
+            entity.Property(x => x.Email).HasMaxLength(256);
+            entity.Property(x => x.EmailConfirmed).IsRequired();
+            entity.Property(x => x.Roles).HasColumnType("text[]").IsRequired();
             entity.Property(x => x.AvatarUrl).HasMaxLength(500);
-            entity.Property(x => x.PasswordHash).HasMaxLength(500);
+            entity.Property(x => x.PasswordHash).HasColumnType("text");
 
             entity.HasIndex(x => x.UserName).IsUnique();
             entity.HasIndex(x => x.Email).IsUnique();
@@ -48,9 +50,11 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Category>(entity =>
         {
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
-            entity.Property(x => x.Slug).HasMaxLength(150).IsRequired();
-            entity.Property(x => x.Description).HasMaxLength(500);
+            entity.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Slug).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Description).HasColumnType("text");
+            entity.Property(x => x.ImageUrl).HasMaxLength(500);
+            entity.Property(x => x.RowVersion).HasColumnName("RowVersion").IsConcurrencyToken();
 
             entity.HasIndex(x => x.Slug).IsUnique();
 
@@ -64,9 +68,13 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Title).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.Slug).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.Content).IsRequired();
-            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.Slug).HasMaxLength(220).IsRequired();
+            entity.Property(x => x.Content).HasColumnName("Instructions").IsRequired();
+            entity.Property(x => x.Description).HasColumnType("text").IsRequired();
+            entity.Property(x => x.PrepTimeMinutes).HasColumnName("PrepTimeMinutes").IsRequired();
+            entity.Property(x => x.CookTimeMinutes).HasColumnName("CookTimeMinutes").IsRequired();
+            entity.Property(x => x.Servings).IsRequired();
+            entity.Property(x => x.RowVersion).HasColumnName("RowVersion").IsConcurrencyToken();
 
             entity.HasIndex(x => x.Slug).IsUnique();
             entity.HasIndex(x => x.AuthorId);
@@ -98,49 +106,55 @@ public class ApplicationDbContext : DbContext
                 .HasForeignKey(x => x.RecipeId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(x => x.Nutrition)
-                .WithOne(x => x.Recipe)
-                .HasForeignKey<RecipeNutrition>(x => x.RecipeId)
-                .OnDelete(DeleteBehavior.Cascade);
+            entity.OwnsOne(x => x.Nutrition, nutrition =>
+            {
+                nutrition.Property(x => x.Calories).HasColumnName("Nutrition_Calories").HasPrecision(8, 2);
+                nutrition.Property(x => x.Protein).HasColumnName("Nutrition_Protein").HasPrecision(8, 2);
+                nutrition.Property(x => x.Carbohydrates).HasColumnName("Nutrition_Carbohydrates").HasPrecision(8, 2);
+                nutrition.Property(x => x.Fat).HasColumnName("Nutrition_Fat").HasPrecision(8, 2);
+                nutrition.Property(x => x.Fiber).HasColumnName("Nutrition_Fiber").HasPrecision(8, 2);
+                nutrition.Property(x => x.Sodium).HasColumnName("Nutrition_Sodium").HasPrecision(8, 2);
+            });
         });
 
         modelBuilder.Entity<RecipeIngredient>(entity =>
         {
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.Quantity).HasMaxLength(100);
+            entity.Property(x => x.Quantity).HasPrecision(10, 3);
             entity.Property(x => x.Unit).HasMaxLength(50);
+            entity.Property(x => x.Notes).HasMaxLength(500);
+            entity.Property(x => x.SortOrder).HasColumnName("OrderIndex");
+            entity.Property(x => x.RowVersion).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<RecipeStep>(entity =>
         {
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.Title).HasMaxLength(200);
+            entity.Property(x => x.Title).HasMaxLength(200).IsRequired();
             entity.Property(x => x.Description).IsRequired();
+            entity.Property(x => x.TimerMinutes).HasColumnName("DurationMinutes");
+            entity.Property(x => x.ImageUrl).HasMaxLength(500);
+            entity.Property(x => x.RowVersion).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<RecipeImage>(entity =>
         {
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.Url).HasMaxLength(500).IsRequired();
-            entity.Property(x => x.AltText).HasMaxLength(255);
-        });
-
-        modelBuilder.Entity<RecipeNutrition>(entity =>
-        {
-            entity.HasKey(x => x.Id);
-            entity.Property(x => x.Calories).HasPrecision(10, 2);
-            entity.Property(x => x.Protein).HasPrecision(10, 2);
-            entity.Property(x => x.Carbohydrates).HasPrecision(10, 2);
-            entity.Property(x => x.Fat).HasPrecision(10, 2);
-            entity.Property(x => x.Fiber).HasPrecision(10, 2);
+            entity.Property(x => x.Url).HasColumnName("OriginalUrl").HasMaxLength(500).IsRequired();
+            entity.Property(x => x.MediumUrl).HasMaxLength(500);
+            entity.Property(x => x.ThumbnailUrl).HasMaxLength(500);
+            entity.Property(x => x.AltText).HasMaxLength(200);
+            entity.Property(x => x.SortOrder).HasColumnName("OrderIndex");
+            entity.Property(x => x.RowVersion).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<RefreshToken>(entity =>
         {
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.Token).HasMaxLength(500).IsRequired();
-            entity.Property(x => x.ReplacedByToken).HasMaxLength(500);
+            entity.Property(x => x.Token).HasColumnName("TokenHash").HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ReplacedByToken).HasColumnName("ReplacedByTokenHash").HasMaxLength(64);
+            entity.Property(x => x.CreatedByIp).HasMaxLength(45);
             entity.HasIndex(x => x.Token).IsUnique();
         });
     }

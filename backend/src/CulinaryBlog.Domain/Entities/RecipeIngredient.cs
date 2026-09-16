@@ -6,7 +6,12 @@ public class RecipeIngredient
     public Guid RecipeId { get; set; }
     public Recipe Recipe { get; set; } = null!;
     public string Name { get; set; } = string.Empty;
-    public string? Quantity { get; set; }
+    public decimal? Quantity { get; set; }
     public string? Unit { get; set; }
+    public string? Notes { get; set; }
     public int SortOrder { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public bool IsDeleted { get; set; }
+    public byte[] RowVersion { get; set; } = new byte[8];
 }
