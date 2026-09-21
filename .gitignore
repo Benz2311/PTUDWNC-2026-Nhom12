@@ -1,0 +1,18 @@
+# Environment variables
+.env
+
+# Build
+bin/
+obj/
+
+# Frontend
+node_modules/
+.next/
+
+# IDE
+.vscode/
+.vs/
+
+# OS
+.DS_Store
+Thumbs.db
