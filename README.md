@@ -61,6 +61,41 @@
 - Chuẩn bị dữ liệu mẫu cho bước nấu và hình ảnh.
 
 ---
+### Bữa 2 - Hoàn thiện cấu hình dữ liệu và tạo dữ liệu kiểm thử
+
+**Mục tiêu:** Hoàn thiện Entity, Configuration và dữ liệu ngẫu nhiên cho từng chức năng; tích hợp vào DbContext và Migration để tạo cơ sở dữ liệu phục vụ kiểm thử.
+
+#### Nguyễn Văn Quốc - User/Auth
+
+- Hoàn thiện `ApplicationUser` và `RefreshToken` theo cấu trúc chung của hệ thống.
+- Thiết lập Configuration cho các entity thuộc User/Auth.
+- Kiểm tra và hoàn thiện quan hệ giữa `ApplicationUser`, `RefreshToken` và `Recipe`.
+- Xử lý các điểm chưa thống nhất giữa Entity và Configuration thuộc chức năng User/Auth.
+- Chuẩn bị dữ liệu ngẫu nhiên cho người dùng và các dữ liệu liên quan phục vụ kiểm thử.
+
+#### Lê Thị Ánh Nhung - Category & Statistics
+
+- Hoàn thiện `Category` và Configuration tương ứng.
+- Kiểm tra và hoàn thiện quan hệ giữa `Category` và `Recipe`.
+- Xử lý các điểm chưa thống nhất giữa Entity và Configuration thuộc chức năng Category.
+- Xây dựng dữ liệu ngẫu nhiên cho danh mục.
+- Đảm bảo cơ sở dữ liệu sau khi tích hợp có ít nhất **20 Categories** phục vụ truy vấn và thống kê.
+
+#### Phạm Nguyễn Ngọc Phước - Recipe & Ingredient
+
+- Hoàn thiện `Recipe`, `RecipeIngredient`, `RecipeNutrition` và các Configuration tương ứng.
+- Kiểm tra và hoàn thiện quan hệ giữa `Recipe`, `RecipeIngredient`, `RecipeNutrition`, User và Category.
+- Xử lý các điểm chưa thống nhất giữa Entity và Configuration thuộc chức năng Recipe & Ingredient.
+- Xây dựng dữ liệu ngẫu nhiên cho công thức, nguyên liệu và dinh dưỡng.
+- Đảm bảo cơ sở dữ liệu sau khi tích hợp có ít nhất **100 Recipes** và mỗi Recipe có ít nhất **10 nguyên liệu**.
+
+#### Võ Hùng Mạnh - Step & Image
+
+- Hoàn thiện `RecipeStep`, `RecipeImage` và các Configuration tương ứng.
+- Kiểm tra và hoàn thiện quan hệ giữa `RecipeStep`, `RecipeImage` và `Recipe`.
+- Xử lý các điểm chưa thống nhất giữa Entity và Configuration thuộc chức năng Step & Image.
+- Xây dựng dữ liệu ngẫu nhiên cho các bước chế biến và hình ảnh.
+- Đảm bảo mỗi Recipe sau khi tích hợp có ít nhất **5 bước chế biến**.
 
 # Cài đặt PostgreSQL bằng Docker
 
