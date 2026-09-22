@@ -43,9 +43,12 @@ public class RecipeImageConfiguration : IEntityTypeConfiguration<RecipeImage>
         builder.Property(x => x.IsDeleted)
             .IsRequired();
 
-        // Kiểm soát cập nhật đồng thời
+        // PostgreSQL không tự sinh rowversion như SQL Server.
+        // Vì vậy RowVersion sẽ được ứng dụng gán giá trị.
         builder.Property(x => x.RowVersion)
-            .IsRowVersion();
+            .IsRequired()
+            .IsConcurrencyToken()
+            .ValueGeneratedNever();
 
         // Một Recipe có nhiều RecipeImage
         builder.HasOne(x => x.Recipe)

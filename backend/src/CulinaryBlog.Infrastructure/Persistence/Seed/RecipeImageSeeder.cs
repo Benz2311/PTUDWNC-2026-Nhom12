@@ -12,33 +12,57 @@ public static class RecipeImageSeeder
 
         foreach (var recipe in recipes)
         {
-            // Mỗi công thức có ngẫu nhiên từ 2 đến 5 hình ảnh
+            // Sinh ngẫu nhiên từ 2 đến 5 ảnh cho mỗi Recipe
             var numberOfImages = faker.Random.Int(2, 5);
 
-            for (var index = 0; index < numberOfImages; index++)
+            for (var index = 0;
+                 index < numberOfImages;
+                 index++)
             {
-                var image = new RecipeImage
-                {
-                    Id = Guid.NewGuid(),
-                    RecipeId = recipe.Id,
+                var imageFaker = new Faker<RecipeImage>("vi")
+                    .RuleFor(x => x.Id, f => f.Random.Guid())
+                    .RuleFor(x => x.RecipeId, _ => recipe.Id)
 
-                    // Dữ liệu URL mẫu để kiểm thử
-                    Url = $"https://picsum.photos/seed/{recipe.Id}-{index}/800/600",
+                    // Sinh URL ảnh ngẫu nhiên
+                    .RuleFor(
+                        x => x.Url,
+                        f => f.Image.PicsumUrl(
+                            width: 800,
+                            height: 600))
 
-                    AltText = $"Hình ảnh {index + 1} của {recipe.Title}",
+                    // Sinh mô tả ảnh
+                    .RuleFor(
+                        x => x.AltText,
+                        f => f.Lorem
+                            .Sentence(f.Random.Int(3, 7)))
 
-                    // Ảnh đầu tiên là ảnh chính
-                    IsPrimary = index == 0,
+                    // Ảnh đầu tiên là ảnh đại diện
+                    .RuleFor(
+                        x => x.IsPrimary,
+                        _ => index == 0)
 
-                    // Thứ tự hiển thị bắt đầu từ 0
-                    SortOrder = index,
+                    // Thứ tự ảnh
+                    .RuleFor(
+                        x => x.SortOrder,
+                        _ => index)
 
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = null,
-                    IsDeleted = false
-                };
+                    // Thời gian tạo
+                    .RuleFor(
+                        x => x.CreatedAt,
+                        f => f.Date
+                            .Recent(30)
+                            .ToUniversalTime())
 
-                images.Add(image);
+                    .RuleFor(x => x.UpdatedAt, _ => null)
+                    .RuleFor(x => x.IsDeleted, _ => false)
+
+                    // PostgreSQL không tự sinh RowVersion
+                    // nên Seeder chủ động gán giá trị
+                    .RuleFor(
+                        x => x.RowVersion,
+                        _ => new byte[8]);
+
+                images.Add(imageFaker.Generate());
             }
         }
 
