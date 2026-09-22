@@ -25,3 +25,10 @@
 - Chuẩn bị dữ liệu phục vụ lọc, sắp xếp, phân trang và thống kê.
 - Chuẩn bị dữ liệu mẫu danh mục phục vụ truy vấn và thống kê.
 
+### TASK 2 - Category & Statistics
+
+- Hoàn thiện `Category` và Configuration tương ứng.
+- Kiểm tra và hoàn thiện quan hệ giữa `Category` và `Recipe`.
+- Xử lý các điểm chưa thống nhất giữa Entity và Configuration thuộc chức năng Category.
+- Xây dựng dữ liệu ngẫu nhiên cho danh mục.
+- Đảm bảo cơ sở dữ liệu sau khi tích hợp có ít nhất **20 Categories** phục vụ truy vấn và thống kê.

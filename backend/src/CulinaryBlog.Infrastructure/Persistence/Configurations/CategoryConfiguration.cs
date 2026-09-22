@@ -4,10 +4,56 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace CulinaryBlog.Infrastructure.Persistence.Configurations;
 
-public class CategoryConfiguration: IEntityTypeConfiguration<Category>
+public class CategoryConfiguration : IEntityTypeConfiguration<Category>
 {
     public void Configure(EntityTypeBuilder<Category> builder)
     {
+        builder.ToTable("Categories");
+
+        builder.HasKey(c => c.Id);
+
+        builder.Property(c => c.Name)
+            .IsRequired()
+            .HasMaxLength(100);
+
+        builder.Property(c => c.Slug)
+            .IsRequired()
+            .HasMaxLength(120);
+
+        builder.Property(c => c.Description)
+            .HasColumnType("text");
+
+        builder.Property(c => c.ImageUrl)
+            .HasMaxLength(500);
+
+        builder.Property(c => c.OrderIndex)
+            .HasDefaultValue(0);
+
+        builder.Property(c => c.RowVersion)
+            .IsRowVersion()
+            .IsConcurrencyToken();
+
+        // ── Indexes ───────────────────────────────────────────────────────────
+        builder.HasIndex(c => c.Slug)
+            .IsUnique();
+
+        builder.HasIndex(c => c.Name);
+
+        builder.HasIndex(c => c.OrderIndex);
+
+        // ── Global Query Filter (Soft Delete) ─────────────────────────────────
+        builder.HasQueryFilter(c => !c.IsDeleted);
+
+        // ── Relationships ─────────────────────────────────────────────────────
+        builder.HasMany(c => c.Recipes)
+            .WithOne(r => r.Category)
+            .HasForeignKey(r => r.CategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Navigation(c => c.Recipes)
+            .UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // ── Seed Data ban đầu (5 danh mục cơ bản) ──────────────────────────────
         builder.HasData(
             new
             {
@@ -63,11 +109,11 @@ public class CategoryConfiguration: IEntityTypeConfiguration<Category>
     }
 
     private static readonly Guid[] CategoryIds =
-[
-    Guid.Parse("10000000-0000-0000-0000-000000000001"),
-    Guid.Parse("10000000-0000-0000-0000-000000000002"),
-    Guid.Parse("10000000-0000-0000-0000-000000000003"),
-    Guid.Parse("10000000-0000-0000-0000-000000000004"),
-    Guid.Parse("10000000-0000-0000-0000-000000000005")
-];
+    [
+        Guid.Parse("10000000-0000-0000-0000-000000000001"),
+        Guid.Parse("10000000-0000-0000-0000-000000000002"),
+        Guid.Parse("10000000-0000-0000-0000-000000000003"),
+        Guid.Parse("10000000-0000-0000-0000-000000000004"),
+        Guid.Parse("10000000-0000-0000-0000-000000000005")
+    ];
 }
