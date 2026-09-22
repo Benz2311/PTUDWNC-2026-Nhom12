@@ -1,0 +1,12 @@
+D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Domain\bin\Debug\net10.0\CulinaryBlog.Domain.deps.json
+D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Domain\bin\Debug\net10.0\CulinaryBlog.Domain.dll
+D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Domain\bin\Debug\net10.0\CulinaryBlog.Domain.pdb
+D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Domain\obj\Debug\net10.0\CulinaryBlog.Domain.GeneratedMSBuildEditorConfig.editorconfig
+D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Domain\obj\Debug\net10.0\CulinaryBlog.Domain.AssemblyInfoInputs.cache
+D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Domain\obj\Debug\net10.0\CulinaryBlog.Domain.AssemblyInfo.cs
+D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Domain\obj\Debug\net10.0\CulinaryBlog.Domain.csproj.CoreCompileInputs.cache
+D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Domain\obj\Debug\net10.0\CulinaryBlog.Domain.sourcelink.json
+D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Domain\obj\Debug\net10.0\CulinaryBlog.Domain.dll
+D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Domain\obj\Debug\net10.0\refint\CulinaryBlog.Domain.dll
+D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Domain\obj\Debug\net10.0\CulinaryBlog.Domain.pdb
+D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Domain\obj\Debug\net10.0\ref\CulinaryBlog.Domain.dll
