@@ -1,4 +1,4 @@
-using CulinaryBlog.Domain.Entities;
+﻿using CulinaryBlog.Domain.Entities;
 using CulinaryBlog.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,9 +8,135 @@ public static class RecipeSeedData
 {
     private const string DemoUserId = "11111111-1111-1111-1111-111111111111";
 
-    public static async Task InitializeAsync(ApplicationDbContext db, CancellationToken cancellationToken = default)
+    private static readonly Random Random = new(20260922);
+
+    private static readonly string[] RecipeBases =
+    [
+        "Phở bò",
+        "Bún thịt nướng",
+        "Cơm chiên",
+        "Gỏi cuốn",
+        "Bún chả",
+        "Canh chua",
+        "Cá kho",
+        "Thịt kho",
+        "Bánh xèo",
+        "Chả giò",
+        "Mì Ý",
+        "Pizza rau củ",
+        "Pasta sốt kem",
+        "Salad gà",
+        "Cơm cà ri",
+        "Mì xào",
+        "Gà nướng",
+        "Bò xào rau củ",
+        "Cá áp chảo",
+        "Súp bí đỏ",
+        "Đậu hũ kho",
+        "Nấm xào",
+        "Rau củ nướng",
+        "Cháo gà",
+        "Chè hạt sen",
+        "Bánh chuối",
+        "Pudding sữa",
+        "Sinh tố xoài",
+        "Kem dừa",
+        "Bánh flan"
+    ];
+
+    private static readonly string[] IngredientNames =
+    [
+        "Thịt bò",
+        "Thịt heo",
+        "Thịt gà",
+        "Thịt vịt",
+        "Cá hồi",
+        "Cá basa",
+        "Tôm",
+        "Mực",
+        "Trứng gà",
+        "Đậu hũ",
+        "Nấm hương",
+        "Nấm rơm",
+        "Cà rốt",
+        "Khoai tây",
+        "Khoai lang",
+        "Bí đỏ",
+        "Bông cải xanh",
+        "Đậu que",
+        "Đậu Hà Lan",
+        "Cà chua",
+        "Dưa leo",
+        "Hành tây",
+        "Hành lá",
+        "Tỏi",
+        "Gừng",
+        "Sả",
+        "Ớt",
+        "Rau mùi",
+        "Húng quế",
+        "Chanh",
+        "Me",
+        "Dứa",
+        "Xoài",
+        "Chuối",
+        "Chanh dây",
+        "Bánh phở",
+        "Bún tươi",
+        "Mì spaghetti",
+        "Mì trứng",
+        "Gạo",
+        "Cơm nguội",
+        "Bột mì",
+        "Bột gạo",
+        "Bột bắp",
+        "Nước tương",
+        "Nước mắm",
+        "Dầu ăn",
+        "Dầu ô liu",
+        "Đường",
+        "Muối",
+        "Tiêu",
+        "Đường phèn",
+        "Nước cốt dừa",
+        "Sữa tươi",
+        "Phô mai",
+        "Bơ",
+        "Giấm",
+        "Dầu hào",
+        "Tương ớt",
+        "Rau cải",
+        "Xà lách",
+        "Ngô ngọt",
+        "Hạt sen",
+        "Long nhãn",
+        "Đậu đỏ",
+        "Mè trắng",
+        "Đậu phộng",
+        "Hạt điều"
+    ];
+
+    private static readonly string[] Units =
+    [
+        "g",
+        "kg",
+        "ml",
+        "l",
+        "quả",
+        "củ",
+        "bó",
+        "muỗng canh",
+        "muỗng cà phê",
+        "chén"
+    ];
+
+    public static async Task InitializeAsync(
+        ApplicationDbContext db,
+        CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == DemoUserId, cancellationToken);
+        var user = await db.Users
+            .SingleOrDefaultAsync(item => item.Id == DemoUserId, cancellationToken);
+
         if (user is null)
         {
             user = new ApplicationUser
@@ -22,7 +148,9 @@ public static class RecipeSeedData
                 PasswordHash = "seeded-demo-password",
                 EmailConfirmed = true
             };
+
             db.Users.Add(user);
+            await db.SaveChangesAsync(cancellationToken);
         }
 
         var categories = new[]
@@ -36,72 +164,180 @@ public static class RecipeSeedData
 
         foreach (var category in categories)
         {
-            if (!await db.Categories.AnyAsync(item => item.Slug == category.Slug, cancellationToken))
+            var exists = await db.Categories
+                .AnyAsync(item => item.Slug == category.Slug, cancellationToken);
+
+            if (!exists)
             {
                 db.Categories.Add(category);
             }
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
         var categoryBySlug = await db.Categories
-            .Where(item => categories.Select(category => category.Slug).Contains(item.Slug))
+            .Where(item => categories
+                .Select(category => category.Slug)
+                .Contains(item.Slug))
             .ToDictionaryAsync(item => item.Slug, cancellationToken);
 
-        var recipes = new[]
-        {
-            CreateRecipe("rcp-001", "Phở bò truyền thống", "cat-001", "Nước dùng trong, thơm mùi quế hồi và thịt bò mềm.", "Nấu nước dùng từ xương bò với gừng nướng, hành nướng và gia vị phở. Trụng bánh phở, xếp thịt rồi chan nước dùng nóng.", 20, 180, DifficultyLevel.Medium, 420, 32, 48, 12, 3, new[] { ("Xương bò", "1", "kg"), ("Bánh phở", "500", "g"), ("Thịt bò", "400", "g") }),
-            CreateRecipe("rcp-002", "Cơm chiên rau củ", "cat-002", "Món cơm nhanh gọn, nhiều màu sắc và dễ biến tấu.", "Phi thơm hành tỏi, xào rau củ, thêm cơm nguội và nêm vừa ăn. Đảo trên lửa lớn đến khi hạt cơm tơi.", 10, 25, DifficultyLevel.Easy, 360, 10, 55, 9, 5, new[] { ("Cơm nguội", "3", "chén"), ("Cà rốt", "1", "củ"), ("Đậu Hà Lan", "100", "g") }),
-            CreateRecipe("rcp-003", "Mì Ý sốt cà chua", "cat-003", "Mì Ý đơn giản với sốt cà chua tươi và rau thơm.", "Luộc mì al dente. Xào tỏi với dầu ô liu, thêm cà chua và nấu đến khi sốt sánh, trộn cùng mì.", 15, 30, DifficultyLevel.Easy, 390, 14, 62, 11, 6, new[] { ("Mì spaghetti", "200", "g"), ("Cà chua", "4", "quả"), ("Dầu ô liu", "2", "muỗng canh") }),
-            CreateRecipe("rcp-004", "Đậu hũ kho nấm", "cat-004", "Món chay đậm vị, dùng ngon cùng cơm nóng.", "Chiên sơ đậu hũ, xào nấm rồi thêm nước tương và gia vị. Kho nhỏ lửa đến khi nước sốt áo đều.", 18, 35, DifficultyLevel.Easy, 280, 18, 24, 12, 8, new[] { ("Đậu hũ", "400", "g"), ("Nấm", "200", "g"), ("Nước tương", "2", "muỗng canh") }),
-            CreateRecipe("rcp-005", "Chè hạt sen long nhãn", "cat-005", "Món tráng miệng thanh nhẹ, thơm dịu.", "Nấu mềm hạt sen, thêm đường phèn rồi cho long nhãn vào sau cùng để giữ độ giòn.", 20, 45, DifficultyLevel.Medium, 220, 6, 38, 2, 4, new[] { ("Hạt sen", "150", "g"), ("Long nhãn", "100", "g"), ("Đường phèn", "80", "g") })
-        };
+        // Tạo dữ liệu ngẫu nhiên cho đến khi database có ít nhất 100 Recipes.
+        var existingRecipeCount = await db.Recipes.CountAsync(cancellationToken);
+        var recipesToCreate = Math.Max(0, 100 - existingRecipeCount);
 
-        foreach (var recipe in recipes)
+        for (var i = 0; i < recipesToCreate; i++)
         {
-            if (await db.Recipes.AnyAsync(item => item.Slug == recipe.Slug, cancellationToken))
-            {
-                continue;
-            }
+            var recipeNumber = existingRecipeCount + i + 1;
 
-            recipe.AuthorId = DemoUserId;
-            var categorySlug = recipe.Category.Slug;
-            recipe.CategoryId = categoryBySlug[categorySlug].Id;
-            recipe.Category = null!;
+            var category = categories[Random.Next(categories.Length)];
+            var categoryEntity = categoryBySlug[category.Slug];
+
+            var recipe = CreateRandomRecipe(
+                recipeNumber,
+                categoryEntity);
+
             db.Recipes.Add(recipe);
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // Đảm bảo tất cả Recipes, kể cả 5 Recipes cũ,
+        // đều có ít nhất 10 Ingredients.
+        var allRecipes = await db.Recipes
+            .Include(recipe => recipe.Ingredients)
+            .ToListAsync(cancellationToken);
+
+        foreach (var recipe in allRecipes)
+{
+    var missingIngredients = 10 - recipe.Ingredients.Count;
+
+    if (missingIngredients <= 0)
+    {
+        continue;
     }
 
-    private static Category CreateCategory(string slug, string name, string description) =>
-        new() { Slug = slug, Name = name, Description = description };
+    var selectedIngredients = IngredientNames
+        .OrderBy(_ => Random.Next())
+        .Take(missingIngredients)
+        .ToArray();
 
-    private static Recipe CreateRecipe(string slug, string title, string categorySlug, string description, string content, int prepTimeMinutes, int cookTime, DifficultyLevel difficulty, decimal calories, decimal protein, decimal carbohydrates, decimal fat, decimal fiber, (string Name, string Quantity, string Unit)[] ingredients) =>
+    var startOrder = recipe.Ingredients.Count;
+
+    for (var i = 0; i < selectedIngredients.Length; i++)
+    {
+        // Add trực tiếp vào DbSet RecipeIngredients thay vì dùng Navigation Property
+        db.RecipeIngredients.Add(new RecipeIngredient
+        {
+            RecipeId = recipe.Id, // Gán Id của Recipe
+            Name = selectedIngredients[i],
+            Quantity = RandomQuantity(),
+            Unit = Units[Random.Next(Units.Length)],
+            Notes = Random.Next(4) == 0
+                ? "Có thể điều chỉnh theo khẩu vị."
+                : null,
+            SortOrder = startOrder + i
+        });
+    }
+}
+
+await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static Category CreateCategory(
+        string slug,
+        string name,
+        string description) =>
         new()
         {
             Slug = slug,
-            Title = title,
-            Category = new Category { Slug = categorySlug },
-            Description = description,
-            Content = content,
-            PrepTimeMinutes = prepTimeMinutes,
-            CookTimeMinutes = cookTime,
-            Difficulty = difficulty,
-            Status = RecipeStatus.Published,
-            Nutrition = new RecipeNutrition
-            {
-                Calories = calories,
-                Protein = protein,
-                Carbohydrates = carbohydrates,
-                Fat = fat,
-                Fiber = fiber
-            },
-            Ingredients = ingredients.Select((ingredient, index) => new RecipeIngredient
-            {
-                Name = ingredient.Name,
-                Quantity = decimal.TryParse(ingredient.Quantity, out var quantity) ? quantity : null,
-                Unit = ingredient.Unit,
-                SortOrder = index
-            }).ToList()
+            Name = name,
+            Description = description
         };
+
+    private static Recipe CreateRandomRecipe(
+        int recipeNumber,
+        Category category)
+    {
+        var baseName = RecipeBases[Random.Next(RecipeBases.Length)];
+
+        var title = $"{baseName} phiên bản {recipeNumber:000}";
+        var slug = $"recipe-{recipeNumber:000}";
+
+        var prepTime = Random.Next(5, 46);
+        var cookTime = Random.Next(10, 121);
+        var servings = Random.Next(1, 7);
+
+        var ingredients = CreateRandomIngredients();
+
+        var nutrition = new RecipeNutrition
+        {
+            Calories = RandomDecimal(180, 850),
+            Protein = RandomDecimal(5, 45),
+            Carbohydrates = RandomDecimal(10, 100),
+            Fat = RandomDecimal(3, 40),
+            Fiber = RandomDecimal(1, 15),
+            Sodium = RandomDecimal(50, 1200)
+        };
+
+        return new Recipe
+        {
+            AuthorId = DemoUserId,
+            CategoryId = category.Id,
+            Title = title,
+            Slug = slug,
+            Description =
+                $"Công thức {baseName.ToLowerInvariant()} được sinh tự động " +
+                $"với dữ liệu nguyên liệu và dinh dưỡng ngẫu nhiên.",
+            Content =
+                $"Chuẩn bị nguyên liệu, sơ chế và nấu {baseName.ToLowerInvariant()} " +
+                $"trong khoảng {cookTime} phút. Nêm nếm phù hợp với khẩu vị.",
+            PrepTimeMinutes = prepTime,
+            CookTimeMinutes = cookTime,
+            Servings = servings,
+            Difficulty = RandomDifficulty(),
+            Status = RecipeStatus.Published,
+            PublishedAt = DateTime.UtcNow.AddDays(-Random.Next(0, 365)),
+            Nutrition = nutrition,
+            Ingredients = ingredients
+        };
+    }
+
+    private static List<RecipeIngredient> CreateRandomIngredients()
+    {
+        var count = Random.Next(10, 16);
+
+        return IngredientNames
+            .OrderBy(_ => Random.Next())
+            .Take(count)
+            .Select((name, index) => new RecipeIngredient
+            {
+                Name = name,
+                Quantity = RandomQuantity(),
+                Unit = Units[Random.Next(Units.Length)],
+                Notes = Random.Next(5) == 0
+                    ? "Có thể thay thế bằng nguyên liệu tương đương."
+                    : null,
+                SortOrder = index
+            })
+            .ToList();
+    }
+
+    private static decimal RandomQuantity()
+    {
+        var value = Random.Next(1, 501);
+
+        return Math.Round(value / 10m, 1);
+    }
+
+    private static decimal RandomDecimal(decimal min, decimal max)
+    {
+        var value = (decimal)Random.NextDouble() * (max - min) + min;
+
+        return Math.Round(value, 2);
+    }
+
+    private static DifficultyLevel RandomDifficulty()
+    {
+        return (DifficultyLevel)Random.Next(1, 5);
+    }
 }

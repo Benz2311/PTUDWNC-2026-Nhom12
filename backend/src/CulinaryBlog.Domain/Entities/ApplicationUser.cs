@@ -1,16 +1,26 @@
-using CulinaryBlog.Domain.Common;
-
 namespace CulinaryBlog.Domain.Entities;
 
-public class ApplicationUser : BaseEntity
+public class ApplicationUser
 {
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string? NormalizedUserName { get; set; }
+    public string? NormalizedEmail { get; set; }
+    public string? SecurityStamp { get; set; }
+    public string? ConcurrencyStamp { get; set; }
+    public string? PhoneNumber { get; set; }
+    public bool TwoFactorEnabled { get; set; }
+    public DateTimeOffset? LockoutEnd { get; set; }
+    public bool LockoutEnabled { get; set; } = true;
+    public int AccessFailedCount { get; set; }
     public string FullName { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
     public string? PasswordHash { get; set; }
     public bool EmailConfirmed { get; set; }
-    public ICollection<string> Roles { get; set; } = new List<string>();
+    public string[] Roles { get; set; } = ["Author"];
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public ICollection<Recipe> Recipes { get; set; } = new List<Recipe>();
