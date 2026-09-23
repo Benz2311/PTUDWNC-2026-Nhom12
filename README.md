@@ -96,6 +96,60 @@
 - Xử lý các điểm chưa thống nhất giữa Entity và Configuration thuộc chức năng Step & Image.
 - Xây dựng dữ liệu ngẫu nhiên cho các bước chế biến và hình ảnh.
 - Đảm bảo mỗi Recipe sau khi tích hợp có ít nhất **5 bước chế biến**.
+--------------------------------------------------------------------------------------------
+# Bữa 3 - Thiết kế dữ liệu và tối ưu truy vấn
+
+**Mục tiêu:** Hoàn thiện Repository, Unit of Work, tối ưu các truy vấn dữ liệu, kiểm tra Index và triển khai Full-Text Search theo nội dung Chương 3; đảm bảo từng thành viên tiếp tục xử lý đúng nhóm Entity đã được phân công.
+
+## Nguyễn Văn Quốc - User/Auth
+
+- Rà soát các truy vấn liên quan đến `ApplicationUser` và `RefreshToken`.
+- Kiểm tra việc sử dụng Repository và Unit of Work cho chức năng User/Auth.
+- Tối ưu các truy vấn đăng nhập, lấy thông tin người dùng và Refresh Token.
+- Sử dụng `AsNoTracking()` cho các truy vấn chỉ đọc khi phù hợp.
+- Kiểm tra các Index phục vụ tra cứu thường xuyên như Email, UserName và Refresh Token.
+- Kiểm tra SQL được EF Core sinh ra và xử lý các truy vấn lấy dư dữ liệu nếu có.
+- Kiểm thử các truy vấn User/Auth sau khi tối ưu.
+
+## Lê Thị Ánh Nhung - Category & Recipe Read
+
+- Rà soát `Category` và các truy vấn đọc dữ liệu liên quan đến Recipe.
+- Hoàn thiện các truy vấn danh sách Recipe, chi tiết Recipe và Recipe theo Category.
+- Hoàn thiện Filter, Sort và Pagination cho danh sách Recipe.
+- Sử dụng `AsNoTracking()` cho các truy vấn chỉ đọc.
+- Sử dụng Projection/DTO để chỉ lấy các trường dữ liệu cần thiết.
+- Kiểm tra và xử lý N+1 Query Problem trong các truy vấn Category và Recipe.
+- Sử dụng `Include()` và `AsSplitQuery()` khi cần lấy nhiều dữ liệu liên quan.
+- Kiểm tra các Index phục vụ truy vấn như `CategoryId`, `Status`, `CreatedAt` và `Slug`.
+- Sử dụng `EXPLAIN ANALYZE` để kiểm tra các truy vấn GetAll, GetById và GetByCategory.
+- Kiểm thử Filter, Sort, Pagination và các truy vấn đọc sau khi tối ưu.
+
+## Phạm Nguyễn Ngọc Phước - Recipe & Ingredient
+
+- Rà soát cấu hình dữ liệu của `Recipe`, `RecipeIngredient` và `RecipeNutrition`.
+- Kiểm tra lại quan hệ giữa Recipe, User, Category và RecipeIngredient.
+- Kiểm tra cấu hình `RecipeNutrition` dưới dạng Owned Entity.
+- Kiểm tra các Index của Recipe như `Slug`, `AuthorId`, `CategoryId`, `Status` và `CreatedAt`.
+- Hoàn thiện Repository và Unit of Work cho các thao tác ghi dữ liệu Recipe.
+- Kiểm tra việc sử dụng `SaveChangesAsync()` và Transaction trong các nghiệp vụ cập nhật dữ liệu.
+- Tối ưu các truy vấn kiểm tra Slug và truy vấn lấy Recipe phục vụ Create/Update/Delete.
+- Tạo và Apply Migration nếu cấu trúc dữ liệu có thay đổi.
+- Kiểm thử các thao tác ghi dữ liệu Recipe và Ingredient sau khi tích hợp.
+
+## Võ Hùng Mạnh - Step, Image & Full-Text Search
+
+- Rà soát `RecipeStep`, `RecipeImage` và các Configuration tương ứng.
+- Kiểm tra quan hệ giữa `RecipeStep`, `RecipeImage` và `Recipe`.
+- Kiểm tra thứ tự các bước chế biến bằng `StepNumber`.
+- Kiểm tra thứ tự hiển thị hình ảnh bằng `SortOrder` và ảnh chính của Recipe.
+- Tối ưu các truy vấn đọc Step và Image bằng `AsNoTracking()` khi phù hợp.
+- Kiểm tra việc load Step/Image trong Recipe Detail để hạn chế N+1 Query.
+- Triển khai Full-Text Search cho Recipe bằng PostgreSQL.
+- Cấu hình `SearchVector` và GIN Index phục vụ tìm kiếm.
+- Sử dụng `PlainToTsQuery()` và `unaccent` để hỗ trợ tìm kiếm tiếng Việt không dấu.
+- Kiểm thử tìm kiếm từ khóa `"pho bo"` và đảm bảo có thể tìm được Recipe `"Phở bò"`.
+- Tạo Migration cho SearchVector/GIN Index nếu cần.
+- Kiểm thử lại Step, Image và Full-Text Search sau khi tích hợp.
 
 # Cài đặt PostgreSQL bằng Docker
 
