@@ -37,11 +37,6 @@ public class RecipeConfiguration
 
         builder.HasIndex(r => r.CreatedAt);
 
-        builder.HasOne(r => r.Category)
-            .WithMany(c => c.Recipes)
-            .HasForeignKey(r => r.CategoryId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         builder.HasQueryFilter(r => !r.IsDeleted);
     }
 }

@@ -30,8 +30,8 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .HasDefaultValue(0);
 
         builder.Property(c => c.RowVersion)
-            .IsRowVersion()
-            .IsConcurrencyToken();
+            .IsConcurrencyToken()
+            .IsRequired(false);
 
         // ── Indexes ───────────────────────────────────────────────────────────
         builder.HasIndex(c => c.Slug)

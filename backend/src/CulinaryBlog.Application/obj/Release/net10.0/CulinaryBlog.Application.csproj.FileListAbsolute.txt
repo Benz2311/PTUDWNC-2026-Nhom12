@@ -1,0 +1,16 @@
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\bin\Release\net10.0\CulinaryBlog.Application.deps.json
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\bin\Release\net10.0\CulinaryBlog.Application.dll
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\bin\Release\net10.0\CulinaryBlog.Application.pdb
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\bin\Release\net10.0\CulinaryBlog.Domain.dll
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\bin\Release\net10.0\CulinaryBlog.Domain.pdb
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Release\net10.0\CulinaryBlog.Application.csproj.AssemblyReference.cache
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Release\net10.0\CulinaryBlog.Application.GeneratedMSBuildEditorConfig.editorconfig
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Release\net10.0\CulinaryBlog.Application.AssemblyInfoInputs.cache
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Release\net10.0\CulinaryBlog.Application.AssemblyInfo.cs
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Release\net10.0\CulinaryBlog.Application.csproj.CoreCompileInputs.cache
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Release\net10.0\CulinaryBlog.Application.sourcelink.json
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Release\net10.0\Culinary.995F3C4F.Up2Date
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Release\net10.0\CulinaryBlog.Application.dll
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Release\net10.0\refint\CulinaryBlog.Application.dll
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Release\net10.0\CulinaryBlog.Application.pdb
+D:\BaoCao\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Release\net10.0\ref\CulinaryBlog.Application.dll

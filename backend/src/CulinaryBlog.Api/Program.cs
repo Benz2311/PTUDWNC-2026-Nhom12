@@ -3,45 +3,83 @@ using CulinaryBlog.Application;
 using CulinaryBlog.Infrastructure;
 using CulinaryBlog.Infrastructure.Persistence;
 using CulinaryBlog.Infrastructure.Persistence.Seed;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+// ── Serilog — cấu hình trước khi build host ──────────────────────────────────
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(new ConfigurationBuilder()
+        .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+        .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true)
+        .AddEnvironmentVariables()
+        .Build())
+    .Enrich.FromLogContext()
+    .CreateLogger();
 
-builder.Services.AddApplication();
-
-builder.Services.AddInfrastructure(
-    builder.Configuration);
-
-builder.Services.AddOpenApi();
-
-builder.Services.AddCors(options =>
+try
 {
-    options.AddPolicy("Frontend", policy =>
+    Log.Information("Starting CulinaryBlog API");
+
+    var builder = WebApplication.CreateBuilder(args);
+
+    // Dùng Serilog thay thế logging mặc định
+    builder.Host.UseSerilog();
+
+    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(builder.Configuration);
+
+    builder.Services.AddOpenApi();
+
+    builder.Services.AddCors(options =>
     {
-        policy
-            .WithOrigins("http://localhost:5000", "http://localhost:3000")
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+        options.AddPolicy("Frontend", policy =>
+        {
+            policy
+                .WithOrigins("http://localhost:5000", "http://localhost:3000")
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
     });
-});
 
-var app = builder.Build();
+    var app = builder.Build();
 
-// Tự động apply migrations và seed dữ liệu danh mục ban đầu (đảm bảo ít nhất 20 categories)
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await dbContext.Database.MigrateAsync();
-    await CategoryDataSeeder.SeedAsync(dbContext, targetCount: 20);
+    // ── Migrate + Seed ────────────────────────────────────────────────────────
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.MigrateAsync();
+        await CategoryDataSeeder.SeedAsync(dbContext, targetCount: 20);
+    }
+
+    // ── Middleware pipeline ───────────────────────────────────────────────────
+    app.MapOpenApi();
+    app.MapScalarApiReference();
+
+    app.UseCors("Frontend");
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    // Hangfire Dashboard (chỉ môi trường dev)
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseHangfireDashboard("/hangfire");
+    }
+
+    // Serilog request logging
+    app.UseSerilogRequestLogging();
+
+    app.MapCategoryEndpoints();
+
+    app.Run();
 }
-
-app.MapOpenApi();
-
-app.MapScalarApiReference();
-
-app.UseCors("Frontend");
-
-app.MapCategoryEndpoints();
-
-app.Run();
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

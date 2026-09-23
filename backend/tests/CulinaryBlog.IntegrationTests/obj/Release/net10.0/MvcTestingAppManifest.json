@@ -1,0 +1,6 @@
+{
+  "CulinaryBlog.API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api",
+  "CulinaryBlog.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application",
+  "CulinaryBlog.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Domain",
+  "CulinaryBlog.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure"
+}
