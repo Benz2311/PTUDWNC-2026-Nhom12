@@ -15,103 +15,45 @@ await using var db =
 
 try
 {
-    Console.WriteLine("Đang kiểm tra kết nối PostgreSQL...");
+    // =========================================================
+    // 1. KIỂM TRA KẾT NỐI POSTGRESQL
+    // =========================================================
+
+    Console.WriteLine(
+        "Đang kiểm tra kết nối PostgreSQL...");
 
     if (!await db.Database.CanConnectAsync())
     {
-        Console.WriteLine("Không thể kết nối PostgreSQL.");
+        Console.WriteLine(
+            "Không thể kết nối PostgreSQL.");
+
         return;
     }
 
-    Console.WriteLine("Kết nối PostgreSQL thành công.");
+    Console.WriteLine(
+        "Kết nối PostgreSQL thành công.");
+
     Console.WriteLine();
 
     // =========================================================
-    // 1. TẠO RECIPE MẪU NẾU DATABASE CHƯA CÓ RECIPE
+    // 2. SEED CATEGORY + RECIPE BẰNG BOGUS
     // =========================================================
 
-    if (!await db.Recipes.AnyAsync())
-    {
-        Console.WriteLine(
-            "Chưa có Recipe. Đang tạo dữ liệu Recipe mẫu...");
+    Console.WriteLine(
+        "Đang sinh dữ liệu Category và Recipe bằng Bogus...");
 
-        var demoUserId = Guid.NewGuid();
+    await CategoryDataSeeder.SeedAsync(
+        db,
+        targetCount: 20,
+        minRecipesPerCategory: 3);
 
-        var demoUser = new ApplicationUser
-        {
-            Id = demoUserId,
-            UserName = "demo_user",
-            Email = "demo@culinary.local",
-            PasswordHash = "demo",
-            DisplayName = "Demo User",
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow
-        };
+    Console.WriteLine(
+        "Hoàn tất seed Category và Recipe.");
 
-        db.Users.Add(demoUser);
-
-        var demoCategory = Category.Create(
-            name: "Món ăn mẫu",
-            slug: "mon-an-mau",
-            description: "Danh mục mẫu để kiểm tra Step và Image",
-            imageUrl: null,
-            orderIndex: 1
-        );
-
-        db.Categories.Add(demoCategory);
-
-        await db.SaveChangesAsync();
-
-        for (var i = 1; i <= 10; i++)
-        {
-            var recipe = new Recipe
-            {
-                Id = Guid.NewGuid(),
-
-                AuthorId = demoUserId,
-
-                CategoryId = demoCategory.Id,
-
-                Title = $"Món ăn mẫu {i}",
-
-                Slug = $"mon-an-mau-{i}",
-
-                Description =
-                    $"Recipe mẫu số {i} dùng để kiểm tra dữ liệu Step và Image.",
-
-                Content =
-                    $"Nội dung Recipe mẫu số {i}.",
-
-                PrepTimeMinutes = 10,
-
-                CookTimeMinutes = 20,
-
-                Servings = 2,
-
-                Difficulty =
-                    CulinaryBlog.Domain.Enums.DifficultyLevel.Easy,
-
-                Status =
-                    CulinaryBlog.Domain.Enums.RecipeStatus.Published,
-
-                CreatedAt = DateTime.UtcNow,
-
-                IsDeleted = false,
-
-                RowVersion = new byte[8]
-            };
-
-            db.Recipes.Add(recipe);
-        }
-
-        await db.SaveChangesAsync();
-
-        Console.WriteLine("Đã tạo 10 Recipe mẫu.");
-        Console.WriteLine();
-    }
+    Console.WriteLine();
 
     // =========================================================
-    // 2. LẤY DANH SÁCH RECIPE
+    // 3. LẤY DANH SÁCH RECIPE SAU KHI ĐÃ SEED
     // =========================================================
 
     var recipes = await db.Recipes
@@ -132,28 +74,34 @@ try
     Console.WriteLine();
 
     // =========================================================
-    // 3. SINH RECIPE STEP
+    // 4. SINH RECIPE STEP
     // =========================================================
 
     Console.WriteLine(
         "Đang sinh dữ liệu RecipeStep...");
 
-    var recipeIdsHavingSteps = await db.RecipeSteps
-        .Select(x => x.RecipeId)
-        .Distinct()
-        .ToListAsync();
+    var recipeIdsHavingSteps =
+        await db.RecipeSteps
+            .Select(x => x.RecipeId)
+            .Distinct()
+            .ToListAsync();
 
-    var recipesWithoutSteps = recipes
-        .Where(recipe =>
-            !recipeIdsHavingSteps.Contains(recipe.Id))
-        .ToList();
+    var recipesWithoutSteps =
+        recipes
+            .Where(
+                recipe =>
+                    !recipeIdsHavingSteps
+                        .Contains(recipe.Id))
+            .ToList();
 
     if (recipesWithoutSteps.Count > 0)
     {
         var steps =
-            RecipeStepSeeder.Generate(recipesWithoutSteps);
+            RecipeStepSeeder.Generate(
+                recipesWithoutSteps);
 
-        await db.RecipeSteps.AddRangeAsync(steps);
+        await db.RecipeSteps
+            .AddRangeAsync(steps);
 
         await db.SaveChangesAsync();
 
@@ -170,28 +118,34 @@ try
     Console.WriteLine();
 
     // =========================================================
-    // 4. SINH RECIPE IMAGE
+    // 5. SINH RECIPE IMAGE
     // =========================================================
 
     Console.WriteLine(
         "Đang sinh dữ liệu RecipeImage...");
 
-    var recipeIdsHavingImages = await db.RecipeImages
-        .Select(x => x.RecipeId)
-        .Distinct()
-        .ToListAsync();
+    var recipeIdsHavingImages =
+        await db.RecipeImages
+            .Select(x => x.RecipeId)
+            .Distinct()
+            .ToListAsync();
 
-    var recipesWithoutImages = recipes
-        .Where(recipe =>
-            !recipeIdsHavingImages.Contains(recipe.Id))
-        .ToList();
+    var recipesWithoutImages =
+        recipes
+            .Where(
+                recipe =>
+                    !recipeIdsHavingImages
+                        .Contains(recipe.Id))
+            .ToList();
 
     if (recipesWithoutImages.Count > 0)
     {
         var images =
-            RecipeImageSeeder.Generate(recipesWithoutImages);
+            RecipeImageSeeder.Generate(
+                recipesWithoutImages);
 
-        await db.RecipeImages.AddRangeAsync(images);
+        await db.RecipeImages
+            .AddRangeAsync(images);
 
         await db.SaveChangesAsync();
 
@@ -208,8 +162,11 @@ try
     Console.WriteLine();
 
     // =========================================================
-    // 5. KIỂM TRA KẾT QUẢ
+    // 6. KIỂM TRA KẾT QUẢ SAU KHI SEED
     // =========================================================
+
+    var categoryCount =
+        await db.Categories.CountAsync();
 
     var recipeCount =
         await db.Recipes.CountAsync();
@@ -220,22 +177,33 @@ try
     var imageCount =
         await db.RecipeImages.CountAsync();
 
-    var stepStatistics = await db.RecipeSteps
-        .GroupBy(x => x.RecipeId)
-        .Select(group => new
-        {
-            RecipeId = group.Key,
-            StepCount = group.Count()
-        })
-        .ToListAsync();
+    // =========================================================
+    // THỐNG KÊ STEP THEO RECIPE
+    // =========================================================
 
-    var recipeIdsWithSteps = stepStatistics
-        .Select(x => x.RecipeId)
-        .ToHashSet();
+    var stepStatistics =
+        await db.RecipeSteps
+            .GroupBy(x => x.RecipeId)
+            .Select(
+                group => new
+                {
+                    RecipeId = group.Key,
+                    StepCount = group.Count()
+                })
+            .ToListAsync();
+
+    var recipeIdsWithSteps =
+        stepStatistics
+            .Select(x => x.RecipeId)
+            .ToHashSet();
 
     var recipesWithoutAnyStep =
-        recipes.Count(recipe =>
-            !recipeIdsWithSteps.Contains(recipe.Id));
+        recipeCount == 0
+            ? 0
+            : recipes.Count(
+                recipe =>
+                    !recipeIdsWithSteps
+                        .Contains(recipe.Id));
 
     var recipesUnderFiveSteps =
         stepStatistics.Count(
@@ -247,9 +215,55 @@ try
                 x => x.StepCount)
             : 0;
 
-    Console.WriteLine("======================================");
-    Console.WriteLine("           KẾT QUẢ SEED DATA");
-    Console.WriteLine("======================================");
+    // =========================================================
+    // THỐNG KÊ IMAGE THEO RECIPE
+    // =========================================================
+
+    var imageStatistics =
+        await db.RecipeImages
+            .GroupBy(x => x.RecipeId)
+            .Select(
+                group => new
+                {
+                    RecipeId = group.Key,
+                    ImageCount = group.Count()
+                })
+            .ToListAsync();
+
+    var recipeIdsWithImages =
+        imageStatistics
+            .Select(x => x.RecipeId)
+            .ToHashSet();
+
+    var recipesWithoutAnyImage =
+        recipeCount == 0
+            ? 0
+            : recipes.Count(
+                recipe =>
+                    !recipeIdsWithImages
+                        .Contains(recipe.Id));
+
+    var minimumImages =
+        imageStatistics.Count > 0
+            ? imageStatistics.Min(
+                x => x.ImageCount)
+            : 0;
+
+    // =========================================================
+    // 7. IN KẾT QUẢ
+    // =========================================================
+
+    Console.WriteLine(
+        "======================================");
+
+    Console.WriteLine(
+        "           KẾT QUẢ SEED DATA");
+
+    Console.WriteLine(
+        "======================================");
+
+    Console.WriteLine(
+        $"Categories   : {categoryCount}");
 
     Console.WriteLine(
         $"Recipes      : {recipeCount}");
@@ -260,8 +274,10 @@ try
     Console.WriteLine(
         $"RecipeImages : {imageCount}");
 
+    Console.WriteLine();
+
     Console.WriteLine(
-        $"Ít nhất Step/Recipe: {minimumSteps}");
+        $"Ít nhất Step/Recipe : {minimumSteps}");
 
     Console.WriteLine(
         $"Recipe không có Step: {recipesWithoutAnyStep}");
@@ -270,6 +286,18 @@ try
         $"Recipe có dưới 5 Step: {recipesUnderFiveSteps}");
 
     Console.WriteLine();
+
+    Console.WriteLine(
+        $"Ít nhất Image/Recipe: {minimumImages}");
+
+    Console.WriteLine(
+        $"Recipe không có Image: {recipesWithoutAnyImage}");
+
+    Console.WriteLine();
+
+    // =========================================================
+    // 8. KIỂM TRA YÊU CẦU
+    // =========================================================
 
     if (
         recipeCount > 0 &&
@@ -285,22 +313,40 @@ try
             "CHƯA ĐẠT: Vẫn còn Recipe chưa đủ 5 bước.");
     }
 
+    if (
+        recipeCount > 0 &&
+        recipesWithoutAnyImage == 0)
+    {
+        Console.WriteLine(
+            "ĐẠT: Tất cả Recipe đều có ít nhất 1 Image.");
+    }
+    else
+    {
+        Console.WriteLine(
+            "CHƯA ĐẠT: Vẫn còn Recipe chưa có Image.");
+    }
+
     Console.WriteLine();
+
     Console.WriteLine(
         "Seed database hoàn tất.");
 }
 catch (Exception ex)
 {
     Console.WriteLine();
+
     Console.WriteLine(
         "Seed database thất bại.");
 
     Console.WriteLine();
-    Console.WriteLine(ex.Message);
+
+    Console.WriteLine(
+        ex.Message);
 
     if (ex.InnerException is not null)
     {
         Console.WriteLine();
+
         Console.WriteLine(
             "Inner exception:");
 
