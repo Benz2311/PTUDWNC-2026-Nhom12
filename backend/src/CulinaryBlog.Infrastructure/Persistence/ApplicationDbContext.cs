@@ -20,5 +20,8 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(ApplicationDbContext).Assembly);
+
+        modelBuilder.Entity<Recipe>()
+            .OwnsOne(r => r.Nutrition);
     }
 }
