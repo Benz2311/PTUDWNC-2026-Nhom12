@@ -93,7 +93,6 @@ public class RecipeRepository : IRecipeRepository
     {
         return _db.Recipes
             .AsNoTracking()
-            .AsSplitQuery()
             .Where(recipe =>
                 recipe.Slug == slug &&
                 recipe.Status == RecipeStatus.Published)
