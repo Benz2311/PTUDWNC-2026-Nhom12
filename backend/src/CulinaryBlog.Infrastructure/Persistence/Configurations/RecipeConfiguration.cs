@@ -31,6 +31,9 @@ public class RecipeConfiguration
         builder.Property(r => r.Status)
             .HasConversion<string>();
 
+        builder.HasIndex(r => r.Slug)
+            .IsUnique();
+
         builder.HasIndex(r => r.CategoryId);
 
         builder.HasIndex(r => r.Status);
