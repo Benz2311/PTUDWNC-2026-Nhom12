@@ -11,4 +11,6 @@ public class RefreshToken
     public bool IsRevoked { get; set; }
     public string? ReplacedByToken { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string? CreatedByIp { get; set; }
+    public byte[] RowVersion { get; set; } = new byte[16];
 }

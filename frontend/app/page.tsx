@@ -1,3 +1,5 @@
+import FeaturedRecipes from '@/components/discovery/FeaturedRecipes';
+
 const categories = [
   ["✨", "Tất cả"],
   ["🍜", "Món Việt"],
@@ -5,41 +7,6 @@ const categories = [
   ["🥗", "Ăn lành mạnh"],
   ["🍰", "Tráng miệng"],
   ["☕", "Đồ uống"],
-];
-
-const recipes = [
-  {
-    title: "Phở bò truyền thống",
-    description: "Nước dùng trong, thơm vị quế hồi và những lát bò mềm.",
-    tag: "Món Việt",
-    time: "45 phút",
-    rating: "4.9",
-    image: "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?auto=format&fit=crop&w=800&q=85",
-  },
-  {
-    title: "Gà nướng mật ong",
-    description: "Lớp da vàng óng, vị ngọt dịu và công thức thật dễ làm.",
-    tag: "Được yêu thích",
-    time: "60 phút",
-    rating: "4.8",
-    image: "https://images.unsplash.com/photo-1532550907401-a500c9a57435?auto=format&fit=crop&w=800&q=85",
-  },
-  {
-    title: "Bánh mì bò bít tết",
-    description: "Bữa sáng giòn thơm với nhân bò đậm đà kiểu nhà làm.",
-    tag: "Bữa sáng",
-    time: "25 phút",
-    rating: "4.7",
-    image: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=800&q=85",
-  },
-  {
-    title: "Pasta sốt kem",
-    description: "Món pasta mềm mượt, hoàn thành trong một chiếc chảo.",
-    tag: "Món Âu",
-    time: "30 phút",
-    rating: "4.9",
-    image: "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=800&q=85",
-  },
 ];
 
 export default function HomePage() {
@@ -55,14 +22,14 @@ export default function HomePage() {
         </a>
 
         <nav className="main-nav" aria-label="Điều hướng chính">
-          <a href="#recipes">Khám phá ẩm thực</a>
-          <a href="#recipes">Học nấu ăn</a>
+          <a href="/recipes">Khám phá ẩm thực</a>
+          <a href="/recipes/new">Học nấu ăn</a>
           <a href="#community">Kết nối cộng đồng</a>
         </nav>
 
         <div className="auth-actions">
-          <button className="text-button" type="button">Đăng nhập</button>
-          <button className="primary-button" type="button">Đăng ký miễn phí</button>
+          <a className="text-button" href="/login">Đăng nhập</a>
+          <a className="primary-button" href="/register">Đăng ký miễn phí</a>
         </div>
       </header>
 
@@ -78,7 +45,7 @@ export default function HomePage() {
               <div className="search-bar" role="search">
                 <span className="search-icon">⌕</span>
                 <input aria-label="Tìm công thức" placeholder="Tìm công thức, món ăn..." />
-                <button type="button">Tìm kiếm</button>
+                <a className="search-submit" href="/search">Tìm kiếm</a>
               </div>
               <div className="hero-note"><span>✦</span> Hơn 1.200 công thức đã được chia sẻ</div>
             </div>
@@ -94,9 +61,9 @@ export default function HomePage() {
           </div>
           <div className="category-row" aria-label="Danh mục món ăn">
             {categories.map(([icon, label]) => (
-              <button className="category" key={label} type="button">
+              <a className="category" href="/recipes" key={label}>
                 <span className="category-icon">{icon}</span>{label}
-              </button>
+              </a>
             ))}
           </div>
 
@@ -105,25 +72,9 @@ export default function HomePage() {
               <h2>Công thức nổi bật</h2>
               <p>Những món ăn được cộng đồng yêu thích tuần này.</p>
             </div>
-            <a className="section-link" href="#recipes">Xem tất cả →</a>
+            <a className="section-link" href="/recipes">Xem tất cả →</a>
           </div>
-          <div className="recipe-grid">
-            {recipes.map((recipe) => (
-              <article className="recipe-card" key={recipe.title}>
-                <div className="recipe-image" style={{ backgroundImage: `url(${recipe.image})` }}>
-                  <span className="recipe-tag">{recipe.tag}</span>
-                </div>
-                <div className="recipe-body">
-                  <h3>{recipe.title}</h3>
-                  <p>{recipe.description}</p>
-                  <div className="recipe-meta">
-                    <span>◷ {recipe.time}</span>
-                    <span className="rating">★ {recipe.rating}</span>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
+          <FeaturedRecipes />
 
           <section className="community-band" id="community">
             <div>
@@ -131,8 +82,8 @@ export default function HomePage() {
               <p>Lưu lại công thức yêu thích, viết câu chuyện của bạn và cùng kết nối với những người yêu bếp.</p>
             </div>
             <div className="community-actions">
-              <button className="outline-button" type="button">Khám phá thêm</button>
-              <button className="primary-button" type="button">Tham gia ngay</button>
+              <a className="outline-button" href="/recipes">Khám phá thêm</a>
+              <a className="primary-button" href="/register">Tham gia ngay</a>
             </div>
           </section>
 

@@ -1,3 +1,5 @@
+import DiscoveryBrowser from '@/components/discovery/DiscoveryBrowser';
+
 export default function ExplorePage() {
-  return <><div className="flow-kicker">Khám phá ẩm thực</div><h1 className="flow-title">Tìm cảm hứng cho bữa ăn tiếp theo.</h1><p className="flow-description">Khám phá món Việt, món Âu, món lành mạnh và những công thức đang được cộng đồng yêu thích.</p><div className="flow-panel-grid"><section className="flow-panel"><h2>Món nổi bật</h2><p>Công thức được đánh giá cao trong tuần.</p></section><section className="flow-panel"><h2>Danh mục</h2><p>Lọc theo khẩu vị, thời gian và độ khó.</p></section><section className="flow-panel"><h2>Cộng đồng</h2><p>Những câu chuyện và công thức mới nhất.</p></section></div></>;
+  return <><div className="flow-kicker">Khám phá ẩm thực</div><h1 className="flow-title">Tìm cảm hứng cho bữa ăn tiếp theo.</h1><p className="flow-description">Khám phá công thức đã xuất bản và lọc theo danh mục.</p><DiscoveryBrowser mode="explore" /></>;
 }

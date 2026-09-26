@@ -6,7 +6,7 @@ namespace CulinaryBlog.Domain.Entities;
 
 public class Recipe : BaseEntity
 {
-    public string AuthorId { get; set; } = string.Empty;
+    public Guid AuthorId { get; set; }
     public ApplicationUser Author { get; set; } = null!;
     public Guid CategoryId { get; set; }
     public Category Category { get; set; } = null!;
@@ -19,6 +19,7 @@ public class Recipe : BaseEntity
     public int Servings { get; set; } = 1;
     [NotMapped]
     public string? SearchVector { get; set; }
+    public string? CoverImageUrl { get; set; }
     public DateTime? PublishedAt { get; set; }
     public DifficultyLevel Difficulty { get; set; }
     public RecipeStatus Status { get; set; } = RecipeStatus.Draft;

@@ -1,6 +1,6 @@
 # PTUDWNC-2026-Nhom12 - Culinary Blog
 
-Ung dung blog am thuc gom frontend Next.js, backend ASP.NET Core Web API, PostgreSQL, Redis va MinIO. Repository hien dang o giai doan hoan thien nen tang kien truc, database schema va bo khung giao dien frontend theo cac luong nghiep vu.
+Ung dung blog am thuc gom frontend Next.js, backend ASP.NET Core Minimal API, PostgreSQL, Redis va MinIO. Backend da co cac luong xac thuc, quan ly danh muc, cong thuc, upload anh va dashboard; frontend van dang hoan thien, mot so trang hien con dung du lieu mau.
 
 ## 1. Thanh vien
 
@@ -23,19 +23,20 @@ Ung dung blog am thuc gom frontend Next.js, backend ASP.NET Core Web API, Postgr
 
 ### Backend
 
-- Tao cac project `CulinaryBlog.Api`, `CulinaryBlog.Application`, `CulinaryBlog.Domain` va `CulinaryBlog.Infrastructure`.
-- Tao cac entity: `ApplicationUser`, `RefreshToken`, `Category`, `Recipe`, `RecipeIngredient`, `RecipeStep`, `RecipeImage`, `RecipeNutrition`.
-- Tao `ApplicationDbContext` va cau hinh khoa chinh, khoa ngoai, index, quan he cascade/restrict va precision cho dinh duong.
-- Dang ky PostgreSQL va cac service Infrastructure trong `DependencyInjection`.
-- API hien co endpoint kiem tra `GET /` va `GET /health`.
-- JWT service hien moi la bo khung placeholder, chua phai xac thuc JWT hoan chinh.
+- Chia backend thanh `CulinaryBlog.Api`, `CulinaryBlog.Application`, `CulinaryBlog.Domain` va `CulinaryBlog.Infrastructure`.
+- Co entity cho user, refresh token, category va recipe cung cac thanh phan ingredient, step, image va nutrition.
+- Minimal API co endpoint auth, category, recipe, dashboard, upload file va health check; mot so route duoc cung cap ca duoi `/api` va `/api/v1`.
+- Dang ky/dang nhap phat hanh JWT; refresh token duoc hash truoc khi luu va co rotation/revocation.
+- Luong ghi Recipe va cac thao tac child entity duoc dieu phoi qua repository, `RecipeWriteService` va `IUnitOfWork`.
+- Rate limit, CORS, exception handling cho concurrency conflict, OpenAPI trong Development va migrate/seed khi API khoi dong.
 
 ### Database
 
-- PostgreSQL container chay tai `localhost:5432`.
-- Database: `PTUDWNC-2026-Nhom12`.
-- Migration dau tien: `InitialCreate`.
-- Schema da tao cac bang: `Users`, `RefreshTokens`, `Categories`, `Recipes`, `RecipeIngredients`, `RecipeSteps`, `RecipeImages`, `RecipeNutritions`, `__EFMigrationsHistory`.
+- PostgreSQL 16 chay tai `localhost:5432`; database phat trien mac dinh: `PTUDWNC-2026-Nhom12`.
+- User duoc map vao `AspNetUsers`; `RecipeNutrition` la owned data nam trong bang `Recipes`, khong phai bang rieng.
+- Chuoi migration dang duoc EF su dung: `20260915015345_InitialCreate`, `20260923102544_UnifyUserIdsAndApplicationConcurrency`, `20260923103026_RemoveUnusedImageVariants`, `20260923104756_AddRefreshTokenConcurrency` va `20260926025747_OptimizeRecipeIndexesAndSearch`.
+- Migration `OptimizeRecipeIndexesAndSearch` them index cho list/filter va child ordering, extension `pg_trgm`, GIN trigram indexes cho title/description va cot `CoverImageUrl`.
+- Database integration test rieng co ten ket thuc bang `_test`; khong dung database phat trien lam target test.
 
 ### Frontend
 
@@ -131,11 +132,17 @@ Copy-Item .env.example .env
 Noi dung mac dinh:
 
 ```env
-DATABASE_URL="postgresql://postgres:2552005@localhost:5432/PTUDWNC-2026-Nhom12"
+DATABASE_URL="postgresql://postgres:change-me@localhost:5432/PTUDWNC-2026-Nhom12"
 POSTGRES_DB=PTUDWNC-2026-Nhom12
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=2552005
+POSTGRES_PASSWORD=change-me
 POSTGRES_PORT=5432
+JWT_KEY=replace-with-a-long-random-signing-key
+MINIO_ROOT_USER=change-me
+MINIO_ROOT_PASSWORD=change-me
+MINIO_ACCESS_KEY=change-me
+MINIO_SECRET_KEY=change-me
+DEMO_PASSWORD=change-this-demo-password
 ```
 
 Khong commit `.env` neu file chua password hoac secret rieng cua may.
@@ -330,27 +337,76 @@ Khong dung file solution gia dinh `backend/CulinaryBlog.slnx`.
 
 ## 10. Trang thai chuc nang
 
-Da co:
+Da co o backend:
 
-- Kien truc backend theo cac layer.
-- PostgreSQL, EF Core va migration dau tien.
-- Docker Compose cho PostgreSQL, Redis, MinIO, backend va frontend.
-- Trang chu frontend.
-- Bon route group frontend va layout rieng theo muc dich.
-- Cac page khung cho authentication, discovery/search, recipe management va admin system.
+- Auth register/login/refresh/logout/profile; JWT va refresh-token rotation.
+- CRUD Category; Redis distributed cache cho danh sach/chi tiet category.
+- Recipe list/search/detail, CRUD, publish/unpublish/archive, child ingredient/step va primary/delete image.
+- Upload anh toi MinIO voi gioi han kich thuoc, MIME va file-signature checks.
+- Dashboard statistics cho Admin; readiness check PostgreSQL, Redis va MinIO.
+- PostgreSQL schema/migrations va seed du lieu demo.
 
-Chua hoan thien:
+Frontend da co route group va giao dien cho auth, discovery, recipe va admin. Login/register/profile va mot so recipe detail requests da noi API. Cac man hinh kham pha/list/form/dashboard va nhieu trang admin van la mock/placeholder, chua phai luong san pham hoan chinh.
 
-- API dang ky, dang nhap va xac thuc JWT thuc te.
-- API CRUD Category va Recipe.
-- Ket noi frontend voi backend.
-- Seed du lieu mau.
-- Upload file thuc te len MinIO.
-- Search, phan trang, danh gia va binh luan.
-- Dashboard admin voi so lieu thuc te.
-- Test integration/unit cho nghiep vu.
+Ngoai pham vi hien thuc hien: Google OAuth, full-text search `tsvector`, email/background jobs, va rating/comments. Unit tests co san; PostgreSQL persistence integration test can duoc bat bang `CULINARYBLOG_TEST_CONNECTION`.
 
-## 11. Quy tac lam viec nhom
+## 11. Phan cong thuc hien: Recipe Persistence - Pham Nguyen Ngoc Phuoc
+
+Phan viec nay tap trung vao cau hinh luu tru va cac thao tac ghi Recipe. Muc tieu la de Recipe va cac entity con duoc ghi qua mot ranh gioi repository/unit-of-work ro rang, bao toan quan he EF Core, va co migration/test kiem chung tren PostgreSQL.
+
+### 11.1 Mo hinh va quan he du lieu
+
+Cac cau hinh hieu luc nam trong `ApplicationDbContext.OnModelCreating`:
+
+- `Recipe` co FK den `ApplicationUser` qua `AuthorId` va den `Category` qua `CategoryId`; hai quan he dung `DeleteBehavior.Restrict` de khong xoa nham tac gia, danh muc hoac recipe lien quan.
+- `RecipeIngredient`, `RecipeStep` va `RecipeImage` la cac collection cua Recipe, FK `RecipeId`; quan he cascade phuc vu viec purge vat ly, con DELETE nghiep vu Recipe la soft-delete.
+- `RecipeNutrition` duoc map bang `OwnsOne`. Cac gia tri Calories, Protein, Carbohydrates, Fat, Fiber va Sodium nam trong cac cot `Nutrition_*` cua bang `Recipes`; decimal precision la `(8,2)`.
+- `RecipeIngredient.Quantity` dung precision `(10,3)`; `SortOrder` map vao cot `OrderIndex`.
+- Entity `ApplicationUser` duoc map vao `AspNetUsers`; khong phu thuoc ASP.NET Identity `UserManager` cho luong auth hien tai.
+
+### 11.2 Index va migration
+
+`Recipe.Slug` co unique index de bao ve tinh duy nhat tai database. Ngoai index theo `AuthorId`, `CategoryId`, `Status`, `CreatedAt`, model con co composite indexes cho danh sach theo trang thai/ngay va category/trang thai/ngay. Recipe title/description dung GIN voi `gin_trgm_ops` cho truy van substring `Contains`; ingredient co index theo Recipe, step co unique index `(RecipeId, StepNumber)`, image co index `(RecipeId, SortOrder)`.
+
+Migration dang ap dung la `20260926025747_OptimizeRecipeIndexesAndSearch`, tiep theo chuoi lich su da ton tai trong PostgreSQL. Migration nay duoc tao tren dung baseline local; cac migration alternate khong thuoc chuoi EF runtime van duoc giu trong repository de tranh xoa dau vet. Migration da duoc ap dung vao database local phat trien va database `_test`; khong can chay lai migration nay tren database da o cung version.
+
+### 11.3 Repository, Unit of Work va ghi du lieu
+
+- `IRecipeRepository` khai bao query/add/update/delete va cac thao tac ingredient, step, image; `RecipeRepository` thuc thi bang EF Core.
+- `GetForUpdateAsync` tai Recipe cung child collections o trang thai tracked va dung `AsSplitQuery` de tranh nhan ban dong ket qua khi load nhieu collection.
+- `ExistsBySlugAsync` su dung `AnyAsync`, co ho tro exclude Id khi update. Unique index van la lop bao ve cuoi neu co hai request tao cung slug dong thoi.
+- `IUnitOfWork.SaveChangesAsync` duoc implement boi `ApplicationUnitOfWork`. `RecipeWriteService` dieu phoi create/update, thay child collections, soft-delete va cac thao tac ingredient/step/image.
+- Khi thay aggregate, repository danh dau cu the child cu la Deleted va cac child moi la Added. Khong danh dau ca graph la Modified: cac entity moi co GUID duoc tao san, neu EF nhan nham la Modified se phat sinh concurrency conflict.
+- Moi nghiep vu ghi trong service chi goi mot `SaveChangesAsync`. EF Core/Npgsql tu dong bao cac lenh SQL cua mot SaveChanges trong transaction. Hien khong co explicit transaction bao nhieu lan SaveChanges trong cung mot use case; neu sau nay tach thanh nhieu lan save, can them transaction tuong ung.
+
+### 11.4 Truy van Create/Update/Delete
+
+- Create kiem tra category/author/slug va validation truoc khi tao Recipe; request khong duoc tu chon author khac voi user dang dang nhap.
+- Update lay aggregate tracked bang Id, kiem tra owner/Admin, slug conflict va thay ingredient/step/image trong cung mot lan save.
+- Delete Recipe la soft-delete; child records khong bi xoa vat ly boi endpoint nghiep vu.
+- Read theo slug chi load graph chi tiet khi can; list/search chieu cac cot summary, dem tong so truoc phan trang va them Id lam tie-breaker de thu tu trang on dinh.
+
+### 11.5 Kiem thu va cach chay
+
+`RecipeWriteServiceTests` kiem tra delegation va so lan save; `RecipePersistenceModelTests` kiem tra index/provider metadata. `RecipePersistenceIntegrationTests` chay tren PostgreSQL that, kiem chung FK User/Category, nutrition owned, ingredient create/update/delete, thay child graph va soft-delete. Test tu goi migrate, yeu cau ten database ket thuc bang `_test`, va rollback transaction sau khi chay.
+
+Tao database test rieng (khong dung database trong `DATABASE_URL` truc tiep). Vi du database test la `PTUDWNC-2026-Nhom12_test`; dat `CULINARYBLOG_TEST_CONNECTION` bang credentials local tu `.env`, sau do chay:
+
+```powershell
+docker exec culinaryblog-postgres createdb -U postgres PTUDWNC-2026-Nhom12_test
+$env:CULINARYBLOG_TEST_CONNECTION = "Host=localhost;Port=5432;Database=PTUDWNC-2026-Nhom12_test;Username=postgres;Password=<POSTGRES_PASSWORD trong .env>"
+dotnet test backend/tests/CulinaryBlog.UnitTests/CulinaryBlog.UnitTests.csproj --nologo
+```
+
+Neu database test da duoc tao thi bo qua lenh `createdb`. Khi khong dat bien moi truong, integration test duoc Skip co chu dich; unit tests van chay. Test tu goi migrations va se tu choi connection string neu ten database khong ket thuc bang `_test`. Moi ghi du lieu trong test duoc rollback khi test ket thuc.
+
+Ket qua kiem chung sau phan viec:
+
+- Toan bo test suite, bao gom PostgreSQL persistence integration test: 14 passed, 0 failed, 0 skipped.
+- API build: `dotnet build backend/src/CulinaryBlog.Api/CulinaryBlog.Api.csproj --nologo`.
+- EF Core model check: khong con thay doi model dang cho migration.
+
+## 12. Quy tac lam viec nhom
 
 1. Khong push truc tiep code chuc nang len `main`.
 2. Pull code moi nhat truoc khi bat dau lam viec.

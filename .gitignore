@@ -1,8 +1,18 @@
+# Environment variables
 .env
-.env.*
-!.env.example
 
+# Build
+bin/
+obj/
+
+# Frontend
 node_modules/
-frontend/.next/
-backend/**/bin/
-backend/**/obj/
+.next/
+
+# IDE
+.vscode/
+.vs/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,3 +1,5 @@
+import RecipeForm from '@/components/recipe-management/RecipeForm';
+
 export default function CreateRecipePage() {
-  return <><div className="flow-kicker">Quản lý công thức</div><h1 className="flow-title">Tạo công thức mới</h1><p className="flow-description">Biên soạn một món ăn hoàn chỉnh để lưu nháp hoặc chia sẻ cùng cộng đồng.</p><div className="flow-panel-grid"><section className="flow-panel"><h2>Thông tin món ăn</h2><p>Tên món, mô tả, danh mục, thời gian và độ khó.</p></section><section className="flow-panel"><h2>Nguyên liệu & các bước</h2><p>Sắp xếp nguyên liệu và hướng dẫn nấu theo từng bước.</p></section><section className="flow-panel"><h2>Ảnh & dinh dưỡng</h2><p>Thêm ảnh minh họa và thông tin dinh dưỡng cho món ăn.</p></section></div></>;
+  return <><div className="flow-kicker">Biên soạn công thức</div><h1 className="flow-title">Tạo món ăn mới.</h1><p className="flow-description">Nhập thông tin, nguyên liệu và giá trị dinh dưỡng. Công thức sẽ được lưu ở trạng thái bản nháp.</p><RecipeForm /></>;
 }

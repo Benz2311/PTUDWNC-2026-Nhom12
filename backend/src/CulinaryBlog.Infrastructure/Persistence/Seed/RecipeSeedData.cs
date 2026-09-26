@@ -1,12 +1,14 @@
 ﻿using CulinaryBlog.Domain.Entities;
 using CulinaryBlog.Domain.Enums;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace CulinaryBlog.Infrastructure.Persistence.Seed;
 
 public static class RecipeSeedData
 {
-    private const string DemoUserId = "11111111-1111-1111-1111-111111111111";
+    private static readonly Guid DemoUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     private static readonly Random Random = new(20260922);
 
@@ -132,8 +134,16 @@ public static class RecipeSeedData
 
     public static async Task InitializeAsync(
         ApplicationDbContext db,
+        IConfiguration configuration,
         CancellationToken cancellationToken = default)
     {
+        var demoPassword = configuration["Seed:DemoPassword"];
+        if (string.IsNullOrWhiteSpace(demoPassword) || demoPassword.Length < 12)
+        {
+            throw new InvalidOperationException("Seed:DemoPassword must be configured with at least 12 characters.");
+        }
+
+        var passwordHasher = new PasswordHasher<ApplicationUser>();
         var user = await db.Users
             .SingleOrDefaultAsync(item => item.Id == DemoUserId, cancellationToken);
 
@@ -145,11 +155,16 @@ public static class RecipeSeedData
                 FullName = "Culinary Blog Demo",
                 UserName = "culinary-demo",
                 Email = "demo@culinaryblog.local",
-                PasswordHash = "seeded-demo-password",
                 EmailConfirmed = true
             };
+            user.PasswordHash = passwordHasher.HashPassword(user, demoPassword);
 
             db.Users.Add(user);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        else if (NeedsPasswordReset(user, passwordHasher, demoPassword))
+        {
+            user.PasswordHash = passwordHasher.HashPassword(user, demoPassword);
             await db.SaveChangesAsync(cancellationToken);
         }
 
@@ -254,6 +269,23 @@ await db.SaveChangesAsync(cancellationToken);
             Description = description
         };
 
+    private static bool NeedsPasswordReset(ApplicationUser user, PasswordHasher<ApplicationUser> passwordHasher, string demoPassword)
+    {
+        if (string.IsNullOrWhiteSpace(user.PasswordHash))
+        {
+            return true;
+        }
+
+        try
+        {
+            return passwordHasher.VerifyHashedPassword(user, user.PasswordHash, demoPassword) == PasswordVerificationResult.Failed;
+        }
+        catch (FormatException)
+        {
+            return true;
+        }
+    }
+
     private static Recipe CreateRandomRecipe(
         int recipeNumber,
         Category category)
@@ -298,7 +330,16 @@ await db.SaveChangesAsync(cancellationToken);
             Status = RecipeStatus.Published,
             PublishedAt = DateTime.UtcNow.AddDays(-Random.Next(0, 365)),
             Nutrition = nutrition,
-            Ingredients = ingredients
+            Ingredients = ingredients,
+            Steps =
+            [
+                new RecipeStep
+                {
+                    StepNumber = 1,
+                    Title = "Thực hiện",
+                    Description = $"Sơ chế và nấu {baseName.ToLowerInvariant()} theo hướng dẫn."
+                }
+            ]
         };
     }
 

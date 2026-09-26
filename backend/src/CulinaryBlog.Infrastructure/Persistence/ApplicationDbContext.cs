@@ -17,9 +17,55 @@ public class ApplicationDbContext : DbContext
     public DbSet<RecipeImage> RecipeImages => Set<RecipeImage>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        UpdateConcurrencyTokens();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        UpdateConcurrencyTokens();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void UpdateConcurrencyTokens()
+    {
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified))
+            {
+                continue;
+            }
+
+            switch (entry.Entity)
+            {
+                case Category category:
+                    category.RowVersion = Guid.NewGuid().ToByteArray();
+                    break;
+                case Recipe recipe:
+                    recipe.RowVersion = Guid.NewGuid().ToByteArray();
+                    break;
+                case RecipeIngredient ingredient:
+                    ingredient.RowVersion = Guid.NewGuid().ToByteArray();
+                    break;
+                case RecipeStep step:
+                    step.RowVersion = Guid.NewGuid().ToByteArray();
+                    break;
+                case RecipeImage image:
+                    image.RowVersion = Guid.NewGuid().ToByteArray();
+                    break;
+                case RefreshToken refreshToken:
+                    refreshToken.RowVersion = Guid.NewGuid().ToByteArray();
+                    break;
+            }
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.HasPostgresExtension("pg_trgm");
 
         modelBuilder.Entity<ApplicationUser>(entity =>
         {
@@ -54,7 +100,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(x => x.Slug).HasMaxLength(120).IsRequired();
             entity.Property(x => x.Description).HasColumnType("text");
             entity.Property(x => x.ImageUrl).HasMaxLength(500);
-            entity.Property(x => x.RowVersion).HasColumnName("RowVersion").IsConcurrencyToken();
+            entity.Property(x => x.RowVersion).HasColumnName("RowVersion").IsConcurrencyToken().ValueGeneratedNever();
 
             entity.HasIndex(x => x.Slug).IsUnique();
 
@@ -74,12 +120,21 @@ public class ApplicationDbContext : DbContext
             entity.Property(x => x.PrepTimeMinutes).HasColumnName("PrepTimeMinutes").IsRequired();
             entity.Property(x => x.CookTimeMinutes).HasColumnName("CookTimeMinutes").IsRequired();
             entity.Property(x => x.Servings).IsRequired();
-            entity.Property(x => x.RowVersion).HasColumnName("RowVersion").IsConcurrencyToken();
+            entity.Property(x => x.RowVersion).HasColumnName("RowVersion").IsConcurrencyToken().ValueGeneratedNever();
 
             entity.HasIndex(x => x.Slug).IsUnique();
             entity.HasIndex(x => x.AuthorId);
             entity.HasIndex(x => x.CategoryId);
             entity.HasIndex(x => x.Status);
+            entity.HasIndex(x => x.CreatedAt);
+            entity.HasIndex(x => new { x.IsDeleted, x.Status, x.CreatedAt });
+            entity.HasIndex(x => new { x.CategoryId, x.IsDeleted, x.Status, x.CreatedAt });
+            entity.HasIndex(x => x.Title)
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
+            entity.HasIndex(x => x.Description)
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
 
             entity.HasOne(x => x.Author)
                 .WithMany(x => x.Recipes)
@@ -125,7 +180,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(x => x.Unit).HasMaxLength(50);
             entity.Property(x => x.Notes).HasMaxLength(500);
             entity.Property(x => x.SortOrder).HasColumnName("OrderIndex");
-            entity.Property(x => x.RowVersion).IsConcurrencyToken();
+            entity.Property(x => x.RowVersion).IsConcurrencyToken().ValueGeneratedNever();
+            entity.HasIndex(x => x.RecipeId);
         });
 
         modelBuilder.Entity<RecipeStep>(entity =>
@@ -133,20 +189,18 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Title).HasMaxLength(200).IsRequired();
             entity.Property(x => x.Description).IsRequired();
-            entity.Property(x => x.TimerMinutes).HasColumnName("DurationMinutes");
-            entity.Property(x => x.ImageUrl).HasMaxLength(500);
-            entity.Property(x => x.RowVersion).IsConcurrencyToken();
+            entity.Property(x => x.RowVersion).IsConcurrencyToken().ValueGeneratedNever();
+            entity.HasIndex(x => new { x.RecipeId, x.StepNumber }).IsUnique();
         });
 
         modelBuilder.Entity<RecipeImage>(entity =>
         {
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Url).HasColumnName("OriginalUrl").HasMaxLength(500).IsRequired();
-            entity.Property(x => x.MediumUrl).HasMaxLength(500);
-            entity.Property(x => x.ThumbnailUrl).HasMaxLength(500);
             entity.Property(x => x.AltText).HasMaxLength(200);
             entity.Property(x => x.SortOrder).HasColumnName("OrderIndex");
-            entity.Property(x => x.RowVersion).IsConcurrencyToken();
+            entity.Property(x => x.RowVersion).IsConcurrencyToken().ValueGeneratedNever();
+            entity.HasIndex(x => new { x.RecipeId, x.SortOrder });
         });
 
         modelBuilder.Entity<RefreshToken>(entity =>
@@ -155,6 +209,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(x => x.Token).HasColumnName("TokenHash").HasMaxLength(64).IsRequired();
             entity.Property(x => x.ReplacedByToken).HasColumnName("ReplacedByTokenHash").HasMaxLength(64);
             entity.Property(x => x.CreatedByIp).HasMaxLength(45);
+            entity.Property(x => x.RowVersion).IsConcurrencyToken().ValueGeneratedNever();
             entity.HasIndex(x => x.Token).IsUnique();
         });
     }

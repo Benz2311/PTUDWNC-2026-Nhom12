@@ -2,7 +2,7 @@ namespace CulinaryBlog.Domain.Entities;
 
 public class ApplicationUser
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public Guid Id { get; set; } = Guid.NewGuid();
     public string? NormalizedUserName { get; set; }
     public string? NormalizedEmail { get; set; }
     public string? SecurityStamp { get; set; }
