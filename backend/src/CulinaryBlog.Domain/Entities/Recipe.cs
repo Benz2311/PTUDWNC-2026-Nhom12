@@ -1,66 +1,43 @@
+using CulinaryBlog.Domain.Enums;
+using CulinaryBlog.Domain.Common;
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace CulinaryBlog.Domain.Entities;
-
-public enum DifficultyLevel
-{
-    Easy,
-    Medium,
-    Hard
-}
-
-public enum RecipeStatus
-{
-    Draft,
-    Published,
-    Archived
-}
 
 public class Recipe : BaseEntity
 {
-    public string Title { get; private set; } = string.Empty;
+    public Guid AuthorId { get; set; }
+    public ApplicationUser Author { get; set; } = null!;
 
-    public string Slug { get; private set; } = string.Empty;
+    public Guid CategoryId { get; set; }
+    public Category Category { get; set; } = null!;
 
-    public string? Description { get; private set; }
+    public string Title { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
 
-    public int PrepTimeMinutes { get; private set; }
+    public int PrepTimeMinutes { get; set; }
+    public int CookTimeMinutes { get; set; }
+    public int Servings { get; set; } = 1;
 
-    public int CookTimeMinutes { get; private set; }
+    [NotMapped]
+    public string? SearchVector { get; set; }
 
-    public int Servings { get; private set; }
+    public DateTime? PublishedAt { get; set; }
 
-    public DifficultyLevel Difficulty { get; private set; }
+    public DifficultyLevel Difficulty { get; set; }
 
-    public RecipeStatus Status { get; private set; }
+    public RecipeStatus Status { get; set; } = RecipeStatus.Draft;
 
-    public Guid CategoryId { get; private set; }
+    public ICollection<RecipeIngredient> Ingredients { get; set; }
+        = new List<RecipeIngredient>();
 
-    public Category? Category { get; private set; }
+    public ICollection<RecipeStep> Steps { get; set; }
+        = new List<RecipeStep>();
 
-    private Recipe()
-    {
-    }
+    public ICollection<RecipeImage> Images { get; set; }
+        = new List<RecipeImage>();
 
-    public Recipe(
-        string title,
-        string slug,
-        string? description,
-        int prepTimeMinutes,
-        int cookTimeMinutes,
-        int servings,
-        DifficultyLevel difficulty,
-        RecipeStatus status,
-        Guid categoryId)
-    {
-        Id = Guid.NewGuid();
-        Title = title;
-        Slug = slug;
-        Description = description;
-        PrepTimeMinutes = prepTimeMinutes;
-        CookTimeMinutes = cookTimeMinutes;
-        Servings = servings;
-        Difficulty = difficulty;
-        Status = status;
-        CategoryId = categoryId;
-        CreatedAt = DateTime.UtcNow;
-    }
+    public RecipeNutrition Nutrition { get; set; } = new();
 }

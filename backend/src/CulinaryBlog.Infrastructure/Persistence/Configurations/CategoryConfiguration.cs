@@ -30,10 +30,10 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .HasDefaultValue(0);
 
         builder.Property(c => c.RowVersion)
+            .IsRequired()
             .IsConcurrencyToken()
-            .IsRequired(false);
+            .ValueGeneratedNever();
 
-        // ── Indexes ───────────────────────────────────────────────────────────
         builder.HasIndex(c => c.Slug)
             .IsUnique();
 
@@ -41,10 +41,8 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
 
         builder.HasIndex(c => c.OrderIndex);
 
-        // ── Global Query Filter (Soft Delete) ─────────────────────────────────
         builder.HasQueryFilter(c => !c.IsDeleted);
 
-        // ── Relationships ─────────────────────────────────────────────────────
         builder.HasMany(c => c.Recipes)
             .WithOne(r => r.Category)
             .HasForeignKey(r => r.CategoryId)
@@ -53,7 +51,6 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
         builder.Navigation(c => c.Recipes)
             .UsePropertyAccessMode(PropertyAccessMode.Field);
 
-        // ── Seed Data ban đầu (5 danh mục cơ bản) ──────────────────────────────
         builder.HasData(
             new
             {
@@ -63,7 +60,8 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
                 Description = "Các món ăn chính trong bữa cơm Việt",
                 OrderIndex = 1,
                 CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-                IsDeleted = false
+                IsDeleted = false,
+                RowVersion = new byte[8]
             },
             new
             {
@@ -73,7 +71,8 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
                 Description = "Canh và súp truyền thống",
                 OrderIndex = 2,
                 CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-                IsDeleted = false
+                IsDeleted = false,
+                RowVersion = new byte[8]
             },
             new
             {
@@ -83,7 +82,8 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
                 Description = "Các loại bánh, chè và tráng miệng",
                 OrderIndex = 3,
                 CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-                IsDeleted = false
+                IsDeleted = false,
+                RowVersion = new byte[8]
             },
             new
             {
@@ -93,7 +93,8 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
                 Description = "Nước ép, sinh tố và thức uống",
                 OrderIndex = 4,
                 CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-                IsDeleted = false
+                IsDeleted = false,
+                RowVersion = new byte[8]
             },
             new
             {
@@ -103,7 +104,8 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
                 Description = "Snack và đồ ăn nhẹ",
                 OrderIndex = 5,
                 CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-                IsDeleted = false
+                IsDeleted = false,
+                RowVersion = new byte[8]
             }
         );
     }
