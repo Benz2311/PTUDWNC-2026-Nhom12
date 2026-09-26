@@ -4068,8 +4068,8 @@
     },
     "CulinaryBlog.API/1.0.0": {
       "type": "project",
-      "path": "../../src/CulinaryBlog.Api/CulinaryBlog.API.csproj",
-      "msbuildProject": "../../src/CulinaryBlog.Api/CulinaryBlog.API.csproj"
+      "path": "../../src/CulinaryBlog.API/CulinaryBlog.API.csproj",
+      "msbuildProject": "../../src/CulinaryBlog.API/CulinaryBlog.API.csproj"
     },
     "CulinaryBlog.Application/1.0.0": {
       "type": "project",
@@ -4124,8 +4124,8 @@
           "framework": "net10.0",
           "targetAlias": "net10.0",
           "projectReferences": {
-            "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj": {
-              "projectPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj"
+            "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.API\\CulinaryBlog.API.csproj": {
+              "projectPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.API\\CulinaryBlog.API.csproj"
             }
           }
         }

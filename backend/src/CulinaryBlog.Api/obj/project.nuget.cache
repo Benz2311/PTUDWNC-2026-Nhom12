@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "yD2vhWKDz0M=",
+  "dgSpecHash": "iHCgFTaZC7w=",
   "success": true,
-  "projectFilePath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
+  "projectFilePath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.API\\CulinaryBlog.API.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\AnhNhung\\.nuget\\packages\\bogus\\35.6.5\\bogus.35.6.5.nupkg.sha512",
     "C:\\Users\\AnhNhung\\.nuget\\packages\\fluentvalidation\\12.1.1\\fluentvalidation.12.1.1.nupkg.sha512",
