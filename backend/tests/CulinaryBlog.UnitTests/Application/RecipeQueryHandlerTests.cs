@@ -190,6 +190,29 @@ public class RecipeQueryHandlerTests
         result.HasPreviousPage.Should().BeFalse();
     }
 
+    [Fact]
+    public void ToPaginatedResponse_ReturnsCorrectDataAndMetaContract()
+    {
+        // Arrange
+        var items = new List<RecipeListItemDto>
+        {
+            MakeListItem("Phở Bò", "pho-bo")
+        };
+        var paged = MakePaged(items, total: 15, page: 2, pageSize: 5);
+
+        // Act
+        var response = paged.ToPaginatedResponse();
+
+        // Assert
+        response.Data.Items.Should().HaveCount(1);
+        response.Meta.Page.Should().Be(2);
+        response.Meta.PageSize.Should().Be(5);
+        response.Meta.Total.Should().Be(15);
+        response.Meta.TotalPages.Should().Be(3);
+        response.Meta.HasNextPage.Should().BeTrue();
+        response.Meta.HasPreviousPage.Should().BeTrue();
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // GetRecipeBySlugQueryHandler — chi tiết recipe
     // ─────────────────────────────────────────────────────────────────────────
@@ -298,6 +321,9 @@ public class RecipeQueryHandlerTests
         result.Category.Slug.Should().Be("mon-chinh");
         result.Recipes.Items.Should().HaveCount(2);
         result.Recipes.TotalCount.Should().Be(2);
+        result.Data.Items.Should().HaveCount(2);
+        result.Data.Category.Name.Should().Be("Món Chính");
+        result.Meta.Total.Should().Be(2);
     }
 
     [Fact]

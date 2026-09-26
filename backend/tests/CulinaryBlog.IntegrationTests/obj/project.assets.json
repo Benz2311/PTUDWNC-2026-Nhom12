@@ -5608,11 +5608,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\tests\\CulinaryBlog.IntegrationTests\\CulinaryBlog.IntegrationTests.csproj",
+      "projectUniqueName": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\tests\\CulinaryBlog.IntegrationTests\\CulinaryBlog.IntegrationTests.csproj",
       "projectName": "CulinaryBlog.IntegrationTests",
-      "projectPath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\tests\\CulinaryBlog.IntegrationTests\\CulinaryBlog.IntegrationTests.csproj",
+      "projectPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\tests\\CulinaryBlog.IntegrationTests\\CulinaryBlog.IntegrationTests.csproj",
       "packagesPath": "C:\\Users\\AnhNhung\\.nuget\\packages\\",
-      "outputPath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\tests\\CulinaryBlog.IntegrationTests\\obj\\",
+      "outputPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\tests\\CulinaryBlog.IntegrationTests\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\AnhNhung\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -5628,8 +5628,8 @@
           "framework": "net10.0",
           "targetAlias": "net10.0",
           "projectReferences": {
-            "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj": {
-              "projectPath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj"
+            "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj": {
+              "projectPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj"
             }
           }
         }

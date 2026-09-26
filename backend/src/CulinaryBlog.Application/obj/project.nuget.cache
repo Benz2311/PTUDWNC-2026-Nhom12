@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "wOHJYuentf4=",
+  "dgSpecHash": "4Fx/knvyGvM=",
   "success": true,
-  "projectFilePath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj",
+  "projectFilePath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\AnhNhung\\.nuget\\packages\\fluentvalidation\\12.1.1\\fluentvalidation.12.1.1.nupkg.sha512",
     "C:\\Users\\AnhNhung\\.nuget\\packages\\fluentvalidation.dependencyinjectionextensions\\12.1.1\\fluentvalidation.dependencyinjectionextensions.12.1.1.nupkg.sha512",

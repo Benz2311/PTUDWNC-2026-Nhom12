@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "Go6MDrjx+uk=",
+  "dgSpecHash": "ul4wQJDIK5c=",
   "success": true,
-  "projectFilePath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
+  "projectFilePath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\AnhNhung\\.nuget\\packages\\awssdk.core\\3.7.402.85\\awssdk.core.3.7.402.85.nupkg.sha512",
     "C:\\Users\\AnhNhung\\.nuget\\packages\\awssdk.s3\\3.7.421.4\\awssdk.s3.3.7.421.4.nupkg.sha512",
@@ -91,9 +91,9 @@
       "code": "NU1902",
       "level": "Warning",
       "message": "Package 'MailKit' 4.12.1 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-9j88-vvj5-vhgr",
-      "projectPath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
+      "projectPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
       "warningLevel": 1,
-      "filePath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
+      "filePath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
       "libraryId": "MailKit",
       "targetGraphs": [
         "net10.0"
@@ -103,9 +103,9 @@
       "code": "NU1902",
       "level": "Warning",
       "message": "Package 'MimeKit' 4.12.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g7hc-96xr-gvvx",
-      "projectPath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
+      "projectPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
       "warningLevel": 1,
-      "filePath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
+      "filePath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
       "libraryId": "MimeKit",
       "targetGraphs": [
         "net10.0"
@@ -115,9 +115,9 @@
       "code": "NU1902",
       "level": "Warning",
       "message": "Package 'OpenTelemetry.Api' 1.12.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-g94r-2vxg-569j",
-      "projectPath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
+      "projectPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
       "warningLevel": 1,
-      "filePath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
+      "filePath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
       "libraryId": "OpenTelemetry.Api",
       "targetGraphs": [
         "net10.0"
@@ -127,9 +127,9 @@
       "code": "NU1902",
       "level": "Warning",
       "message": "Package 'OpenTelemetry.Exporter.OpenTelemetryProtocol' 1.12.0 has a known moderate severity vulnerability, https://github.com/advisories/GHSA-4625-4j76-fww9",
-      "projectPath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
+      "projectPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
       "warningLevel": 1,
-      "filePath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
+      "filePath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
       "libraryId": "OpenTelemetry.Exporter.OpenTelemetryProtocol",
       "targetGraphs": [
         "net10.0"

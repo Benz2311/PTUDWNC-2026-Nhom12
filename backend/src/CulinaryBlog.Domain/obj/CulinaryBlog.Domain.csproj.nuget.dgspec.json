@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Domain\\CulinaryBlog.Domain.csproj": {}
+    "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Domain\\CulinaryBlog.Domain.csproj": {}
   },
   "projects": {
-    "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Domain\\CulinaryBlog.Domain.csproj": {
+    "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Domain\\CulinaryBlog.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Domain\\CulinaryBlog.Domain.csproj",
+        "projectUniqueName": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Domain\\CulinaryBlog.Domain.csproj",
         "projectName": "CulinaryBlog.Domain",
-        "projectPath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Domain\\CulinaryBlog.Domain.csproj",
+        "projectPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Domain\\CulinaryBlog.Domain.csproj",
         "packagesPath": "C:\\Users\\AnhNhung\\.nuget\\packages\\",
-        "outputPath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Domain\\obj\\",
+        "outputPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Domain\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\AnhNhung\\AppData\\Roaming\\NuGet\\NuGet.Config"

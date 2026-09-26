@@ -11,6 +11,21 @@ public enum RecipeSortField
     TotalTime
 }
 
+public record PaginationMetaDto(
+    int Page,
+    int PageSize,
+    int Total,
+    int TotalPages,
+    bool HasNextPage,
+    bool HasPreviousPage);
+
+public record PaginatedDataDto<T>(
+    IReadOnlyList<T> Items);
+
+public record PaginatedResponseDto<T>(
+    PaginatedDataDto<T> Data,
+    PaginationMetaDto Meta);
+
 public record PagedResultDto<T>(
     IReadOnlyList<T> Items,
     int TotalCount,
@@ -21,6 +36,11 @@ public record PagedResultDto<T>(
     public int Total => TotalCount;
     public bool HasNextPage => Page < TotalPages;
     public bool HasPreviousPage => Page > 1;
+
+    public PaginatedDataDto<T> Data => new(Items);
+    public PaginationMetaDto Meta => new(Page, PageSize, TotalCount, TotalPages, HasNextPage, HasPreviousPage);
+
+    public PaginatedResponseDto<T> ToPaginatedResponse() => new(Data, Meta);
 }
 
 public record RecipeCategoryDto(
@@ -66,10 +86,13 @@ public record RecipeImageDto(
 public record RecipeNutritionDto(
     decimal? Calories,
     decimal? Protein,
-    decimal? Carbohydrates,
+    decimal? Carbs,
     decimal? Fat,
-    decimal? Fiber,
-    decimal? Sodium);
+    decimal? Fiber = null,
+    decimal? Sodium = null)
+{
+    public decimal? Carbohydrates => Carbs;
+}
 
 public record RecipeAuthorDto(
     Guid Id,
@@ -94,9 +117,17 @@ public record RecipeDetailDto(
     RecipeNutritionDto Nutrition,
     RecipeAuthorDto? Author = null);
 
+public record CategoryRecipesDataDto(
+    RecipeCategoryDto Category,
+    IReadOnlyList<RecipeListItemDto> Items);
+
 public record CategoryRecipesResponseDto(
     RecipeCategoryDto Category,
-    PagedResultDto<RecipeListItemDto> Recipes);
+    PagedResultDto<RecipeListItemDto> Recipes)
+{
+    public CategoryRecipesDataDto Data => new(Category, Recipes.Items);
+    public PaginationMetaDto Meta => Recipes.Meta;
+}
 
 public record RecipeListOptions(
     string? Search = null,

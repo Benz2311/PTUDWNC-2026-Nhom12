@@ -84,10 +84,12 @@ public static class RecipeEndpoints
 
         if (search?.Length > 200)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["search"] = ["Từ khóa tìm kiếm không được vượt quá 200 ký tự."]
-            });
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["search"] = ["Từ khóa tìm kiếm không được vượt quá 200 ký tự."]
+                },
+                statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
         DifficultyLevel? parsedDifficulty = null;
@@ -101,10 +103,12 @@ public static class RecipeEndpoints
 
             if (difficultyName is null)
             {
-                return Results.ValidationProblem(new Dictionary<string, string[]>
-                {
-                    ["difficulty"] = ["Độ khó phải là Easy, Medium, Hard hoặc Expert."]
-                });
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]>
+                    {
+                        ["difficulty"] = ["Độ khó phải là Easy, Medium, Hard hoặc Expert."]
+                    },
+                    statusCode: StatusCodes.Status422UnprocessableEntity);
             }
 
             parsedDifficulty = Enum.Parse<DifficultyLevel>(difficultyName);
@@ -112,18 +116,22 @@ public static class RecipeEndpoints
 
         if (maxCookTimeMinutes is <= 0)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["maxCookTimeMinutes"] = ["Thời gian nấu tối đa phải lớn hơn 0."]
-            });
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["maxCookTimeMinutes"] = ["Thời gian nấu tối đa phải lớn hơn 0."]
+                },
+                statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
         if (maxTotalTimeMinutes is <= 0)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["maxTotalTimeMinutes"] = ["Thời gian tối đa phải lớn hơn 0."]
-            });
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["maxTotalTimeMinutes"] = ["Thời gian tối đa phải lớn hơn 0."]
+                },
+                statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
         // Hỗ trợ tham số sort theo SRS FR-SRCH-003 (ví dụ: sort=-createdAt, sort=title)
@@ -168,10 +176,12 @@ public static class RecipeEndpoints
 
         if (!parsedSortBy.HasValue)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["sortBy"] = ["SortBy phải là publishedAt, createdAt, title, prepTime, cookTime hoặc totalTime."]
-            });
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["sortBy"] = ["SortBy phải là publishedAt, createdAt, title, prepTime, cookTime hoặc totalTime."]
+                },
+                statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
         var sortDirectionValue = string.IsNullOrWhiteSpace(sortDirection)
@@ -186,10 +196,12 @@ public static class RecipeEndpoints
 
         if (!parsedSortDirection.HasValue)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["sortDirection"] = ["SortDirection phải là asc hoặc desc."]
-            });
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["sortDirection"] = ["SortDirection phải là asc hoặc desc."]
+                },
+                statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
         options = new RecipeListOptions(
