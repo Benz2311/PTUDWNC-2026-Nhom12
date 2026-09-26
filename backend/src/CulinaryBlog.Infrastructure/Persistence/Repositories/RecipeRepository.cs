@@ -72,6 +72,16 @@ public class RecipeRepository : IRecipeRepository
             query = query.Where(recipe => recipe.Difficulty == options.Difficulty.Value);
         }
 
+        if (options.CategoryId.HasValue)
+        {
+            query = query.Where(recipe => recipe.CategoryId == options.CategoryId.Value);
+        }
+
+        if (options.MaxCookTimeMinutes.HasValue)
+        {
+            query = query.Where(recipe => recipe.CookTimeMinutes <= options.MaxCookTimeMinutes.Value);
+        }
+
         if (options.MaxTotalTimeMinutes.HasValue)
         {
             query = query.Where(recipe =>
@@ -153,7 +163,13 @@ public class RecipeRepository : IRecipeRepository
                     recipe.Nutrition.Carbohydrates,
                     recipe.Nutrition.Fat,
                     recipe.Nutrition.Fiber,
-                    recipe.Nutrition.Sodium)))
+                    recipe.Nutrition.Sodium),
+                recipe.Author != null
+                    ? new RecipeAuthorDto(
+                        recipe.Author.Id,
+                        recipe.Author.DisplayName,
+                        recipe.Author.AvatarUrl)
+                    : null))
             .FirstOrDefaultAsync(cancellationToken);
     }
 

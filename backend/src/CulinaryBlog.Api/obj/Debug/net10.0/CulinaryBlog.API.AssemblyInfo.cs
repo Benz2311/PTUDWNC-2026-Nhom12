@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CulinaryBlog.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0322f4de16e6d1f5e10f11bbbd9c3d77028f898f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ee659bc95c058971674995009dbb5e2e3757483d")]
 [assembly: System.Reflection.AssemblyProductAttribute("CulinaryBlog.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CulinaryBlog.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

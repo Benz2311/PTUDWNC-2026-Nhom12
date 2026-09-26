@@ -1,4 +1,5 @@
 using CulinaryBlog.Domain.Entities;
+using CulinaryBlog.Domain.Enums;
 using FluentAssertions;
 using Xunit;
 

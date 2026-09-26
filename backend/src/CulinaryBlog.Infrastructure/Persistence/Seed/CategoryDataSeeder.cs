@@ -594,11 +594,7 @@ public static class CategoryDataSeeder
                                 .ToUniversalTime()
                             : null,
 
-                    Nutrition = new RecipeNutrition(),
-
-                    IsDeleted = false,
-
-                    RowVersion = new byte[8]
+                    Nutrition = new RecipeNutrition()
                 };
 
                 recipesToAdd.Add(recipe);

@@ -27,8 +27,12 @@ public static class DependencyInjection
     {
         // ── Database — PostgreSQL + EF Core ──────────────────────────────────
         services.AddDbContext<ApplicationDbContext>(options =>
+        {
             options.UseNpgsql(
-                configuration.GetConnectionString("DefaultConnection")));
+                configuration.GetConnectionString("DefaultConnection"));
+            options.ConfigureWarnings(warnings =>
+                warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+        });
 
         // ── Repositories ──────────────────────────────────────────────────────
         services.AddScoped<ICategoryRepository, CategoryRepository>();

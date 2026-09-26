@@ -7,6 +7,8 @@ public record CategoryDto(
     string? Description,
     string? ImageUrl,
     int OrderIndex,
-    int RecipeCount
-);
+    int RecipeCount)
+{
+    public int SortOrder => OrderIndex;
+}
 

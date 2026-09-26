@@ -16,7 +16,12 @@ public record PagedResultDto<T>(
     int TotalCount,
     int Page,
     int PageSize,
-    int TotalPages);
+    int TotalPages)
+{
+    public int Total => TotalCount;
+    public bool HasNextPage => Page < TotalPages;
+    public bool HasPreviousPage => Page > 1;
+}
 
 public record RecipeCategoryDto(
     Guid Id,
@@ -66,6 +71,11 @@ public record RecipeNutritionDto(
     decimal? Fiber,
     decimal? Sodium);
 
+public record RecipeAuthorDto(
+    Guid Id,
+    string DisplayName,
+    string? AvatarUrl);
+
 public record RecipeDetailDto(
     Guid Id,
     string Title,
@@ -81,7 +91,8 @@ public record RecipeDetailDto(
     IReadOnlyList<RecipeIngredientDto> Ingredients,
     IReadOnlyList<RecipeStepDto> Steps,
     IReadOnlyList<RecipeImageDto> Images,
-    RecipeNutritionDto Nutrition);
+    RecipeNutritionDto Nutrition,
+    RecipeAuthorDto? Author = null);
 
 public record CategoryRecipesResponseDto(
     RecipeCategoryDto Category,
@@ -93,4 +104,6 @@ public record RecipeListOptions(
     DifficultyLevel? Difficulty = null,
     int? MaxTotalTimeMinutes = null,
     RecipeSortField SortBy = RecipeSortField.PublishedAt,
-    bool SortDescending = true);
+    bool SortDescending = true,
+    Guid? CategoryId = null,
+    int? MaxCookTimeMinutes = null);

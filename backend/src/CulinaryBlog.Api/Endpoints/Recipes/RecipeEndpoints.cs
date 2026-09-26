@@ -32,19 +32,24 @@ public static class RecipeEndpoints
         int? pageSize,
         string? search,
         string? categorySlug,
+        Guid? categoryId,
         string? difficulty,
+        int? maxCookTimeMinutes,
         int? maxTotalTimeMinutes,
         string? sortBy,
         string? sortDirection,
+        string? sort,
         ISender sender,
         CancellationToken cancellationToken)
     {
         var validationResult = ValidateListOptions(
             search,
             difficulty,
+            maxCookTimeMinutes,
             maxTotalTimeMinutes,
             sortBy,
             sortDirection,
+            sort,
             out var options);
 
         if (validationResult is not null)
@@ -57,7 +62,8 @@ public static class RecipeEndpoints
             {
                 CategorySlug = string.IsNullOrWhiteSpace(categorySlug)
                     ? null
-                    : categorySlug.Trim()
+                    : categorySlug.Trim(),
+                CategoryId = categoryId
             }),
             cancellationToken);
 
@@ -67,9 +73,11 @@ public static class RecipeEndpoints
     private static IResult? ValidateListOptions(
         string? search,
         string? difficulty,
+        int? maxCookTimeMinutes,
         int? maxTotalTimeMinutes,
         string? sortBy,
         string? sortDirection,
+        string? sort,
         out RecipeListOptions options)
     {
         options = new RecipeListOptions();
@@ -102,6 +110,14 @@ public static class RecipeEndpoints
             parsedDifficulty = Enum.Parse<DifficultyLevel>(difficultyName);
         }
 
+        if (maxCookTimeMinutes is <= 0)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["maxCookTimeMinutes"] = ["Thời gian nấu tối đa phải lớn hơn 0."]
+            });
+        }
+
         if (maxTotalTimeMinutes is <= 0)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -110,9 +126,36 @@ public static class RecipeEndpoints
             });
         }
 
+        // Hỗ trợ tham số sort theo SRS FR-SRCH-003 (ví dụ: sort=-createdAt, sort=title)
+        if (!string.IsNullOrWhiteSpace(sort))
+        {
+            var trimmedSort = sort.Trim();
+            if (trimmedSort.StartsWith('-'))
+            {
+                sortDirection = "desc";
+                sortBy = trimmedSort[1..];
+            }
+            else if (trimmedSort.StartsWith('+'))
+            {
+                sortDirection = "asc";
+                sortBy = trimmedSort[1..];
+            }
+            else
+            {
+                sortDirection = "asc";
+                sortBy = trimmedSort;
+            }
+        }
+
         var sortByValue = string.IsNullOrWhiteSpace(sortBy)
             ? "publishedat"
             : sortBy.Trim().ToLowerInvariant();
+
+        if (sortByValue is "createdat" or "-createdat")
+        {
+            sortByValue = "publishedat";
+        }
+
         var parsedSortBy = sortByValue switch
         {
             "publishedat" => RecipeSortField.PublishedAt,
@@ -127,7 +170,7 @@ public static class RecipeEndpoints
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
             {
-                ["sortBy"] = ["SortBy phải là publishedAt, title, prepTime, cookTime hoặc totalTime."]
+                ["sortBy"] = ["SortBy phải là publishedAt, createdAt, title, prepTime, cookTime hoặc totalTime."]
             });
         }
 
@@ -154,7 +197,8 @@ public static class RecipeEndpoints
             Difficulty: parsedDifficulty,
             MaxTotalTimeMinutes: maxTotalTimeMinutes,
             SortBy: parsedSortBy.Value,
-            SortDescending: parsedSortDirection.Value);
+            SortDescending: parsedSortDirection.Value,
+            MaxCookTimeMinutes: maxCookTimeMinutes);
         return null;
     }
 

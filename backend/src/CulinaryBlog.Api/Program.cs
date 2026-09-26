@@ -49,8 +49,23 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await dbContext.Database.MigrateAsync();
-        await CategoryDataSeeder.SeedAsync(dbContext, targetCount: 20);
+        try
+        {
+            await dbContext.Database.MigrateAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Database migration skipped or tables already exist.");
+        }
+
+        try
+        {
+            await CategoryDataSeeder.SeedAsync(dbContext, targetCount: 20);
+        }
+        catch (Exception seedEx)
+        {
+            Log.Warning(seedEx, "Seeding skipped: {Message}", seedEx.Message);
+        }
     }
 
     // ── Middleware pipeline ───────────────────────────────────────────────────
@@ -83,4 +98,8 @@ catch (Exception ex)
 finally
 {
     Log.CloseAndFlush();
+}
+
+public partial class Program
+{
 }

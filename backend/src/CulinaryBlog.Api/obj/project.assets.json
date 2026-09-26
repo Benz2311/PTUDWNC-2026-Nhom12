@@ -4451,11 +4451,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
+      "projectUniqueName": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
       "projectName": "CulinaryBlog.API",
-      "projectPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
+      "projectPath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\CulinaryBlog.API.csproj",
       "packagesPath": "C:\\Users\\AnhNhung\\.nuget\\packages\\",
-      "outputPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\obj\\",
+      "outputPath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Api\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\AnhNhung\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -4471,11 +4471,11 @@
           "framework": "net10.0",
           "targetAlias": "net10.0",
           "projectReferences": {
-            "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj": {
-              "projectPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj"
+            "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj": {
+              "projectPath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj"
             },
-            "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj": {
-              "projectPath": "D:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj"
+            "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj": {
+              "projectPath": "d:\\BaoCao\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj"
             }
           }
         }
