@@ -3,6 +3,7 @@ using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipeBySlug;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipes;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipesByCategory;
+using CulinaryBlog.Domain.Enums;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -12,9 +13,16 @@ namespace CulinaryBlog.UnitTests.Application.Features.Recipes;
 public class RecipeQueryHandlerTests
 {
     [Fact]
-    public async Task GetRecipesHandler_DelegatesPaginationToRepository()
+    public async Task GetRecipesHandler_DelegatesFiltersAndPaginationToRepository()
     {
         var repository = new Mock<IRecipeRepository>();
+        var options = new RecipeListOptions(
+            "soup",
+            "main-dishes",
+            DifficultyLevel.Easy,
+            45,
+            RecipeSortField.TotalTime,
+            false);
         var expected = new PagedResultDto<RecipeListItemDto>(
             [],
             0,
@@ -23,12 +31,12 @@ public class RecipeQueryHandlerTests
             0);
         var cancellationToken = new CancellationTokenSource().Token;
         repository
-            .Setup(item => item.GetPublishedAsync(2, 8, cancellationToken))
+            .Setup(item => item.GetPublishedAsync(2, 8, options, cancellationToken))
             .ReturnsAsync(expected);
         var handler = new GetRecipesQueryHandler(repository.Object);
 
         var result = await handler.Handle(
-            new GetRecipesQuery(2, 8),
+            new GetRecipesQuery(2, 8, options),
             cancellationToken);
 
         result.Should().BeSameAs(expected);

@@ -46,14 +46,44 @@ public class RecipeRepository : IRecipeRepository
     public Task<PagedResultDto<RecipeListItemDto>> GetPublishedAsync(
         int page,
         int pageSize,
+        RecipeListOptions options,
         CancellationToken cancellationToken = default)
     {
+        var query = _db.Recipes
+            .AsNoTracking()
+            .Where(recipe => recipe.Status == RecipeStatus.Published);
+
+        if (!string.IsNullOrWhiteSpace(options.Search))
+        {
+            var search = options.Search.Trim();
+            query = query.Where(recipe =>
+                EF.Functions.ILike(recipe.Title, $"%{search}%") ||
+                EF.Functions.ILike(recipe.Description, $"%{search}%"));
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.CategorySlug))
+        {
+            var categorySlug = options.CategorySlug.Trim();
+            query = query.Where(recipe => recipe.Category.Slug == categorySlug);
+        }
+
+        if (options.Difficulty.HasValue)
+        {
+            query = query.Where(recipe => recipe.Difficulty == options.Difficulty.Value);
+        }
+
+        if (options.MaxTotalTimeMinutes.HasValue)
+        {
+            query = query.Where(recipe =>
+                recipe.PrepTimeMinutes + recipe.CookTimeMinutes <=
+                options.MaxTotalTimeMinutes.Value);
+        }
+
         return GetPublishedPageAsync(
-            _db.Recipes
-                .AsNoTracking()
-                .Where(recipe => recipe.Status == RecipeStatus.Published),
+            query,
             page,
             pageSize,
+            options,
             cancellationToken);
     }
 
@@ -155,6 +185,7 @@ public class RecipeRepository : IRecipeRepository
                     recipe.Status == RecipeStatus.Published),
             page,
             pageSize,
+            new RecipeListOptions(),
             cancellationToken);
 
         return new CategoryRecipesResponseDto(category, recipes);
@@ -164,6 +195,7 @@ public class RecipeRepository : IRecipeRepository
         IQueryable<Recipe> query,
         int page,
         int pageSize,
+        RecipeListOptions options,
         CancellationToken cancellationToken)
     {
         page = Math.Max(page, 1);
@@ -173,10 +205,7 @@ public class RecipeRepository : IRecipeRepository
 
         var totalCount = await query.CountAsync(cancellationToken);
         var skip = (int)Math.Min((long)(page - 1) * pageSize, int.MaxValue);
-        var items = await query
-            .OrderByDescending(recipe => recipe.PublishedAt)
-            .ThenByDescending(recipe => recipe.CreatedAt)
-            .ThenBy(recipe => recipe.Id)
+        var items = await ApplySort(query, options)
             .Select(ListProjection)
             .Skip(skip)
             .Take(pageSize)
@@ -189,5 +218,43 @@ public class RecipeRepository : IRecipeRepository
             page,
             pageSize,
             totalPages);
+    }
+
+    private static IOrderedQueryable<Recipe> ApplySort(
+        IQueryable<Recipe> query,
+        RecipeListOptions options)
+    {
+        if (options.SortBy == RecipeSortField.PublishedAt)
+        {
+            var publishedOrder = options.SortDescending
+                ? query.OrderByDescending(recipe => recipe.PublishedAt)
+                    .ThenByDescending(recipe => recipe.CreatedAt)
+                : query.OrderBy(recipe => recipe.PublishedAt)
+                    .ThenBy(recipe => recipe.CreatedAt);
+
+            return publishedOrder.ThenBy(recipe => recipe.Id);
+        }
+
+        IOrderedQueryable<Recipe> ordered = options.SortBy switch
+        {
+            RecipeSortField.Title => options.SortDescending
+                ? query.OrderByDescending(recipe => recipe.Title)
+                : query.OrderBy(recipe => recipe.Title),
+            RecipeSortField.PrepTime => options.SortDescending
+                ? query.OrderByDescending(recipe => recipe.PrepTimeMinutes)
+                : query.OrderBy(recipe => recipe.PrepTimeMinutes),
+            RecipeSortField.CookTime => options.SortDescending
+                ? query.OrderByDescending(recipe => recipe.CookTimeMinutes)
+                : query.OrderBy(recipe => recipe.CookTimeMinutes),
+            RecipeSortField.TotalTime => options.SortDescending
+                ? query.OrderByDescending(recipe =>
+                    recipe.PrepTimeMinutes + recipe.CookTimeMinutes)
+                : query.OrderBy(recipe =>
+                    recipe.PrepTimeMinutes + recipe.CookTimeMinutes),
+            _ => query.OrderByDescending(recipe => recipe.PublishedAt)
+                .ThenByDescending(recipe => recipe.CreatedAt)
+        };
+
+        return ordered.ThenBy(recipe => recipe.Id);
     }
 }

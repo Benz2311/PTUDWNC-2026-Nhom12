@@ -1,4 +1,15 @@
+using CulinaryBlog.Domain.Enums;
+
 namespace CulinaryBlog.Application.DTOs;
+
+public enum RecipeSortField
+{
+    PublishedAt,
+    Title,
+    PrepTime,
+    CookTime,
+    TotalTime
+}
 
 public record PagedResultDto<T>(
     IReadOnlyList<T> Items,
@@ -75,3 +86,11 @@ public record RecipeDetailDto(
 public record CategoryRecipesResponseDto(
     RecipeCategoryDto Category,
     PagedResultDto<RecipeListItemDto> Recipes);
+
+public record RecipeListOptions(
+    string? Search = null,
+    string? CategorySlug = null,
+    DifficultyLevel? Difficulty = null,
+    int? MaxTotalTimeMinutes = null,
+    RecipeSortField SortBy = RecipeSortField.PublishedAt,
+    bool SortDescending = true);

@@ -21,6 +21,7 @@ public class GetRecipesQueryHandler
         return _recipeRepository.GetPublishedAsync(
             request.Page,
             request.PageSize,
+            request.Options ?? new RecipeListOptions(),
             cancellationToken);
     }
 }

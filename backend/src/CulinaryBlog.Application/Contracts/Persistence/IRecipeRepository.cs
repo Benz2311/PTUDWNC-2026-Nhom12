@@ -7,6 +7,7 @@ public interface IRecipeRepository
     Task<PagedResultDto<RecipeListItemDto>> GetPublishedAsync(
         int page,
         int pageSize,
+        RecipeListOptions options,
         CancellationToken cancellationToken = default);
 
     Task<RecipeDetailDto?> GetPublishedBySlugAsync(
