@@ -5,7 +5,7 @@ namespace CulinaryBlog.Application.Contracts.Persistence;
 
 public interface ICategoryRepository
 {
-    Task<IReadOnlyList<Category>> GetAllWithRecipeCountAsync(
+    Task<IReadOnlyList<CategoryDto>> GetAllWithRecipeCountAsync(
         CancellationToken cancellationToken = default);
 
     Task<Category?> GetBySlugAsync(

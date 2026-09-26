@@ -1,7 +1,6 @@
 using CulinaryBlog.Application.Contracts.Persistence;
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Features.Categories.Queries.GetCategories;
-using CulinaryBlog.Domain.Entities;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -20,23 +19,24 @@ public class GetCategoriesQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_WhenRepositoryReturnsCategories_ReturnsMappedDtos()
+    public async Task Handle_WhenRepositoryReturnsDtos_ReturnsThemInRepositoryOrder()
     {
         // Arrange
-        var catA = Category.Create("Món Chính", orderIndex: 2);
-        var catB = Category.Create("Khai Vị", orderIndex: 1);
+        var categories = new List<CategoryDto>
+        {
+            new(Guid.NewGuid(), "Appetizers", "appetizers", null, null, 1, 3),
+            new(Guid.NewGuid(), "Main dishes", "main-dishes", null, null, 2, 5)
+        };
 
         _repositoryMock
             .Setup(r => r.GetAllWithRecipeCountAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Category> { catA, catB });
+            .ReturnsAsync(categories);
 
         // Act
         var result = await _handler.Handle(new GetCategoriesQuery(), CancellationToken.None);
 
         // Assert
-        result.Should().HaveCount(2);
-        result[0].Name.Should().Be("Khai Vị", "categories are ordered by OrderIndex ascending");
-        result[1].Name.Should().Be("Món Chính");
+        result.Should().BeSameAs(categories);
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public class GetCategoriesQueryHandlerTests
         // Arrange
         _repositoryMock
             .Setup(r => r.GetAllWithRecipeCountAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Category>());
+            .ReturnsAsync(new List<CategoryDto>());
 
         // Act
         var result = await _handler.Handle(new GetCategoriesQuery(), CancellationToken.None);
@@ -60,7 +60,7 @@ public class GetCategoriesQueryHandlerTests
         // Arrange
         _repositoryMock
             .Setup(r => r.GetAllWithRecipeCountAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Category>());
+            .ReturnsAsync(new List<CategoryDto>());
 
         // Act
         await _handler.Handle(new GetCategoriesQuery(), CancellationToken.None);
@@ -72,37 +72,25 @@ public class GetCategoriesQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ResultItemsAreCategoryDtoType()
+    public async Task Handle_ReturnsProjectedCategoryFields()
     {
         // Arrange
-        var category = Category.Create("Tráng Miệng");
+        var category = new CategoryDto(
+            Guid.NewGuid(),
+            "Desserts",
+            "desserts",
+            "Sweet dishes",
+            null,
+            3,
+            2);
         _repositoryMock
             .Setup(r => r.GetAllWithRecipeCountAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Category> { category });
+            .ReturnsAsync(new List<CategoryDto> { category });
 
         // Act
         var result = await _handler.Handle(new GetCategoriesQuery(), CancellationToken.None);
 
         // Assert
-        result.Should().AllBeOfType<CategoryDto>();
-    }
-
-    [Fact]
-    public async Task Handle_CategoriesWithSameOrderIndex_OrderedByNameAscending()
-    {
-        // Arrange — use ASCII names so default string ordering is predictable
-        var catB = Category.Create("Beverages", orderIndex: 0);
-        var catA = Category.Create("Appetizers", orderIndex: 0);
-        var catC = Category.Create("Desserts", orderIndex: 0);
-
-        _repositoryMock
-            .Setup(r => r.GetAllWithRecipeCountAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Category> { catB, catA, catC });
-
-        // Act
-        var result = await _handler.Handle(new GetCategoriesQuery(), CancellationToken.None);
-
-        // Assert
-        result.Select(r => r.Name).Should().BeInAscendingOrder();
+        result.Should().ContainSingle().Which.Should().Be(category);
     }
 }

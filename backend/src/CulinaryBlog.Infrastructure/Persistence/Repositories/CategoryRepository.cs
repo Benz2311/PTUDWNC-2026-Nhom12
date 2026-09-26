@@ -1,4 +1,5 @@
 using CulinaryBlog.Application.Contracts.Persistence;
+using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,14 +14,23 @@ public class CategoryRepository : ICategoryRepository
         _db = db;
     }
 
-    public async Task<IReadOnlyList<Category>>
+    public async Task<IReadOnlyList<CategoryDto>>
         GetAllWithRecipeCountAsync(
             CancellationToken cancellationToken = default)
     {
         return await _db.Categories
             .AsNoTracking()
-            .Include(c => c.Recipes)
-            .OrderBy(c => c.Name)
+            .OrderBy(category => category.OrderIndex)
+            .ThenBy(category => category.Name)
+            .Select(category => new CategoryDto(
+                category.Id,
+                category.Name,
+                category.Slug,
+                category.Description,
+                category.ImageUrl,
+                category.OrderIndex,
+                category.Recipes.Count(recipe =>
+                    recipe.Status == RecipeStatus.Published)))
             .ToListAsync(cancellationToken);
     }
 
@@ -40,6 +50,7 @@ public class CategoryRepository : ICategoryRepository
         CancellationToken cancellationToken = default)
     {
         return await _db.Categories
+            .AsNoTracking()
             .FirstOrDefaultAsync(
                 c => c.Id == id,
                 cancellationToken);
