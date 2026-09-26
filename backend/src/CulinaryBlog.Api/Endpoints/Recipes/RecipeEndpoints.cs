@@ -1,6 +1,7 @@
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipeBySlug;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipes;
+using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipesByCategory;
 using CulinaryBlog.Domain.Enums;
 using MediatR;
 
@@ -16,6 +17,10 @@ public static class RecipeEndpoints
         group.MapGet("/", GetRecipes)
             .WithName("GetRecipes")
             .WithSummary("Lấy danh sách công thức đã xuất bản");
+
+        group.MapGet("/category/{categorySlug}", GetRecipesByCategory)
+            .WithName("GetRecipesByCategory")
+            .WithSummary("Lấy danh sách công thức theo danh mục");
 
         group.MapGet("/{slug}", GetRecipeBySlug)
             .WithName("GetRecipeBySlug")
@@ -160,6 +165,22 @@ public static class RecipeEndpoints
     {
         var result = await sender.Send(
             new GetRecipeBySlugQuery(slug),
+            cancellationToken);
+
+        return result is null
+            ? Results.NotFound()
+            : Results.Ok(result);
+    }
+
+    private static async Task<IResult> GetRecipesByCategory(
+        string categorySlug,
+        int? page,
+        int? pageSize,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new GetRecipesByCategoryQuery(categorySlug, page ?? 1, pageSize ?? 12),
             cancellationToken);
 
         return result is null

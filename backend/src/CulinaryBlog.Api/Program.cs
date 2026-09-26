@@ -72,6 +72,7 @@ try
     app.UseSerilogRequestLogging();
 
     app.MapCategoryEndpoints();
+    app.MapRecipeEndpoints();
 
     app.Run();
 }

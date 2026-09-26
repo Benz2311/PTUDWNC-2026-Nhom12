@@ -1,6 +1,7 @@
 using CulinaryBlog.Application.Contracts.Persistence;
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Domain.Entities;
+using CulinaryBlog.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace CulinaryBlog.Infrastructure.Persistence.Repositories;

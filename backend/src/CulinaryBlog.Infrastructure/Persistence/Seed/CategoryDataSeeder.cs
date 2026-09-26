@@ -377,10 +377,6 @@ public static class CategoryDataSeeder
                     imageUrl: imageUrl,
                     orderIndex: orderIndex++);
 
-                category.RowVersion = new byte[8];
-                category.IsDeleted = false;
-                category.CreatedAt = DateTime.UtcNow;
-
                 categoriesToAdd.Add(category);
 
                 existingCategoryNames.Add(nameLower);
@@ -426,10 +422,6 @@ public static class CategoryDataSeeder
                     description: description,
                     imageUrl: imageUrl,
                     orderIndex: orderIndex++);
-
-                category.RowVersion = new byte[8];
-                category.IsDeleted = false;
-                category.CreatedAt = DateTime.UtcNow;
 
                 categoriesToAdd.Add(category);
 

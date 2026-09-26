@@ -32,6 +32,7 @@ public static class DependencyInjection
 
         // ── Repositories ──────────────────────────────────────────────────────
         services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<IRecipeRepository, RecipeRepository>();
 
         // ── Authentication — ASP.NET Core Identity + JWT ─────────────────────
         var jwtSettings = configuration
