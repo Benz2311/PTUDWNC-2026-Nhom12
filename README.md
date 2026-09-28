@@ -60,7 +60,7 @@
 ------------------------------------------------------------------------------------------------
 ### Chi tiết đã làm :
 Tạo file docs/database/explain-analyze-category-recipe.md phân tích chi tiết kế hoạch thực thi (Index Scan vs Seq Scan, thời gian chạy dưới 1ms, chứng minh không bị N+1) cho 4 câu truy vấn chính.
-Xây dựng Unit Tests: Tạo mới các file kiểm thử tự động bằng xUnit + Moq + FluentAssertions: 
+1. Xây dựng Unit Tests: Tạo mới các file kiểm thử tự động bằng xUnit + Moq + FluentAssertions: 
 - CategoryQueryHandlerTests.cs: test lấy danh mục, kiểm tra từng trường DTO, test thống kê tổng số món, món published/draft.
 - RecipeQueryHandlerTests.cs: test lọc, sắp xếp, phân trang, lấy chi tiết món ăn và lấy món theo danh mục.
 2. Chuẩn hóa theo tài liệu SRS v1.1.1 (Reconciled Final) & Báo cáo rà soát mâu thuẫn:
@@ -68,12 +68,12 @@ Chuẩn hóa Category (SRS 7.6 & Table 8.2):
 - Bổ sung property getter SortOrder => OrderIndex cho entity Category.cs và CategoryDto.cs.
 - Cấu hình index Name là IsUnique() trong CategoryConfiguration.cs .
 - Bổ sung route GET /api/v1/categories/{slug} và /api/categories/{slug} trong CategoryEndpoints.cs (khớp Bảng 8.2 SRS và sửa lỗi 404 khi frontend Next.js gọi trang chi tiết danh mục).
-  Chuẩn hóa Hợp đồng Phân trang (Mục 17 SRS):Bổ sung cấu trúc data.items + meta (total, totalPages, hasNextPage, hasPreviousPage) vào RecipeReadDtos.cs và method ToPaginatedResponse(), đồng thời vẫn giữ tương thích ngược với frontend.
-  Chuẩn hóa Dinh dưỡng RecipeNutrition (Mục 8 SRS):Bổ sung property Carbs cho entity RecipeNutrition.cs .
-  Chuẩn hóa 4 trường cốt lõi Calories, Protein, Carbs, Fat cho RecipeNutritionDto kèm alias Carbohydrates => Carbs.
-  Chuẩn hóa HTTP Status Code Validation (Mục 13 & 23 SRS): Cập nhật ValidateListOptions trong RecipeEndpoints.cs trả về đúng mã 422 Unprocessable Entity (thay vì 400).
- Mở rộng khả năng truy vấn:
- Hỗ trợ thêm CategoryId, MaxCookTimeMinutes, tham số sort dạng -createdAt, và bổ sung thông tin tác giả RecipeAuthorDto trong chi tiết Recipe.
+- Chuẩn hóa Hợp đồng Phân trang (Mục 17 SRS):Bổ sung cấu trúc data.items + meta (total, totalPages, hasNextPage, hasPreviousPage) vào RecipeReadDtos.cs và method ToPaginatedResponse(), đồng thời vẫn giữ tương thích ngược với frontend.
+- Chuẩn hóa Dinh dưỡng RecipeNutrition (Mục 8 SRS):Bổ sung property Carbs cho entity RecipeNutrition.cs .
+- Chuẩn hóa 4 trường cốt lõi Calories, Protein, Carbs, Fat cho RecipeNutritionDto kèm alias Carbohydrates => Carbs.
+- Chuẩn hóa HTTP Status Code Validation (Mục 13 & 23 SRS): Cập nhật ValidateListOptions trong RecipeEndpoints.cs trả về đúng mã 422 Unprocessable Entity (thay vì 400).
+- Mở rộng khả năng truy vấn:
+- Hỗ trợ thêm CategoryId, MaxCookTimeMinutes, tham số sort dạng -createdAt, và bổ sung thông tin tác giả RecipeAuthorDto trong chi tiết Recipe.
 # Cài đặt PostgreSQL bằng Docker
 
 Project sử dụng **PostgreSQL 16** chạy bằng Docker.
