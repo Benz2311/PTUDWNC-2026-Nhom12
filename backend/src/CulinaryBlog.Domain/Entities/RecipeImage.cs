@@ -27,4 +27,17 @@ public class RecipeImage
     public bool IsDeleted { get; set; }
 
     public byte[] RowVersion { get; set; } = new byte[8];
+
+    public void Validate()
+    {
+        if (OrderIndex < 0)
+        {
+            throw new Exceptions.InvalidRecipeImageException($"Order index cannot be negative. Actual: {OrderIndex}");
+        }
+
+        if (string.IsNullOrWhiteSpace(OriginalUrl))
+        {
+            throw new Exceptions.InvalidRecipeImageException("OriginalUrl cannot be empty.");
+        }
+    }
 }

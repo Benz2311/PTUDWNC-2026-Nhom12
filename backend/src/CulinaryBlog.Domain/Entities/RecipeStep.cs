@@ -25,4 +25,17 @@ public class RecipeStep
     public bool IsDeleted { get; set; }
 
     public byte[] RowVersion { get; set; } = new byte[8];
+
+    public void Validate()
+    {
+        if (StepNumber < 1)
+        {
+            throw new Exceptions.InvalidRecipeStepException($"Step number must be >= 1. Actual: {StepNumber}");
+        }
+
+        if (TimerMinutes.HasValue && TimerMinutes.Value < 0)
+        {
+            throw new Exceptions.InvalidRecipeStepException($"Timer minutes cannot be negative. Actual: {TimerMinutes.Value}");
+        }
+    }
 }
