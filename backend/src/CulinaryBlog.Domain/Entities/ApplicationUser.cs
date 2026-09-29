@@ -8,9 +8,17 @@ public class ApplicationUser
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
+    public string FullName
+    {
+        get => DisplayName;
+        set => DisplayName = value;
+    }
 
     public string? AvatarUrl { get; set; }
     public string? Bio { get; set; }
+
+    public bool EmailConfirmed { get; set; }
+    public string[] Roles { get; set; } = ["Author"];
 
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
