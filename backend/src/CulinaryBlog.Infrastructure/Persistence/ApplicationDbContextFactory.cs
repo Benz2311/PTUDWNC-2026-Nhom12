@@ -10,15 +10,15 @@ public class ApplicationDbContextFactory
     {
         var host =
             Environment.GetEnvironmentVariable("POSTGRES_HOST")
-            ?? "localhost";
+            ?? "127.0.0.1";
 
         var port =
             Environment.GetEnvironmentVariable("POSTGRES_PORT")
-            ?? "5433";
+            ?? "5432";
 
         var database =
             Environment.GetEnvironmentVariable("POSTGRES_DB")
-            ?? "culinary_blog";
+            ?? "culinaryblog_db";
 
         var username =
             Environment.GetEnvironmentVariable("POSTGRES_USER")
@@ -26,8 +26,7 @@ public class ApplicationDbContextFactory
 
         var password =
             Environment.GetEnvironmentVariable("POSTGRES_PASSWORD")
-            ?? throw new InvalidOperationException(
-                "POSTGRES_PASSWORD chưa được cấu hình.");
+            ?? "YourStrongPassword123";
 
         var connectionString =
             $"Host={host};" +
@@ -35,6 +34,8 @@ public class ApplicationDbContextFactory
             $"Database={database};" +
             $"Username={username};" +
             $"Password={password}";
+
+        Console.WriteLine($"[DEBUG] Connection string: {connectionString}");
 
         var optionsBuilder =
             new DbContextOptionsBuilder<ApplicationDbContext>();

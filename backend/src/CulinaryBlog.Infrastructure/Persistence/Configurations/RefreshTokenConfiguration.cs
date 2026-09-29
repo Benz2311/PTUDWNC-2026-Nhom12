@@ -34,7 +34,8 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
             .HasMaxLength(64);
 
         builder.Property(x => x.CreatedAt)
-            .IsRequired();
+            .IsRequired()
+            .HasDefaultValueSql("NOW()");
 
         builder.Property(x => x.CreatedByIp)
             .HasMaxLength(45);
