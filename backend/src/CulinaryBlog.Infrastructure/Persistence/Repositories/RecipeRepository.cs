@@ -25,9 +25,9 @@ public class RecipeRepository : IRecipeRepository
             recipe.Images
                 .Where(image => !image.IsDeleted)
                 .OrderByDescending(image => image.IsPrimary)
-                .ThenBy(image => image.SortOrder)
+                .ThenBy(image => image.OrderIndex)
                 .ThenBy(image => image.Id)
-                .Select(image => image.Url)
+                .Select(image => image.OriginalUrl)
                 .FirstOrDefault(),
             new RecipeCategoryDto(
                 recipe.Category.Id,
@@ -142,20 +142,20 @@ public class RecipeRepository : IRecipeRepository
                     .Select(step => new RecipeStepDto(
                         step.Id,
                         step.StepNumber,
-                        step.Title,
+                        step.Title ?? string.Empty,
                         step.Description))
                     .ToList(),
                 recipe.Images
                     .Where(image => !image.IsDeleted)
                     .OrderByDescending(image => image.IsPrimary)
-                    .ThenBy(image => image.SortOrder)
+                    .ThenBy(image => image.OrderIndex)
                     .ThenBy(image => image.Id)
                     .Select(image => new RecipeImageDto(
                         image.Id,
-                        image.Url,
+                        image.OriginalUrl,
                         image.AltText,
                         image.IsPrimary,
-                        image.SortOrder))
+                        image.OrderIndex))
                     .ToList(),
                 new RecipeNutritionDto(
                     recipe.Nutrition.Calories,

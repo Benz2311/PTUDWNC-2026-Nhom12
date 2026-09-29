@@ -34,6 +34,9 @@ public static class DependencyInjection
                 warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
         });
 
+        services.AddScoped<IApplicationDbContext>(provider =>
+            provider.GetRequiredService<ApplicationDbContext>());
+
         // ── Repositories ──────────────────────────────────────────────────────
         services.AddScoped<CulinaryBlog.Application.Contracts.Persistence.ICategoryRepository, CategoryRepository>();
         services.AddScoped<CulinaryBlog.Application.Contracts.Persistence.IRecipeRepository, CulinaryBlog.Infrastructure.Persistence.Repositories.RecipeRepository>();
@@ -71,12 +74,27 @@ public static class DependencyInjection
         services.AddAuthorization();
         services.AddSingleton<JwtService>();
 
-        // ── Redis Cache — StackExchange.Redis ─────────────────────────────────
-        services.AddStackExchangeRedisCache(options =>
+        // ── Redis Cache — StackExchange.Redis / Resilient Cache ──────────────
+        var redisConnection = configuration.GetConnectionString("Redis")
+            ?? configuration["REDIS_CONNECTION"];
+        if (!string.IsNullOrWhiteSpace(redisConnection))
         {
-            options.Configuration = configuration.GetConnectionString("Redis");
-        });
-        services.AddSingleton<ICacheService, RedisCacheService>();
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = redisConnection;
+                options.InstanceName = "CulinaryBlog:";
+            });
+        }
+        else
+        {
+            services.AddDistributedMemoryCache();
+        }
+
+        services.AddSingleton<ResilientCacheService>();
+        services.AddSingleton<CulinaryBlog.Application.Common.Interfaces.ICacheService>(sp =>
+            sp.GetRequiredService<ResilientCacheService>());
+        services.AddSingleton<CulinaryBlog.Application.Interfaces.ICacheService>(sp =>
+            sp.GetRequiredService<ResilientCacheService>());
 
         // ── Object Storage — AWSSDK.S3 → MinIO ───────────────────────────────
         services.AddSingleton<IStorageService, S3StorageService>();

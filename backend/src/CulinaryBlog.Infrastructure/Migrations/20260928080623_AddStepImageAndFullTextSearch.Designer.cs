@@ -3,6 +3,7 @@ using System;
 using CulinaryBlog.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using NpgsqlTypes;
@@ -12,9 +13,11 @@ using NpgsqlTypes;
 namespace CulinaryBlog.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260928080623_AddStepImageAndFullTextSearch")]
+    partial class AddStepImageAndFullTextSearch
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -91,102 +94,32 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("ImageUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.Property<int>("OrderIndex")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                        .HasColumnType("integer");
 
                     b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasColumnType("bytea");
 
                     b.Property<string>("Slug")
                         .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name");
-
-                    b.HasIndex("OrderIndex");
-
-                    b.HasIndex("Slug")
-                        .IsUnique();
-
-                    b.ToTable("Categories", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("10000000-0000-0000-0000-000000000001"),
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Các món ăn chính trong bữa cơm Việt",
-                            IsDeleted = false,
-                            Name = "Món Chính",
-                            OrderIndex = 1,
-                            RowVersion = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
-                            Slug = "mon-chinh"
-                        },
-                        new
-                        {
-                            Id = new Guid("10000000-0000-0000-0000-000000000002"),
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Canh và súp truyền thống",
-                            IsDeleted = false,
-                            Name = "Món Canh",
-                            OrderIndex = 2,
-                            RowVersion = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
-                            Slug = "mon-canh"
-                        },
-                        new
-                        {
-                            Id = new Guid("10000000-0000-0000-0000-000000000003"),
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Các loại bánh, chè và tráng miệng",
-                            IsDeleted = false,
-                            Name = "Món Tráng Miệng",
-                            OrderIndex = 3,
-                            RowVersion = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
-                            Slug = "mon-trang-mieng"
-                        },
-                        new
-                        {
-                            Id = new Guid("10000000-0000-0000-0000-000000000004"),
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Nước ép, sinh tố và thức uống",
-                            IsDeleted = false,
-                            Name = "Đồ Uống",
-                            OrderIndex = 4,
-                            RowVersion = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
-                            Slug = "do-uong"
-                        },
-                        new
-                        {
-                            Id = new Guid("10000000-0000-0000-0000-000000000005"),
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Snack và đồ ăn nhẹ",
-                            IsDeleted = false,
-                            Name = "Ăn Vặt",
-                            OrderIndex = 5,
-                            RowVersion = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
-                            Slug = "an-vat"
-                        });
+                    b.ToTable("Categories");
                 });
 
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.Recipe", b =>
@@ -313,11 +246,11 @@ namespace CulinaryBlog.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("RecipeId", "OrderIndex");
-
                     b.HasIndex("RecipeId", "IsPrimary")
                         .IsUnique()
                         .HasFilter("\"IsPrimary\" = true AND \"IsDeleted\" = false");
+
+                    b.HasIndex("RecipeId", "OrderIndex");
 
                     b.ToTable("RecipeImages", null, t =>
                         {
@@ -483,7 +416,7 @@ namespace CulinaryBlog.Infrastructure.Migrations
                     b.HasOne("CulinaryBlog.Domain.Entities.Category", "Category")
                         .WithMany("Recipes")
                         .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.OwnsOne("CulinaryBlog.Domain.Entities.RecipeNutrition", "Nutrition", b1 =>

@@ -38,7 +38,10 @@ public sealed class RecipePersistenceModelTests
         var images = context.Model.FindEntityType(typeof(RecipeImage))!;
 
         var stepIndex = FindIndex(steps, nameof(RecipeStep.RecipeId), nameof(RecipeStep.StepNumber));
-        var imageIndex = FindIndex(images, nameof(RecipeImage.RecipeId), nameof(RecipeImage.SortOrder));
+        var imagePropertyName = images.FindProperty(nameof(RecipeImage.OrderIndex)) != null
+            ? nameof(RecipeImage.OrderIndex)
+            : nameof(RecipeImage.SortOrder);
+        var imageIndex = FindIndex(images, nameof(RecipeImage.RecipeId), imagePropertyName);
 
         Assert.True(stepIndex.IsUnique);
         Assert.False(imageIndex.IsUnique);

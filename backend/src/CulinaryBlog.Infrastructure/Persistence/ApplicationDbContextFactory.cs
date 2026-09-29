@@ -14,7 +14,7 @@ public class ApplicationDbContextFactory
 
         var port =
             Environment.GetEnvironmentVariable("POSTGRES_PORT")
-            ?? "5433";
+            ?? "5432";
 
         var database =
             Environment.GetEnvironmentVariable("POSTGRES_DB")
@@ -26,20 +26,22 @@ public class ApplicationDbContextFactory
 
         var password =
             Environment.GetEnvironmentVariable("POSTGRES_PASSWORD")
-            ?? throw new InvalidOperationException(
-                "POSTGRES_PASSWORD chưa được cấu hình.");
+            ?? "Manh80891234567";
 
         var connectionString =
             $"Host={host};" +
             $"Port={port};" +
             $"Database={database};" +
             $"Username={username};" +
-            $"Password={password}";
+            $"Password={password};" +
+            "Include Error Detail=true";
 
         var optionsBuilder =
             new DbContextOptionsBuilder<ApplicationDbContext>();
 
         optionsBuilder.UseNpgsql(connectionString);
+        optionsBuilder.ConfigureWarnings(warnings =>
+            warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
 
         return new ApplicationDbContext(
             optionsBuilder.Options);

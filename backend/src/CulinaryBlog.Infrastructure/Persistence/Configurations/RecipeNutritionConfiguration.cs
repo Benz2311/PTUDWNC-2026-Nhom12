@@ -25,6 +25,8 @@ public class RecipeNutritionConfiguration
                     .HasPrecision(8, 2)
                     .HasColumnName("Nutrition_Carbohydrates");
 
+                nutrition.Ignore(x => x.Carbs);
+
                 nutrition.Property(x => x.Fat)
                     .HasPrecision(8, 2)
                     .HasColumnName("Nutrition_Fat");
