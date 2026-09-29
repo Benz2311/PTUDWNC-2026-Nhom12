@@ -3,10 +3,9 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using CulinaryBlog.Application.DTOs.Auth;
+using CulinaryBlog.Application.Repositories;
 using CulinaryBlog.Application.Services;
 using CulinaryBlog.Domain.Entities;
-using CulinaryBlog.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
@@ -15,16 +14,22 @@ namespace CulinaryBlog.Infrastructure.Services;
 
 public class AuthService : IAuthService
 {
-    private readonly ApplicationDbContext _db;
+    private readonly IUserRepository _userRepository;
+    private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IConfiguration _configuration;
     private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
 
     public AuthService(
-        ApplicationDbContext db,
+        IUserRepository userRepository,
+        IRefreshTokenRepository refreshTokenRepository,
+        IUnitOfWork unitOfWork,
         IConfiguration configuration,
         IPasswordHasher<ApplicationUser> passwordHasher)
     {
-        _db = db;
+        _userRepository = userRepository;
+        _refreshTokenRepository = refreshTokenRepository;
+        _unitOfWork = unitOfWork;
         _configuration = configuration;
         _passwordHasher = passwordHasher;
     }
@@ -36,14 +41,10 @@ public class AuthService : IAuthService
         var userName = request.UserName.Trim();
         var email = request.Email.Trim().ToLowerInvariant();
 
-        if (await _db.Users
-                .AsNoTracking()
-                .AnyAsync(x => x.UserName == userName))
+        if (await _userRepository.ExistsByUserNameAsync(userName))
             throw new InvalidOperationException("Username already exists.");
 
-        if (await _db.Users
-                .AsNoTracking()
-                .AnyAsync(x => x.Email == email))
+        if (await _userRepository.ExistsByEmailAsync(email))
             throw new InvalidOperationException("Email already exists.");
 
         var user = new ApplicationUser
@@ -64,8 +65,8 @@ public class AuthService : IAuthService
             user,
             request.Password);
 
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync();
+        await _userRepository.AddAsync(user);
+        await _unitOfWork.SaveChangesAsync();
 
         return await CreateAuthResponseAsync(user, ipAddress);
     }
@@ -76,21 +77,7 @@ public class AuthService : IAuthService
     {
         var login = request.UserNameOrEmail.Trim();
 
-        var user = await _db.Users
-            .AsNoTracking()
-            .Where(x => x.UserName == login || x.Email == login.ToLowerInvariant())
-            .Select(x => new
-            {
-                x.Id,
-                x.UserName,
-                x.Email,
-                x.PasswordHash,
-                x.IsActive,
-                x.DisplayName,
-                x.AvatarUrl,
-                x.Bio
-            })
-            .FirstOrDefaultAsync();
+        var user = await _userRepository.GetByEmailOrUserNameAsync(login);
 
         if (user is null)
             throw new UnauthorizedAccessException("Invalid username/email or password.");
@@ -133,10 +120,7 @@ public class AuthService : IAuthService
     {
         var tokenHash = HashToken(request.RefreshToken);
 
-        var storedToken = await _db.RefreshTokens
-            .AsNoTracking()
-            .Include(x => x.User)
-            .FirstOrDefaultAsync(x => x.TokenHash == tokenHash);
+        var storedToken = await _refreshTokenRepository.GetByTokenHashWithUserAsync(tokenHash);
 
         if (storedToken is null)
             throw new UnauthorizedAccessException("Invalid refresh token.");
@@ -149,11 +133,12 @@ public class AuthService : IAuthService
 
         var response = await CreateAuthResponseAsync(storedToken.User, ipAddress);
 
-        await _db.RefreshTokens
-            .Where(x => x.TokenHash == tokenHash)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(x => x.RevokedAt, DateTimeOffset.UtcNow)
-                .SetProperty(x => x.ReplacedByTokenHash, HashToken(response.RefreshToken)));
+        await _refreshTokenRepository.RevokeAsync(
+            tokenHash,
+            DateTimeOffset.UtcNow,
+            HashToken(response.RefreshToken));
+
+        await _unitOfWork.SaveChangesAsync();
 
         return response;
     }
@@ -162,29 +147,26 @@ public class AuthService : IAuthService
     {
         var tokenHash = HashToken(refreshToken);
 
-        await _db.RefreshTokens
-            .Where(x => x.TokenHash == tokenHash)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(x => x.RevokedAt, DateTimeOffset.UtcNow));
+        await _refreshTokenRepository.RevokeAsync(tokenHash, DateTimeOffset.UtcNow);
+        await _unitOfWork.SaveChangesAsync();
     }
 
     public async Task<UserResponse?> GetMeAsync(string userId)
     {
-        var user = await _db.Users
-            .AsNoTracking()
-            .Where(x => x.Id == userId)
-            .Select(x => new UserResponse
-            {
-                Id = x.Id,
-                UserName = x.UserName ?? string.Empty,
-                Email = x.Email ?? string.Empty,
-                DisplayName = x.DisplayName,
-                AvatarUrl = x.AvatarUrl,
-                Bio = x.Bio
-            })
-            .FirstOrDefaultAsync();
+        var profile = await _userRepository.GetProfileAsync(userId);
 
-        return user;
+        if (profile is null)
+            return null;
+
+        return new UserResponse
+        {
+            Id = profile.Id,
+            UserName = profile.UserName,
+            Email = profile.Email,
+            DisplayName = profile.DisplayName,
+            AvatarUrl = profile.AvatarUrl,
+            Bio = profile.Bio
+        };
     }
 
     private async Task<AuthResponse> CreateAuthResponseAsync(
@@ -205,8 +187,8 @@ public class AuthService : IAuthService
             CreatedByIp = ipAddress
         };
 
-        _db.RefreshTokens.Add(refreshTokenEntity);
-        await _db.SaveChangesAsync();
+        await _refreshTokenRepository.AddAsync(refreshTokenEntity);
+        await _unitOfWork.SaveChangesAsync();
 
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(
             _configuration.GetValue<int>("Jwt:AccessTokenMinutes", 60));

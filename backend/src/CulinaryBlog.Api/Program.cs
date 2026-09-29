@@ -1,6 +1,8 @@
 using System.Text;
+using CulinaryBlog.Application.Repositories;
 using CulinaryBlog.Application.Services;
 using CulinaryBlog.Infrastructure.Persistence;
+using CulinaryBlog.Infrastructure.Repositories;
 using CulinaryBlog.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -26,6 +28,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<
     IPasswordHasher<CulinaryBlog.Domain.Entities.ApplicationUser>,
     PasswordHasher<CulinaryBlog.Domain.Entities.ApplicationUser>>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services
