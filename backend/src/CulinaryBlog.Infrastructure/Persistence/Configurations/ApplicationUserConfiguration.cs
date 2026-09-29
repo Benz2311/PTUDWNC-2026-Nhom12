@@ -28,6 +28,25 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
             .IsRequired()
             .HasDefaultValueSql("NOW()");
 
+        builder.HasIndex(x => x.Email)
+            .IsUnique()
+            .HasDatabaseName("IX_AspNetUsers_Email");
+
+        builder.HasIndex(x => x.NormalizedEmail)
+            .IsUnique()
+            .HasDatabaseName("IX_AspNetUsers_NormalizedEmail");
+
+        builder.HasIndex(x => x.UserName)
+            .IsUnique()
+            .HasDatabaseName("IX_AspNetUsers_UserName");
+
+        builder.HasIndex(x => x.NormalizedUserName)
+            .IsUnique()
+            .HasDatabaseName("IX_AspNetUsers_NormalizedUserName");
+
+        builder.HasIndex(x => x.IsActive)
+            .HasDatabaseName("IX_AspNetUsers_IsActive");
+
         builder.HasMany(x => x.RefreshTokens)
             .WithOne(x => x.User)
             .HasForeignKey(x => x.UserId)
