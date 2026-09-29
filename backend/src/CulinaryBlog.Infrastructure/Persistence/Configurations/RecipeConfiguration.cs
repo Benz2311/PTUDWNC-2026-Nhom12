@@ -25,11 +25,7 @@ public class RecipeConfiguration
         builder.Property(r => r.Description)
             .HasColumnType("text");
 
-        builder.Property(r => r.Difficulty)
-            .HasConversion<string>();
 
-        builder.Property(r => r.Status)
-            .HasConversion<string>();
 
         builder.HasIndex(r => r.Slug)
             .IsUnique();

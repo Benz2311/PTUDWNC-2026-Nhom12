@@ -50,6 +50,10 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(x => x.CreatedAt)
             .IsRequired();
 
+        builder.Ignore(x => x.FullName);
+        builder.Ignore(x => x.EmailConfirmed);
+        builder.Ignore(x => x.Roles);
+
         builder.HasMany(x => x.RefreshTokens)
             .WithOne(x => x.User)
             .HasForeignKey(x => x.UserId)

@@ -1,11 +1,9 @@
 using CulinaryBlog.Application.Contracts.Persistence;
 using CulinaryBlog.Application.DTOs;
-using MediatR;
 
 namespace CulinaryBlog.Application.Features.Recipes.Queries.GetRecipeBySlug;
 
 public class GetRecipeBySlugQueryHandler
-    : IRequestHandler<GetRecipeBySlugQuery, RecipeDetailDto?>
 {
     private readonly IRecipeRepository _recipeRepository;
 
@@ -16,7 +14,7 @@ public class GetRecipeBySlugQueryHandler
 
     public Task<RecipeDetailDto?> Handle(
         GetRecipeBySlugQuery request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         return _recipeRepository.GetPublishedBySlugAsync(
             request.Slug,
