@@ -3,6 +3,7 @@ using System;
 using CulinaryBlog.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using NpgsqlTypes;
@@ -12,9 +13,11 @@ using NpgsqlTypes;
 namespace CulinaryBlog.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260928080623_AddStepImageAndFullTextSearch")]
+    partial class AddStepImageAndFullTextSearch
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -32,34 +35,48 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("AvatarUrl")
-                        .HasColumnType("text");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<string>("Bio")
-                        .HasColumnType("text");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("UserName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("UserName")
+                        .IsUnique();
 
                     b.ToTable("Users", (string)null);
                 });
@@ -77,102 +94,32 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("ImageUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.Property<int>("OrderIndex")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                        .HasColumnType("integer");
 
                     b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasColumnType("bytea");
 
                     b.Property<string>("Slug")
                         .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name");
-
-                    b.HasIndex("OrderIndex");
-
-                    b.HasIndex("Slug")
-                        .IsUnique();
-
-                    b.ToTable("Categories", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("10000000-0000-0000-0000-000000000001"),
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Các món ăn chính trong bữa cơm Việt",
-                            IsDeleted = false,
-                            Name = "Món Chính",
-                            OrderIndex = 1,
-                            RowVersion = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
-                            Slug = "mon-chinh"
-                        },
-                        new
-                        {
-                            Id = new Guid("10000000-0000-0000-0000-000000000002"),
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Canh và súp truyền thống",
-                            IsDeleted = false,
-                            Name = "Món Canh",
-                            OrderIndex = 2,
-                            RowVersion = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
-                            Slug = "mon-canh"
-                        },
-                        new
-                        {
-                            Id = new Guid("10000000-0000-0000-0000-000000000003"),
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Các loại bánh, chè và tráng miệng",
-                            IsDeleted = false,
-                            Name = "Món Tráng Miệng",
-                            OrderIndex = 3,
-                            RowVersion = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
-                            Slug = "mon-trang-mieng"
-                        },
-                        new
-                        {
-                            Id = new Guid("10000000-0000-0000-0000-000000000004"),
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Nước ép, sinh tố và thức uống",
-                            IsDeleted = false,
-                            Name = "Đồ Uống",
-                            OrderIndex = 4,
-                            RowVersion = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
-                            Slug = "do-uong"
-                        },
-                        new
-                        {
-                            Id = new Guid("10000000-0000-0000-0000-000000000005"),
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Snack và đồ ăn nhẹ",
-                            IsDeleted = false,
-                            Name = "Ăn Vặt",
-                            OrderIndex = 5,
-                            RowVersion = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 },
-                            Slug = "an-vat"
-                        });
+                    b.ToTable("Categories");
                 });
 
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.Recipe", b =>
@@ -181,11 +128,7 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("AuthorId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("AuthorId1")
+                    b.Property<Guid>("AuthorId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("CategoryId")
@@ -244,7 +187,7 @@ namespace CulinaryBlog.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AuthorId1");
+                    b.HasIndex("AuthorId");
 
                     b.HasIndex("CategoryId");
 
@@ -292,7 +235,6 @@ namespace CulinaryBlog.Infrastructure.Migrations
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bytea");
 
                     b.Property<string>("ThumbnailUrl")
@@ -330,26 +272,32 @@ namespace CulinaryBlog.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("Notes")
-                        .HasColumnType("text");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<decimal?>("Quantity")
-                        .HasColumnType("numeric");
+                        .HasPrecision(10, 3)
+                        .HasColumnType("numeric(10,3)");
 
                     b.Property<Guid>("RecipeId")
                         .HasColumnType("uuid");
 
                     b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasColumnType("bytea");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("OrderIndex");
 
                     b.Property<string>("Unit")
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -387,7 +335,6 @@ namespace CulinaryBlog.Infrastructure.Migrations
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bytea");
 
                     b.Property<int>("StepNumber")
@@ -427,25 +374,31 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedByIp")
-                        .HasColumnType("text");
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
 
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ReplacedByTokenHash")
-                        .HasColumnType("text");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("TokenHash")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
 
                     b.HasIndex("UserId");
 
@@ -455,15 +408,15 @@ namespace CulinaryBlog.Infrastructure.Migrations
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.Recipe", b =>
                 {
                     b.HasOne("CulinaryBlog.Domain.Entities.ApplicationUser", "Author")
-                        .WithMany()
-                        .HasForeignKey("AuthorId1")
+                        .WithMany("Recipes")
+                        .HasForeignKey("AuthorId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("CulinaryBlog.Domain.Entities.Category", "Category")
                         .WithMany("Recipes")
                         .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.OwnsOne("CulinaryBlog.Domain.Entities.RecipeNutrition", "Nutrition", b1 =>
@@ -472,26 +425,38 @@ namespace CulinaryBlog.Infrastructure.Migrations
                                 .HasColumnType("uuid");
 
                             b1.Property<decimal?>("Calories")
-                                .HasColumnType("numeric");
+                                .HasPrecision(8, 2)
+                                .HasColumnType("numeric(8,2)")
+                                .HasColumnName("Nutrition_Calories");
 
                             b1.Property<decimal?>("Carbohydrates")
-                                .HasColumnType("numeric");
+                                .HasPrecision(8, 2)
+                                .HasColumnType("numeric(8,2)")
+                                .HasColumnName("Nutrition_Carbohydrates");
 
                             b1.Property<decimal?>("Fat")
-                                .HasColumnType("numeric");
+                                .HasPrecision(8, 2)
+                                .HasColumnType("numeric(8,2)")
+                                .HasColumnName("Nutrition_Fat");
 
                             b1.Property<decimal?>("Fiber")
-                                .HasColumnType("numeric");
+                                .HasPrecision(8, 2)
+                                .HasColumnType("numeric(8,2)")
+                                .HasColumnName("Nutrition_Fiber");
 
                             b1.Property<decimal?>("Protein")
-                                .HasColumnType("numeric");
+                                .HasPrecision(8, 2)
+                                .HasColumnType("numeric(8,2)")
+                                .HasColumnName("Nutrition_Protein");
 
                             b1.Property<decimal?>("Sodium")
-                                .HasColumnType("numeric");
+                                .HasPrecision(8, 2)
+                                .HasColumnType("numeric(8,2)")
+                                .HasColumnName("Nutrition_Sodium");
 
                             b1.HasKey("RecipeId");
 
-                            b1.ToTable("Recipes", (string)null);
+                            b1.ToTable("Recipes");
 
                             b1.WithOwner()
                                 .HasForeignKey("RecipeId");
@@ -551,6 +516,8 @@ namespace CulinaryBlog.Infrastructure.Migrations
 
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.ApplicationUser", b =>
                 {
+                    b.Navigation("Recipes");
+
                     b.Navigation("RefreshTokens");
                 });
 
