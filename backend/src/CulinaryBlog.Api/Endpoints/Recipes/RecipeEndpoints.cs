@@ -83,28 +83,17 @@ public static class RecipeEndpoints
                 }
             }
 
-            try
-            {
-                var query = new GetRecipeBySlugQuery(slug, currentUserId, isAdmin);
-                var recipe = await sender.Send(query, ct);
+            var query = new GetRecipeBySlugQuery(slug, currentUserId, isAdmin);
+            var recipe = await sender.Send(query, ct);
 
-                // Major-01 Fix: CHỈ cache công thức có trạng thái Published!
-                // Draft và Archived tuyệt đối KHÔNG được ghi vào shared cache recipe:{slug}
-                if (recipe.Status == RecipeStatus.Published)
-                {
-                    await cache.SetAsync(cacheKey, recipe, TimeSpan.FromMinutes(5), ct);
-                }
+            // Major-01 Fix: CHỈ cache công thức có trạng thái Published!
+            // Draft và Archived tuyệt đối KHÔNG được ghi vào shared cache recipe:{slug}
+            if (recipe.Status == RecipeStatus.Published)
+            {
+                await cache.SetAsync(cacheKey, recipe, TimeSpan.FromMinutes(5), ct);
+            }
 
-                return Results.Ok(recipe);
-            }
-            catch (NotFoundException ex)
-            {
-                return Results.NotFound(new { error = ex.Message });
-            }
-            catch (ForbiddenException ex)
-            {
-                return Results.Json(new { error = ex.Message }, statusCode: 403);
-            }
+            return Results.Ok(recipe);
         })
         .WithName("GetRecipeBySlug");
 
@@ -126,31 +115,20 @@ public static class RecipeEndpoints
             }
             bool isAdmin = user.IsInRole("Admin");
 
-            try
-            {
-                var command = new AddRecipeImageCommand(
-                    recipeId,
-                    request.OriginalUrl,
-                    request.MediumUrl,
-                    request.ThumbnailUrl,
-                    request.AltText,
-                    request.IsPrimary,
-                    request.OrderIndex,
-                    currentUserId,
-                    isAdmin);
+            var command = new AddRecipeImageCommand(
+                recipeId,
+                request.OriginalUrl,
+                request.MediumUrl,
+                request.ThumbnailUrl,
+                request.AltText,
+                request.IsPrimary,
+                request.OrderIndex,
+                currentUserId,
+                isAdmin);
 
-                var image = await sender.Send(command, ct);
+            var image = await sender.Send(command, ct);
 
-                return Results.Created($"/api/v1/recipes/{recipeId}/images/{image.Id}", image);
-            }
-            catch (NotFoundException ex)
-            {
-                return Results.NotFound(new { error = ex.Message });
-            }
-            catch (ForbiddenException ex)
-            {
-                return Results.Json(new { error = ex.Message }, statusCode: 403);
-            }
+            return Results.Created($"/api/v1/recipes/{recipeId}/images/{image.Id}", image);
         })
         .WithName("AddRecipeImage");
 
@@ -172,21 +150,10 @@ public static class RecipeEndpoints
             }
             bool isAdmin = user.IsInRole("Admin");
 
-            try
-            {
-                var command = new SetPrimaryRecipeImageCommand(recipeId, imageId, currentUserId, isAdmin);
-                var updated = await sender.Send(command, ct);
+            var command = new SetPrimaryRecipeImageCommand(recipeId, imageId, currentUserId, isAdmin);
+            var updated = await sender.Send(command, ct);
 
-                return Results.Ok(updated);
-            }
-            catch (NotFoundException ex)
-            {
-                return Results.NotFound(new { error = ex.Message });
-            }
-            catch (ForbiddenException ex)
-            {
-                return Results.Json(new { error = ex.Message }, statusCode: 403);
-            }
+            return Results.Ok(updated);
         })
         .WithName("SetPrimaryRecipeImage");
 
@@ -208,21 +175,10 @@ public static class RecipeEndpoints
             }
             bool isAdmin = user.IsInRole("Admin");
 
-            try
-            {
-                var command = new DeleteRecipeImageCommand(recipeId, imageId, currentUserId, isAdmin);
-                await sender.Send(command, ct);
+            var command = new DeleteRecipeImageCommand(recipeId, imageId, currentUserId, isAdmin);
+            await sender.Send(command, ct);
 
-                return Results.NoContent();
-            }
-            catch (NotFoundException ex)
-            {
-                return Results.NotFound(new { error = ex.Message });
-            }
-            catch (ForbiddenException ex)
-            {
-                return Results.Json(new { error = ex.Message }, statusCode: 403);
-            }
+            return Results.NoContent();
         })
         .WithName("DeleteRecipeImage");
 
