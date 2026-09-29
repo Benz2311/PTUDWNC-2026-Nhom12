@@ -17,21 +17,29 @@ public class RecipeImageConfiguration : IEntityTypeConfiguration<RecipeImage>
         builder.Property(x => x.RecipeId)
             .IsRequired();
 
-        // Đường dẫn hình ảnh
-        builder.Property(x => x.Url)
+        // Đường dẫn hình ảnh gốc (bắt buộc)
+        builder.Property(x => x.OriginalUrl)
             .IsRequired()
             .HasMaxLength(2048);
 
-        // Nội dung mô tả hình ảnh
+        // Đường dẫn hình ảnh cỡ trung (800x600)
+        builder.Property(x => x.MediumUrl)
+            .HasMaxLength(2048);
+
+        // Đường dẫn hình ảnh thu nhỏ (300x300)
+        builder.Property(x => x.ThumbnailUrl)
+            .HasMaxLength(2048);
+
+        // Nội dung mô tả hình ảnh (tối đa 200 ký tự theo SRS v1.2.0)
         builder.Property(x => x.AltText)
-            .HasMaxLength(500);
+            .HasMaxLength(200);
 
         // Ảnh đại diện của công thức
         builder.Property(x => x.IsPrimary)
             .IsRequired();
 
-        // Thứ tự hiển thị hình ảnh
-        builder.Property(x => x.SortOrder)
+        // Thứ tự hiển thị hình ảnh (OrderIndex theo SRS v1.2.0)
+        builder.Property(x => x.OrderIndex)
             .IsRequired();
 
         // Thông tin quản lý dữ liệu
@@ -60,13 +68,22 @@ public class RecipeImageConfiguration : IEntityTypeConfiguration<RecipeImage>
         builder.HasIndex(x => new
         {
             x.RecipeId,
-            x.SortOrder
+            x.OrderIndex
         });
 
-        // SortOrder không được âm
+        // Đảm bảo tối đa 1 active primary image trên mỗi Recipe theo SRS v1.2.0
+        builder.HasIndex(x => new
+        {
+            x.RecipeId,
+            x.IsPrimary
+        })
+        .IsUnique()
+        .HasFilter("\"IsPrimary\" = true AND \"IsDeleted\" = false");
+
+        // OrderIndex không được âm
         builder.ToTable(t =>
             t.HasCheckConstraint(
-                "CK_RecipeImages_SortOrder",
-                "\"SortOrder\" >= 0"));
+                "CK_RecipeImages_OrderIndex",
+                "\"OrderIndex\" >= 0"));
     }
 }
