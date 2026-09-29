@@ -35,8 +35,10 @@ public static class DependencyInjection
         });
 
         // ── Repositories ──────────────────────────────────────────────────────
-        services.AddScoped<ICategoryRepository, CategoryRepository>();
-        services.AddScoped<IRecipeRepository, RecipeRepository>();
+        services.AddScoped<CulinaryBlog.Application.Contracts.Persistence.ICategoryRepository, CategoryRepository>();
+        services.AddScoped<CulinaryBlog.Application.Contracts.Persistence.IRecipeRepository, CulinaryBlog.Infrastructure.Persistence.Repositories.RecipeRepository>();
+        services.AddScoped<CulinaryBlog.Application.Interfaces.IRecipeRepository, CulinaryBlog.Infrastructure.Persistence.RecipeRepository>();
+        services.AddScoped<IUnitOfWork, ApplicationUnitOfWork>();
 
         // ── Authentication — ASP.NET Core Identity + JWT ─────────────────────
         var jwtSettings = configuration

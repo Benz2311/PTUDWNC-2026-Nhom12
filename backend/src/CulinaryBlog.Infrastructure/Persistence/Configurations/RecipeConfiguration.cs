@@ -40,6 +40,18 @@ public class RecipeConfiguration
 
         builder.HasIndex(r => r.CreatedAt);
 
+        builder.HasIndex(r => new { r.IsDeleted, r.Status, r.CreatedAt });
+
+        builder.HasIndex(r => new { r.CategoryId, r.IsDeleted, r.Status, r.CreatedAt });
+
+        builder.HasIndex(r => r.Title)
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
+
+        builder.HasIndex(r => r.Description)
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
+
         builder.HasQueryFilter(r => !r.IsDeleted);
     }
 }
