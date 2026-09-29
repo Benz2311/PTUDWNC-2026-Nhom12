@@ -59,6 +59,11 @@ public static class DependencyInjection
 
         services.AddSingleton<ICacheService, ResilientCacheService>();
 
+        // 3. Đăng ký Repository & Unit of Work (Lab 3)
+        services.AddScoped(typeof(IRepository<>), typeof(Persistence.Repositories.Repository<>));
+        services.AddScoped<CulinaryBlog.Application.Features.Recipes.Interfaces.IRecipeRepository, Persistence.Repositories.RecipeRepository>();
+        services.AddScoped<IUnitOfWork, Persistence.UnitOfWork.UnitOfWork>();
+
         return services;
     }
 }
