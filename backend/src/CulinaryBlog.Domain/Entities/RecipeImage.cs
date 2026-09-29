@@ -8,13 +8,17 @@ public class RecipeImage
 
     public Recipe Recipe { get; set; } = null!;
 
-    public string Url { get; set; } = string.Empty;
+    public string OriginalUrl { get; set; } = string.Empty;
+
+    public string? MediumUrl { get; set; }
+
+    public string? ThumbnailUrl { get; set; }
 
     public string? AltText { get; set; }
 
     public bool IsPrimary { get; set; }
 
-    public int SortOrder { get; set; }
+    public int OrderIndex { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
