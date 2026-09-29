@@ -13,8 +13,8 @@ public static class CategoryDataSeeder
     private const int SEED = 42;
 
     // User mẫu dùng làm Author nếu database chưa có user.
-    private static readonly Guid DemoUserId =
-        Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly string DemoUserId =
+        "11111111-1111-1111-1111-111111111111";
 
     // ============================================================
     // DANH SÁCH CATEGORY

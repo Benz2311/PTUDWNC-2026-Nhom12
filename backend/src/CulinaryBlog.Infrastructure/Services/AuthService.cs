@@ -2,13 +2,13 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using BCrypt.Net;
 using CulinaryBlog.Application.DTOs.Auth;
 using CulinaryBlog.Application.Services;
 using CulinaryBlog.Domain.Entities;
 using CulinaryBlog.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CulinaryBlog.Infrastructure.Services;
@@ -17,13 +17,16 @@ public class AuthService : IAuthService
 {
     private readonly ApplicationDbContext _db;
     private readonly IConfiguration _configuration;
+    private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
 
     public AuthService(
         ApplicationDbContext db,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IPasswordHasher<ApplicationUser> passwordHasher)
     {
         _db = db;
         _configuration = configuration;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<AuthResponse> RegisterAsync(
@@ -41,16 +44,21 @@ public class AuthService : IAuthService
 
         var user = new ApplicationUser
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.NewGuid().ToString(),
             UserName = userName,
+            NormalizedUserName = userName.ToUpperInvariant(),
             Email = email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            NormalizedEmail = email.ToUpperInvariant(),
             DisplayName = string.IsNullOrWhiteSpace(request.DisplayName)
                 ? userName
                 : request.DisplayName.Trim(),
             IsActive = true,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
+
+        user.PasswordHash = _passwordHasher.HashPassword(
+            user,
+            request.Password);
 
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
@@ -72,10 +80,14 @@ public class AuthService : IAuthService
             throw new UnauthorizedAccessException(
                 "Invalid username/email or password.");
 
-        if (!user.IsActive)
+if (!user.IsActive)
             throw new UnauthorizedAccessException(
                 "Account is inactive.");
-if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))            throw new UnauthorizedAccessException(
+        if (_passwordHasher.VerifyHashedPassword(
+                user,
+                user.PasswordHash!,
+                request.Password) == PasswordVerificationResult.Failed)
+            throw new UnauthorizedAccessException(
                 "Invalid username/email or password.");
 
         return await CreateAuthResponseAsync(user, ipAddress);
@@ -99,11 +111,11 @@ if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))            t
             throw new UnauthorizedAccessException(
                 "Refresh token has been revoked.");
 
-        if (storedToken.ExpiresAt <= DateTime.UtcNow)
+        if (storedToken.ExpiresAt <= DateTimeOffset.UtcNow)
             throw new UnauthorizedAccessException(
                 "Refresh token has expired.");
 
-        storedToken.RevokedAt = DateTime.UtcNow;
+        storedToken.RevokedAt = DateTimeOffset.UtcNow;
 
         var response = await CreateAuthResponseAsync(
             storedToken.User,
@@ -127,12 +139,12 @@ if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))            t
         if (storedToken is null)
             return;
 
-        storedToken.RevokedAt = DateTime.UtcNow;
+        storedToken.RevokedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync();
     }
 
-    public async Task<UserResponse?> GetMeAsync(Guid userId)
+    public async Task<UserResponse?> GetMeAsync(string userId)
     {
         var user = await _db.Users
             .AsNoTracking()
@@ -156,10 +168,10 @@ if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))            t
             Id = Guid.NewGuid(),
             UserId = user.Id,
             TokenHash = HashToken(refreshToken),
-            ExpiresAt = DateTime.UtcNow.AddDays(
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(
                 _configuration.GetValue<int>(
                     "Jwt:RefreshTokenDays", 7)),
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
             CreatedByIp = ipAddress
         };
 
@@ -167,7 +179,7 @@ if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))            t
 
         await _db.SaveChangesAsync();
 
-        var expiresAt = DateTime.UtcNow.AddMinutes(
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(
             _configuration.GetValue<int>(
                 "Jwt:AccessTokenMinutes", 60));
 
@@ -191,9 +203,9 @@ if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))            t
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new(JwtRegisteredClaimNames.UniqueName, user.UserName),
-            new(JwtRegisteredClaimNames.Email, user.Email),
+            new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(JwtRegisteredClaimNames.UniqueName, user.UserName ?? string.Empty),
+            new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
             new("displayName", user.DisplayName)
         };
 
@@ -239,8 +251,8 @@ if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))            t
         return new UserResponse
         {
             Id = user.Id,
-            UserName = user.UserName,
-            Email = user.Email,
+            UserName = user.UserName ?? string.Empty,
+            Email = user.Email ?? string.Empty,
             DisplayName = user.DisplayName,
             AvatarUrl = user.AvatarUrl,
             Bio = user.Bio

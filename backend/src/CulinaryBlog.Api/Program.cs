@@ -3,6 +3,7 @@ using CulinaryBlog.Application.Services;
 using CulinaryBlog.Infrastructure.Persistence;
 using CulinaryBlog.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -22,6 +23,9 @@ Console.WriteLine("========================================");
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
+builder.Services.AddScoped<
+    IPasswordHasher<CulinaryBlog.Domain.Entities.ApplicationUser>,
+    PasswordHasher<CulinaryBlog.Domain.Entities.ApplicationUser>>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services

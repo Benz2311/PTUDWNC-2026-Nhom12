@@ -4,17 +4,17 @@ public class RefreshToken
 {
     public Guid Id { get; set; }
 
-    public Guid UserId { get; set; }
+    public string UserId { get; set; } = string.Empty;
 
     public string TokenHash { get; set; } = string.Empty;
 
-    public DateTime ExpiresAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
 
-    public DateTime? RevokedAt { get; set; }
+    public DateTimeOffset? RevokedAt { get; set; }
 
     public string? ReplacedByTokenHash { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTimeOffset CreatedAt { get; set; }
 
     public string? CreatedByIp { get; set; }
 

@@ -6,7 +6,7 @@ namespace CulinaryBlog.Domain.Entities;
 
 public class Recipe : BaseEntity
 {
-    public Guid AuthorId { get; set; }
+    public string AuthorId { get; set; } = string.Empty;
     public ApplicationUser Author { get; set; } = null!;
 
     public Guid CategoryId { get; set; }

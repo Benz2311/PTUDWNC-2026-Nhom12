@@ -104,10 +104,10 @@ public class AuthController : ControllerBase
             User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? User.FindFirstValue("sub");
 
-        if (!Guid.TryParse(userIdClaim, out var userId))
+        if (string.IsNullOrWhiteSpace(userIdClaim))
             return Unauthorized();
 
-        var user = await _authService.GetMeAsync(userId);
+        var user = await _authService.GetMeAsync(userIdClaim);
 
         if (user is null)
             return NotFound();

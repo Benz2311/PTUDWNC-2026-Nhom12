@@ -10,10 +10,6 @@ public static class RecipeSeedData
     private const string DemoUserId =
         "11111111-1111-1111-1111-111111111111";
 
-    // ApplicationUser.Id hiện đang là Guid
-    private static readonly Guid DemoUserGuid =
-        Guid.Parse(DemoUserId);
-
     private static readonly Random Random = new(20260922);
 
     private static readonly string[] RecipeBases =
@@ -140,17 +136,17 @@ public static class RecipeSeedData
         ApplicationDbContext db,
         CancellationToken cancellationToken = default)
     {
-        // ApplicationUser.Id là Guid
+        // ApplicationUser.Id là string
         var user = await db.Users
             .SingleOrDefaultAsync(
-                item => item.Id == DemoUserGuid,
+                item => item.Id == DemoUserId,
                 cancellationToken);
 
         if (user is null)
         {
             user = new ApplicationUser
             {
-                Id = DemoUserGuid,
+                Id = DemoUserId,
                 UserName = "culinary-demo",
                 Email = "demo@culinaryblog.local",
                 PasswordHash = "seeded-demo-password"
@@ -337,7 +333,7 @@ public static class RecipeSeedData
         return new Recipe
         {
             // Recipe.AuthorId hiện đang là string
-            AuthorId = DemoUserGuid,
+            AuthorId = DemoUserId,
 
             CategoryId = category.Id,
             Title = title,
