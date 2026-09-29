@@ -1,4 +1,4 @@
-﻿using CulinaryBlog.Domain.Entities;
+using CulinaryBlog.Domain.Entities;
 using CulinaryBlog.Infrastructure.Persistence;
 using CulinaryBlog.Infrastructure.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
@@ -65,8 +65,8 @@ try
             {
                 Id = Guid.NewGuid(),
 
-                // Recipe.AuthorId hiện đang là string
-                AuthorId = demoUserId.ToString(),
+                // Recipe.AuthorId là Guid
+                AuthorId = demoUserId,
 
                 CategoryId = demoCategory.Id,
 

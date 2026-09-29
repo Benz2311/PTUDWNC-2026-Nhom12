@@ -25,10 +25,12 @@ public static class RecipeImageSeeder
 
                     // Sinh URL ảnh ngẫu nhiên
                     .RuleFor(
-                        x => x.Url,
+                        x => x.OriginalUrl,
                         f => f.Image.PicsumUrl(
                             width: 800,
                             height: 600))
+                    .RuleFor(x => x.MediumUrl, _ => null)
+                    .RuleFor(x => x.ThumbnailUrl, _ => null)
 
                     // Sinh mô tả ảnh
                     .RuleFor(
@@ -43,7 +45,7 @@ public static class RecipeImageSeeder
 
                     // Thứ tự ảnh
                     .RuleFor(
-                        x => x.SortOrder,
+                        x => x.OrderIndex,
                         _ => index)
 
                     // Thời gian tạo
