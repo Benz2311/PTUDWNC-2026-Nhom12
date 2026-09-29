@@ -98,12 +98,24 @@ namespace CulinaryBlog.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasDatabaseName("IX_AspNetUsers_Email");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("IX_AspNetUsers_IsActive");
+
                     b.HasIndex("NormalizedEmail")
-                        .HasDatabaseName("EmailIndex");
+                        .IsUnique()
+                        .HasDatabaseName("IX_AspNetUsers_NormalizedEmail");
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
-                        .HasDatabaseName("UserNameIndex");
+                        .HasDatabaseName("IX_AspNetUsers_NormalizedUserName");
+
+                    b.HasIndex("UserName")
+                        .IsUnique()
+                        .HasDatabaseName("IX_AspNetUsers_UserName");
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -470,10 +482,18 @@ namespace CulinaryBlog.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TokenHash")
-                        .IsUnique();
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("IX_RefreshTokens_ExpiresAt");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("RevokedAt")
+                        .HasDatabaseName("IX_RefreshTokens_RevokedAt");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RefreshTokens_TokenHash");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_RefreshTokens_UserId");
 
                     b.ToTable("RefreshTokens", (string)null);
                 });

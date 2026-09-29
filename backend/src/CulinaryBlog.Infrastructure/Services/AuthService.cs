@@ -36,10 +36,14 @@ public class AuthService : IAuthService
         var userName = request.UserName.Trim();
         var email = request.Email.Trim().ToLowerInvariant();
 
-        if (await _db.Users.AnyAsync(x => x.UserName == userName))
+        if (await _db.Users
+                .AsNoTracking()
+                .AnyAsync(x => x.UserName == userName))
             throw new InvalidOperationException("Username already exists.");
 
-        if (await _db.Users.AnyAsync(x => x.Email == email))
+        if (await _db.Users
+                .AsNoTracking()
+                .AnyAsync(x => x.Email == email))
             throw new InvalidOperationException("Email already exists.");
 
         var user = new ApplicationUser
@@ -72,25 +76,55 @@ public class AuthService : IAuthService
     {
         var login = request.UserNameOrEmail.Trim();
 
-        var user = await _db.Users.FirstOrDefaultAsync(x =>
-            x.UserName == login ||
-            x.Email == login.ToLowerInvariant());
+        var user = await _db.Users
+            .AsNoTracking()
+            .Where(x => x.UserName == login || x.Email == login.ToLowerInvariant())
+            .Select(x => new
+            {
+                x.Id,
+                x.UserName,
+                x.Email,
+                x.PasswordHash,
+                x.IsActive,
+                x.DisplayName,
+                x.AvatarUrl,
+                x.Bio
+            })
+            .FirstOrDefaultAsync();
 
         if (user is null)
-            throw new UnauthorizedAccessException(
-                "Invalid username/email or password.");
+            throw new UnauthorizedAccessException("Invalid username/email or password.");
 
-if (!user.IsActive)
-            throw new UnauthorizedAccessException(
-                "Account is inactive.");
+        if (!user.IsActive)
+            throw new UnauthorizedAccessException("Account is inactive.");
+
+        var userForVerification = new ApplicationUser
+        {
+            Id = user.Id,
+            UserName = user.UserName,
+            Email = user.Email,
+            PasswordHash = user.PasswordHash
+        };
+
         if (_passwordHasher.VerifyHashedPassword(
-                user,
+                userForVerification,
                 user.PasswordHash!,
                 request.Password) == PasswordVerificationResult.Failed)
-            throw new UnauthorizedAccessException(
-                "Invalid username/email or password.");
+            throw new UnauthorizedAccessException("Invalid username/email or password.");
 
-        return await CreateAuthResponseAsync(user, ipAddress);
+        var fullUser = new ApplicationUser
+        {
+            Id = user.Id,
+            UserName = user.UserName,
+            Email = user.Email,
+            PasswordHash = user.PasswordHash,
+            IsActive = user.IsActive,
+            DisplayName = user.DisplayName,
+            AvatarUrl = user.AvatarUrl,
+            Bio = user.Bio
+        };
+
+        return await CreateAuthResponseAsync(fullUser, ipAddress);
     }
 
     public async Task<AuthResponse> RefreshAsync(
@@ -100,31 +134,26 @@ if (!user.IsActive)
         var tokenHash = HashToken(request.RefreshToken);
 
         var storedToken = await _db.RefreshTokens
+            .AsNoTracking()
             .Include(x => x.User)
             .FirstOrDefaultAsync(x => x.TokenHash == tokenHash);
 
         if (storedToken is null)
-            throw new UnauthorizedAccessException(
-                "Invalid refresh token.");
+            throw new UnauthorizedAccessException("Invalid refresh token.");
 
         if (storedToken.RevokedAt.HasValue)
-            throw new UnauthorizedAccessException(
-                "Refresh token has been revoked.");
+            throw new UnauthorizedAccessException("Refresh token has been revoked.");
 
         if (storedToken.ExpiresAt <= DateTimeOffset.UtcNow)
-            throw new UnauthorizedAccessException(
-                "Refresh token has expired.");
+            throw new UnauthorizedAccessException("Refresh token has expired.");
 
-        storedToken.RevokedAt = DateTimeOffset.UtcNow;
+        var response = await CreateAuthResponseAsync(storedToken.User, ipAddress);
 
-        var response = await CreateAuthResponseAsync(
-            storedToken.User,
-            ipAddress);
-
-        storedToken.ReplacedByTokenHash =
-            HashToken(response.RefreshToken);
-
-        await _db.SaveChangesAsync();
+        await _db.RefreshTokens
+            .Where(x => x.TokenHash == tokenHash)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.RevokedAt, DateTimeOffset.UtcNow)
+                .SetProperty(x => x.ReplacedByTokenHash, HashToken(response.RefreshToken)));
 
         return response;
     }
@@ -133,27 +162,29 @@ if (!user.IsActive)
     {
         var tokenHash = HashToken(refreshToken);
 
-        var storedToken = await _db.RefreshTokens
-            .FirstOrDefaultAsync(x => x.TokenHash == tokenHash);
-
-        if (storedToken is null)
-            return;
-
-        storedToken.RevokedAt = DateTimeOffset.UtcNow;
-
-        await _db.SaveChangesAsync();
+        await _db.RefreshTokens
+            .Where(x => x.TokenHash == tokenHash)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.RevokedAt, DateTimeOffset.UtcNow));
     }
 
     public async Task<UserResponse?> GetMeAsync(string userId)
     {
         var user = await _db.Users
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == userId);
+            .Where(x => x.Id == userId)
+            .Select(x => new UserResponse
+            {
+                Id = x.Id,
+                UserName = x.UserName ?? string.Empty,
+                Email = x.Email ?? string.Empty,
+                DisplayName = x.DisplayName,
+                AvatarUrl = x.AvatarUrl,
+                Bio = x.Bio
+            })
+            .FirstOrDefaultAsync();
 
-        if (user is null)
-            return null;
-
-        return ToUserResponse(user);
+        return user;
     }
 
     private async Task<AuthResponse> CreateAuthResponseAsync(
@@ -169,19 +200,16 @@ if (!user.IsActive)
             UserId = user.Id,
             TokenHash = HashToken(refreshToken),
             ExpiresAt = DateTimeOffset.UtcNow.AddDays(
-                _configuration.GetValue<int>(
-                    "Jwt:RefreshTokenDays", 7)),
+                _configuration.GetValue<int>("Jwt:RefreshTokenDays", 7)),
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByIp = ipAddress
         };
 
         _db.RefreshTokens.Add(refreshTokenEntity);
-
         await _db.SaveChangesAsync();
 
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(
-            _configuration.GetValue<int>(
-                "Jwt:AccessTokenMinutes", 60));
+            _configuration.GetValue<int>("Jwt:AccessTokenMinutes", 60));
 
         return new AuthResponse
         {
@@ -195,8 +223,7 @@ if (!user.IsActive)
     private string GenerateAccessToken(ApplicationUser user)
     {
         var key = _configuration["Jwt:Key"]
-            ?? throw new InvalidOperationException(
-                "JWT key is missing.");
+            ?? throw new InvalidOperationException("JWT key is missing.");
 
         var issuer = _configuration["Jwt:Issuer"];
         var audience = _configuration["Jwt:Audience"];
@@ -209,16 +236,11 @@ if (!user.IsActive)
             new("displayName", user.DisplayName)
         };
 
-        var securityKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(key));
-
-        var credentials = new SigningCredentials(
-            securityKey,
-            SecurityAlgorithms.HmacSha256);
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var expires = DateTime.UtcNow.AddMinutes(
-            _configuration.GetValue<int>(
-                "Jwt:AccessTokenMinutes", 60));
+            _configuration.GetValue<int>("Jwt:AccessTokenMinutes", 60));
 
         var token = new JwtSecurityToken(
             issuer: issuer,
@@ -227,8 +249,7 @@ if (!user.IsActive)
             expires: expires,
             signingCredentials: credentials);
 
-        return new JwtSecurityTokenHandler()
-            .WriteToken(token);
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     private static string GenerateRefreshToken()
@@ -239,14 +260,11 @@ if (!user.IsActive)
 
     private static string HashToken(string token)
     {
-        var bytes = SHA256.HashData(
-            Encoding.UTF8.GetBytes(token));
-
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
-    private static UserResponse ToUserResponse(
-        ApplicationUser user)
+    private static UserResponse ToUserResponse(ApplicationUser user)
     {
         return new UserResponse
         {

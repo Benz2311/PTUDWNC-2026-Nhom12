@@ -22,16 +22,21 @@ try
     Console.WriteLine(
         "Đang kiểm tra kết nối PostgreSQL...");
 
-    if (!await db.Database.CanConnectAsync())
+    try
     {
-        Console.WriteLine(
-            "Không thể kết nối PostgreSQL.");
-
+        await db.Database.OpenConnectionAsync();
+        Console.WriteLine("Kết nối PostgreSQL thành công.");
+        await db.Database.CloseConnectionAsync();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Lỗi kết nối: {ex.Message}");
+        if (ex.InnerException != null)
+        {
+            Console.WriteLine($"Inner: {ex.InnerException.Message}");
+        }
         return;
     }
-
-    Console.WriteLine(
-        "Kết nối PostgreSQL thành công.");
 
     Console.WriteLine();
 
