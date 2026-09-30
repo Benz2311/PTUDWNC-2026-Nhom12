@@ -42,6 +42,10 @@ public static class DependencyInjection
         services.AddScoped<CulinaryBlog.Application.Contracts.Persistence.IRecipeRepository, CulinaryBlog.Infrastructure.Persistence.Repositories.RecipeRepository>();
         services.AddScoped<CulinaryBlog.Application.Interfaces.IRecipeRepository, CulinaryBlog.Infrastructure.Persistence.RecipeRepository>();
         services.AddScoped<IUnitOfWork, ApplicationUnitOfWork>();
+        services.AddScoped<CulinaryBlog.Application.Repositories.IUserRepository, CulinaryBlog.Infrastructure.Repositories.UserRepository>();
+        services.AddScoped<CulinaryBlog.Application.Repositories.IRefreshTokenRepository, CulinaryBlog.Infrastructure.Repositories.RefreshTokenRepository>();
+        services.AddScoped<Microsoft.AspNetCore.Identity.IPasswordHasher<CulinaryBlog.Domain.Entities.ApplicationUser>, Microsoft.AspNetCore.Identity.PasswordHasher<CulinaryBlog.Domain.Entities.ApplicationUser>>();
+        services.AddScoped<CulinaryBlog.Application.Services.IAuthService, CulinaryBlog.Infrastructure.Services.AuthService>();
 
         // ── Authentication — ASP.NET Core Identity + JWT ─────────────────────
         var jwtSettings = configuration
