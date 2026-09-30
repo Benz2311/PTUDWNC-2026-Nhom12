@@ -96,7 +96,648 @@
 - Xử lý các điểm chưa thống nhất giữa Entity và Configuration thuộc chức năng Step & Image.
 - Xây dựng dữ liệu ngẫu nhiên cho các bước chế biến và hình ảnh.
 - Đảm bảo mỗi Recipe sau khi tích hợp có ít nhất **5 bước chế biến**.
+# 👥 Phân công công việc nhóm
 
+## Mục tiêu hiện tại
+
+### Hoàn thành việc cài đặt tất cả API Endpoints
+
+Việc triển khai Backend tuân theo tài liệu SRS v1.2.0 của dự án.
+
+Nguyên tắc phân công:
+
+- Mỗi thành viên tiếp tục phụ trách đúng module/entity đã được giao.
+- Hạn chế chỉnh sửa trực tiếp phần code của thành viên khác.
+- Tất cả API phải tuân theo Clean Architecture + CQRS + MediatR.
+- Validation thực hiện bằng FluentValidation.
+- API lỗi trả theo RFC 7807.
+- Mỗi endpoint phải có ít nhất:
+  - 1 Happy Path.
+  - 1 Error Case.
+- Kiểm thử API bằng Scalar.
+- Kiểm tra dữ liệu thực tế trên PostgreSQL sau các thao tác ghi.
+
+---
+
+# Nguyễn Văn Quốc – User / Authentication
+
+## Entity phụ trách
+
+- `ApplicationUser`
+- `RefreshToken`
+
+## API Endpoints
+
+- [ ] `POST /api/v1/auth/register`
+- [ ] `POST /api/v1/auth/login`
+- [ ] `POST /api/v1/auth/google`
+- [ ] `POST /api/v1/auth/refresh`
+- [ ] `POST /api/v1/auth/logout`
+- [ ] `POST /api/v1/auth/email/confirm`
+- [ ] `POST /api/v1/auth/email/resend`
+- [ ] `GET /api/v1/auth/me`
+- [ ] `PATCH /api/v1/auth/me`
+- [ ] `PATCH /api/v1/admin/users/{id}/status`
+
+## Công việc chi tiết
+
+### Register
+
+- [ ] Tạo Request/Response DTO.
+- [ ] Tạo `RegisterCommand`.
+- [ ] Tạo Validator.
+- [ ] Kiểm tra Email duy nhất, không phân biệt hoa thường.
+- [ ] Validate Password.
+- [ ] Tạo `ApplicationUser`.
+- [ ] Gán role `Author`.
+- [ ] Sinh Access Token.
+- [ ] Sinh Refresh Token.
+- [ ] Hash Refresh Token bằng SHA-256 trước khi lưu.
+- [ ] Trả HTTP `201 Created`.
+
+### Login
+
+- [ ] Kiểm tra Email/Password.
+- [ ] Kiểm tra trạng thái tài khoản.
+- [ ] Xử lý AccessFailedCount.
+- [ ] Xử lý Lockout.
+- [ ] Sinh Access Token mới.
+- [ ] Sinh Refresh Token mới.
+- [ ] Lưu Refresh Token vào PostgreSQL.
+
+### Google Login
+
+- [ ] Nhận Google ID Token.
+- [ ] Verify Signature.
+- [ ] Verify Issuer.
+- [ ] Verify Audience.
+- [ ] Verify Expiration.
+- [ ] Nếu Email đã tồn tại thì liên kết Google Login.
+- [ ] Nếu chưa tồn tại thì tạo User mới.
+- [ ] Gán role `Author`.
+- [ ] Sinh Access Token + Refresh Token.
+
+### Refresh Token
+
+- [ ] Hash token client gửi lên.
+- [ ] Kiểm tra token tồn tại.
+- [ ] Kiểm tra Expired.
+- [ ] Kiểm tra Revoked.
+- [ ] Token Rotation.
+- [ ] Quản lý `FamilyId`.
+- [ ] Lưu `ReplacedByTokenHash`.
+- [ ] Detect Refresh Token Reuse.
+- [ ] Nếu reuse → revoke toàn bộ token family.
+
+### Logout
+
+- [ ] Không yêu cầu Access Token.
+- [ ] Revoke Refresh Token.
+- [ ] Logout phải idempotent.
+- [ ] Luôn trả `204 No Content`.
+
+### Email
+
+- [ ] Confirm Email.
+- [ ] Resend Email Confirmation.
+- [ ] Chống User Enumeration.
+- [ ] Resend luôn trả `202 Accepted`.
+- [ ] Hoàn thiện `JOB-001 Welcome Email`.
+
+### Profile
+
+- [ ] GET Profile.
+- [ ] Update `DisplayName`.
+- [ ] Update `AvatarUrl`.
+- [ ] Update `Bio`.
+- [ ] Không cho update Email/Username qua API Profile.
+
+### Admin User
+
+- [ ] Admin Active/Inactive User.
+- [ ] Khi Inactive → revoke toàn bộ Refresh Token của User.
+- [ ] User không được tự disable chính mình.
+
+## Kiểm thử bắt buộc
+
+- [ ] Register thành công.
+- [ ] Email trùng → `409`.
+- [ ] Password không hợp lệ → `422`.
+- [ ] Login thành công.
+- [ ] Sai Email/Password → `401`.
+- [ ] Lockout → `423`.
+- [ ] Google Token sai → `401`.
+- [ ] Refresh Token hết hạn.
+- [ ] Refresh Token bị revoke.
+- [ ] Refresh Token reuse.
+- [ ] Logout nhiều lần.
+- [ ] Confirm Email.
+- [ ] Resend Email.
+- [ ] GET/UPDATE Profile.
+- [ ] Admin Disable User.
+
+---
+
+# Lê Thị Ánh Nhung – Category / Recipe Read / Dashboard
+
+## Entity phụ trách
+
+- `Category`
+- Được phép đọc `Recipe` phục vụ:
+  - List.
+  - Detail.
+  - Filter.
+  - Sort.
+  - Pagination.
+  - Statistics.
+
+> Thành viên 2 không phụ trách nghiệp vụ tạo/cập nhật trạng thái Recipe.
+
+## API Endpoints
+
+- [ ] `GET /api/v1/categories`
+- [ ] `GET /api/v1/categories/{slug}`
+- [ ] `POST /api/v1/categories`
+- [ ] `PUT /api/v1/categories/{id}`
+- [ ] `DELETE /api/v1/categories/{id}`
+
+- [ ] `GET /api/v1/recipes`
+- [ ] `GET /api/v1/recipes/{slug}`
+
+- [ ] `GET /api/v1/admin/recipes/trash`
+
+- [ ] API Dashboard/Statistics của nhóm.
+
+## Công việc chi tiết
+
+### Category List
+
+- [ ] Query tất cả Category chưa bị xóa.
+- [ ] `AsNoTracking()`.
+- [ ] Sort theo Name.
+- [ ] Tính `recipeCount` chỉ với Recipe Published.
+- [ ] Redis Cache.
+- [ ] Cache key `categories:all`.
+- [ ] TTL 30 phút.
+
+### Category Detail
+
+- [ ] Tìm Category theo Slug.
+- [ ] Không tồn tại → `404`.
+- [ ] Trả Recipe thuộc Category.
+- [ ] Pagination.
+- [ ] Guest chỉ thấy Published.
+- [ ] Author có thể thấy thêm Recipe Draft của chính mình.
+
+### Create Category
+
+- [ ] Chỉ Admin.
+- [ ] Validate Name.
+- [ ] Generate Slug.
+- [ ] Nếu Slug trùng → tự thêm suffix.
+- [ ] Kiểm tra Name duplicate.
+- [ ] Save Database.
+- [ ] Invalidate Redis Cache.
+- [ ] Trả `201 Created`.
+
+### Update Category
+
+- [ ] Chỉ Admin.
+- [ ] Update Name.
+- [ ] Update Description.
+- [ ] Không thay đổi Slug khi đổi Name.
+- [ ] Invalidate Cache.
+
+### Delete Category
+
+- [ ] Chỉ Admin.
+- [ ] Kiểm tra Recipe chưa Soft Delete.
+- [ ] Nếu còn Recipe → `409`.
+- [ ] Nếu không còn → Soft Delete Category.
+
+### Recipe List
+
+- [ ] Public chỉ trả Recipe `Published`.
+- [ ] Hỗ trợ Pagination.
+- [ ] Hỗ trợ Category Filter.
+- [ ] Hỗ trợ Difficulty Filter.
+- [ ] Hỗ trợ các Filter theo SRS.
+- [ ] Hỗ trợ Sort.
+- [ ] Hỗ trợ `mine=true`.
+- [ ] Khi `mine=true`, Author xem Recipe của chính mình.
+- [ ] Hỗ trợ Status Filter khi xem Recipe của mình.
+- [ ] Admin được Filter bằng `authorId`.
+- [ ] Author thường không được dùng `authorId`.
+- [ ] Public List Redis Cache 1 phút.
+- [ ] Private List không dùng Shared Cache.
+
+### Recipe Detail
+
+- [ ] Load Recipe.
+- [ ] Load Category.
+- [ ] Load Author.
+- [ ] Load Ingredients.
+- [ ] Load Steps.
+- [ ] Load Images.
+- [ ] Load Nutrition.
+- [ ] Steps sort theo `StepNumber`.
+- [ ] Ingredients sort theo `OrderIndex`.
+- [ ] Images sort theo `OrderIndex`.
+- [ ] `AsNoTracking()`.
+- [ ] Sử dụng Split Query khi phù hợp.
+- [ ] Kiểm tra không xảy ra N+1 Query.
+- [ ] Published → Public.
+- [ ] Draft/Archived → chỉ Owner/Admin.
+- [ ] Public Recipe Detail Cache 5 phút.
+
+### Admin Trash List
+
+- [ ] Chỉ Admin.
+- [ ] Query Recipe có `IsDeleted = true`.
+- [ ] Ignore Global Query Filter có kiểm soát.
+- [ ] Sort `DeletedAt DESC`.
+- [ ] Pagination.
+- [ ] Không Restore/Purge ở phần TV2.
+
+### Dashboard / Statistics
+
+- [ ] Tổng số Category.
+- [ ] Tổng số Recipe.
+- [ ] Tổng số Published Recipe.
+- [ ] Tổng số Draft Recipe.
+- [ ] Tổng số Archived Recipe.
+- [ ] Số Recipe theo Category.
+- [ ] Top Category có nhiều Recipe.
+- [ ] Tỷ lệ Recipe theo Category.
+- [ ] Recipe mới theo thời gian.
+- [ ] Projection DTO.
+- [ ] `AsNoTracking()`.
+- [ ] Không N+1 Query.
+
+## Kiểm thử bắt buộc
+
+- [ ] Category List.
+- [ ] Category Detail.
+- [ ] Create Category.
+- [ ] Update Category.
+- [ ] Delete Category.
+- [ ] Delete Category còn Recipe → `409`.
+- [ ] Redis Cache Hit/Miss.
+- [ ] Cache Invalidation.
+- [ ] Recipe List.
+- [ ] Pagination.
+- [ ] Filter.
+- [ ] Sort.
+- [ ] `mine=true`.
+- [ ] Admin `authorId`.
+- [ ] Recipe Detail Published.
+- [ ] Recipe Detail Draft.
+- [ ] Recipe Detail Archived.
+- [ ] Admin Trash.
+- [ ] Dashboard Statistics.
+- [ ] Kiểm tra SQL Log / N+1.
+
+---
+
+# Phạm Nguyễn Ngọc Phước – Recipe / Ingredient
+
+## Entity phụ trách
+
+- `Recipe`
+- `RecipeNutrition`
+- `RecipeIngredient`
+
+## API Endpoints
+
+- [ ] `POST /api/v1/recipes`
+- [ ] `PUT /api/v1/recipes/{id}`
+- [ ] `PATCH /api/v1/recipes/{id}/publish`
+- [ ] `PATCH /api/v1/recipes/{id}/unpublish`
+- [ ] `PATCH /api/v1/recipes/{id}/archive`
+- [ ] `PATCH /api/v1/recipes/{id}/unarchive`
+- [ ] `DELETE /api/v1/recipes/{id}`
+
+- [ ] `POST /api/v1/admin/recipes/{id}/restore`
+- [ ] `DELETE /api/v1/admin/recipes/{id}/purge`
+
+- [ ] `POST /api/v1/recipes/{id}/ingredients`
+- [ ] `PUT /api/v1/recipes/{id}/ingredients/{ingredientId}`
+- [ ] `DELETE /api/v1/recipes/{id}/ingredients/{ingredientId}`
+
+## Công việc chi tiết
+
+### Create Recipe
+
+- [ ] Owner phải là User hiện tại.
+- [ ] Validate Title.
+- [ ] Validate Description.
+- [ ] Validate Prep Time.
+- [ ] Validate Cook Time.
+- [ ] Validate Servings.
+- [ ] Validate Difficulty.
+- [ ] Kiểm tra Category tồn tại và Active.
+- [ ] Tạo Recipe ở trạng thái `Draft`.
+- [ ] Generate Slug unique.
+- [ ] Nếu Slug trùng → thêm suffix.
+- [ ] Nutrition là Owned Entity.
+- [ ] `Nutrition.Source = Manual`.
+- [ ] Client không được tự thay đổi Source.
+
+### Update Recipe
+
+- [ ] Owner/Admin.
+- [ ] Yêu cầu `If-Match`.
+- [ ] Sử dụng ETag dựa trên PostgreSQL `xmin`.
+- [ ] Detect Optimistic Concurrency.
+- [ ] Conflict → `409`.
+- [ ] Draft đổi Title → có thể đổi Slug.
+- [ ] Lưu Slug cũ vào `RecipeSlugHistory`.
+- [ ] Published/Archived → không đổi Slug.
+
+### Publish
+
+- [ ] Owner/Admin.
+- [ ] Yêu cầu `If-Match`.
+- [ ] Email Author đã Confirm hoặc Admin.
+- [ ] Recipe có ít nhất 1 Ingredient.
+- [ ] Recipe có ít nhất 1 Step.
+- [ ] Category đang Active.
+- [ ] Các field cơ bản hợp lệ.
+- [ ] Set `Status = Published`.
+- [ ] Set `PublishedAt` lần đầu.
+- [ ] Idempotent.
+
+### Unpublish
+
+- [ ] `Published → Draft`.
+- [ ] Giữ `PublishedAt`.
+- [ ] Idempotent.
+
+### Archive / Unarchive
+
+- [ ] Archive Recipe.
+- [ ] Recipe Archived không xuất hiện Public.
+- [ ] Unarchive đúng state.
+- [ ] Invalidate Cache.
+
+### Delete Recipe
+
+- [ ] Soft Delete.
+- [ ] `IsDeleted = true`.
+- [ ] `DeletedAt = now`.
+- [ ] Không xóa Child ngay.
+- [ ] Không xóa MinIO File ngay.
+- [ ] Invalidate Recipe Cache.
+- [ ] Invalidate Search Cache.
+- [ ] Invalidate Category Cache.
+
+### Restore
+
+- [ ] Chỉ Admin.
+- [ ] Recipe phải đang Soft Delete.
+- [ ] Restore trong thời gian Retention.
+- [ ] `IsDeleted = false`.
+- [ ] `DeletedAt = null`.
+- [ ] Invalidate Cache.
+
+### Purge
+
+- [ ] Chỉ Admin.
+- [ ] Physical Delete Recipe.
+- [ ] Delete Child Entities.
+- [ ] Delete Files MinIO.
+- [ ] Audit Log.
+- [ ] Dùng cùng Application Service với Purge Job.
+
+### Ingredient
+
+- [ ] Create Ingredient.
+- [ ] Update Ingredient.
+- [ ] Delete Ingredient.
+- [ ] Owner/Admin.
+- [ ] Yêu cầu `If-Match` Recipe.
+- [ ] Name 1–200.
+- [ ] Quantity nullable.
+- [ ] Quantity > 0 nếu có.
+- [ ] Unit nullable.
+- [ ] Notes max 500.
+- [ ] OrderIndex.
+- [ ] JSON Number decimal.
+- [ ] `"1/2"` dạng string → `422`.
+
+### Background Job
+
+- [ ] Hoàn thiện `JOB-003 Sitemap Generation`.
+- [ ] Sitemap chỉ chứa Published Recipe.
+- [ ] Category pages.
+- [ ] Không chứa Draft/Archived/Deleted.
+
+## Kiểm thử bắt buộc
+
+- [ ] Create Recipe.
+- [ ] Category không tồn tại.
+- [ ] Update Recipe.
+- [ ] User khác update → `403`.
+- [ ] Stale ETag → `409`.
+- [ ] Publish thiếu Confirm Email.
+- [ ] Publish thiếu Ingredient.
+- [ ] Publish thiếu Step.
+- [ ] Publish thành công.
+- [ ] Unpublish.
+- [ ] Archive.
+- [ ] Unarchive.
+- [ ] Soft Delete.
+- [ ] Restore.
+- [ ] Purge.
+- [ ] Ingredient Create.
+- [ ] Ingredient Update.
+- [ ] Ingredient Delete.
+- [ ] Quantity null.
+- [ ] Quantity decimal.
+- [ ] Quantity `"1/2"` → `422`.
+- [ ] Sitemap Job.
+
+---
+
+# Võ Hùng Mạnh – Step / Image / Search / MinIO / Observability
+
+## Entity phụ trách
+
+- `RecipeStep`
+- `RecipeImage`
+
+## API Endpoints
+
+### Step
+
+- [ ] `POST /api/v1/recipes/{id}/steps`
+- [ ] `PUT /api/v1/recipes/{id}/steps/{stepId}`
+- [ ] `PUT /api/v1/recipes/{id}/steps/reorder`
+- [ ] `DELETE /api/v1/recipes/{id}/steps/{stepId}`
+
+### Image
+
+- [ ] `POST /api/v1/recipes/{id}/images`
+- [ ] `PATCH /api/v1/recipes/{id}/images/{imageId}`
+- [ ] `DELETE /api/v1/recipes/{id}/images/{imageId}`
+
+### Search
+
+- [ ] `GET /api/v1/recipes/search`
+
+### Health
+
+- [ ] `GET /health`
+- [ ] `GET /health/live`
+- [ ] `GET /health/ready`
+
+## Công việc chi tiết
+
+### RecipeStep
+
+- [ ] Create Step.
+- [ ] Update Step.
+- [ ] Delete Step.
+- [ ] Reorder Step.
+- [ ] Validate `title`.
+- [ ] Validate `description`.
+- [ ] Validate `timerMinutes >= 0`.
+- [ ] Hỗ trợ `imageUrl?`.
+- [ ] Server tự cấp `StepNumber`.
+- [ ] StepNumber liên tục.
+- [ ] Khi Delete → Renumber trong Transaction.
+- [ ] Reorder phải chứa đúng toàn bộ Active Step.
+- [ ] Không có `ParentStepId`.
+- [ ] Không có Sub-Step trong v1.2.
+
+### RecipeImage
+
+- [ ] Multipart Upload.
+- [ ] Nhận `file`.
+- [ ] Nhận `altText?`.
+- [ ] Nhận `isPrimary?`.
+- [ ] Max File Size = 5 MB.
+- [ ] JPEG.
+- [ ] PNG.
+- [ ] WebP.
+- [ ] AVIF.
+- [ ] Kiểm tra MIME.
+- [ ] Kiểm tra Magic Bytes.
+- [ ] Decode thực tế.
+- [ ] Upload MinIO.
+- [ ] Ảnh đầu tiên tự Primary.
+- [ ] Khi set Primary mới → unset Primary cũ trong cùng Transaction.
+- [ ] Update AltText.
+- [ ] Update OrderIndex.
+- [ ] Delete Image metadata theo SRS.
+- [ ] Schedule Delete File.
+- [ ] Nếu Delete Primary → ảnh OrderIndex nhỏ nhất trở thành Primary.
+- [ ] MinIO unavailable → `503`.
+
+### File Storage
+
+- [ ] `IFileStorageService`.
+- [ ] FILE-001 Upload File.
+- [ ] FILE-002 Delete File.
+- [ ] Unique File Name.
+- [ ] Chống Path Traversal.
+- [ ] Delete idempotent.
+- [ ] Retry khi MinIO lỗi.
+
+### Thumbnail Job
+
+- [ ] Hoàn thiện `JOB-002 Image Resize / Thumbnail`.
+- [ ] Original Image.
+- [ ] Medium Image.
+- [ ] Thumbnail Image.
+- [ ] Upload các phiên bản lên MinIO.
+- [ ] Update URL trong Database.
+- [ ] Retry 3 lần.
+
+### Full-Text Search
+
+- [ ] `SearchVector`.
+- [ ] PostgreSQL Trigger.
+- [ ] Search trên Title.
+- [ ] Search trên Description.
+- [ ] PostgreSQL `unaccent`.
+- [ ] Text Search Config `simple`.
+- [ ] GIN Index.
+- [ ] `pg_trgm`.
+- [ ] Fuzzy fallback.
+- [ ] Ranking theo Relevance.
+- [ ] Sau đó `PublishedAt DESC`.
+- [ ] Chỉ tìm Published Recipe.
+- [ ] Query 2–100 ký tự.
+- [ ] Pagination.
+- [ ] Filter.
+- [ ] Sort.
+- [ ] Redis Cache 1 phút.
+- [ ] Cache key vary theo query/filter/page/sort.
+
+### Health Check
+
+- [ ] `GET /health`.
+- [ ] Check PostgreSQL.
+- [ ] Check Redis.
+- [ ] Check MinIO.
+- [ ] `GET /health/live`.
+- [ ] Liveness chỉ kiểm tra process.
+- [ ] `GET /health/ready`.
+- [ ] Readiness kiểm tra PostgreSQL + Redis.
+
+### Structured Logging
+
+- [ ] Serilog.
+- [ ] CorrelationId.
+- [ ] RequestPath.
+- [ ] HTTP Method.
+- [ ] Status Code.
+- [ ] Elapsed Time.
+- [ ] UserId nếu Login.
+- [ ] LoggingBehavior cho MediatR.
+- [ ] Warning khi request > 500ms.
+
+### Tracing / Metrics
+
+- [ ] OpenTelemetry.
+- [ ] HTTP traces.
+- [ ] EF Core traces.
+- [ ] Activity TraceId.
+- [ ] Request Count.
+- [ ] Duration Histogram.
+- [ ] Error Rate.
+- [ ] Business Metrics Recipe Created/Published.
+
+## Kiểm thử bắt buộc
+
+- [ ] Create Step.
+- [ ] Update Step.
+- [ ] Delete Step.
+- [ ] Delete → Renumber đúng.
+- [ ] Reorder Step đúng.
+- [ ] Reorder thiếu Step → lỗi.
+- [ ] Upload JPEG.
+- [ ] Upload PNG.
+- [ ] Upload WebP.
+- [ ] Upload AVIF.
+- [ ] File >5MB.
+- [ ] MIME giả.
+- [ ] Set Primary.
+- [ ] Delete Primary.
+- [ ] MinIO unavailable → `503`.
+- [ ] Thumbnail Job.
+- [ ] Search `"pho bo"` tìm được `"Phở bò"`.
+- [ ] Fuzzy Search.
+- [ ] Query Search quá ngắn.
+- [ ] Search Pagination.
+- [ ] `/health`.
+- [ ] `/health/live`.
+- [ ] `/health/ready`.
+- [ ] Logging có CorrelationId.
+- [ ] Logging có UserId.
+- [ ] Trace xuất hiện.
+- [ ] Metrics hoạt động.
 # Cài đặt PostgreSQL bằng Docker
 
 Project sử dụng **PostgreSQL 16** chạy bằng Docker.
