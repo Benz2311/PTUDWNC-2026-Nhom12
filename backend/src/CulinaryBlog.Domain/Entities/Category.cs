@@ -15,6 +15,8 @@ public class Category : BaseEntity
 
     public int OrderIndex { get; private set; }
 
+    public int SortOrder => OrderIndex;
+
     public IReadOnlyCollection<Recipe> Recipes => _recipes.AsReadOnly();
 
     private Category()
@@ -37,14 +39,21 @@ public class Category : BaseEntity
 
     public static Category Create(
         string name,
-        string slug,
+        string? slug = null,
         string? description = null,
         string? imageUrl = null,
         int orderIndex = 0)
     {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Category name cannot be empty.", nameof(name));
+        }
+
+        var finalSlug = string.IsNullOrWhiteSpace(slug) ? SlugHelper.Generate(name) : slug;
+
         return new Category(
             name,
-            slug,
+            finalSlug,
             description,
             imageUrl,
             orderIndex);
@@ -52,19 +61,54 @@ public class Category : BaseEntity
 
     public void Update(
         string name,
-        string? description,
-        string? imageUrl,
-        int orderIndex)
+        string? description = null,
+        string? imageUrl = null,
+        int? orderIndex = null,
+        string? slug = null)
     {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Category name cannot be empty.", nameof(name));
+        }
+
         Name = name;
-        Description = description;
-        ImageUrl = imageUrl;
-        OrderIndex = orderIndex;
+
+        if (slug != null)
+        {
+            Slug = slug;
+        }
+
+        if (description != null)
+        {
+            Description = description;
+        }
+
+        if (imageUrl != null)
+        {
+            ImageUrl = imageUrl;
+        }
+
+        if (orderIndex.HasValue)
+        {
+            OrderIndex = orderIndex.Value;
+        }
+
+        UpdatedAt = DateTime.UtcNow;
     }
 
     public void SoftDelete()
     {
         IsDeleted = true;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void AddRecipe(Recipe recipe)
+    {
+        ArgumentNullException.ThrowIfNull(recipe);
+
+        if (!_recipes.Contains(recipe))
+        {
+            _recipes.Add(recipe);
+        }
     }
 }
