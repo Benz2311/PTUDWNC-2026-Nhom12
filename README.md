@@ -1,104 +1,54 @@
 # PTUDWNC-2026-Nhom12 - Culinary Blog
 
-Culinary Blog là ứng dụng blog ẩm thực gồm frontend Next.js, backend ASP.NET Core Minimal API và PostgreSQL. Backend được tổ chức theo kiến trúc phân lớp Domain - Application - Infrastructure - API; Docker Compose cấu hình các dịch vụ phục vụ phát triển như PostgreSQL, Redis và MinIO.
+Tài liệu này ghi nhận phạm vi Recipe / Ingredient do Phạm Nguyễn Ngọc Phước phụ trách, dựa trên source hiện có. Trạng thái được chia thành **đã có**, **đã có một phần** và **chưa triển khai** để phân biệt implementation với yêu cầu còn lại.
 
-Tài liệu này mô tả cấu trúc hiện tại của repository và tập trung ghi nhận phần Recipe & Ingredient đã triển khai.
+## Công nghệ và cấu trúc liên quan
 
-## 1. Cấu trúc dự án
+- Backend: ASP.NET Core Minimal API trên .NET 10; Entity Framework Core/Npgsql; PostgreSQL.
+- Các tầng chính: `CulinaryBlog.Domain` (entity/enum), `CulinaryBlog.Application` (service/interface), `CulinaryBlog.Infrastructure` (EF Core/repository), `CulinaryBlog.Api` (HTTP endpoints).
+- Frontend: Next.js App Router, React, TypeScript; dịch vụ phát triển có Redis và MinIO.
+- Code Recipe: `backend/src/CulinaryBlog.Api/Endpoints/Recipes/RecipeEndpoints.cs`.
+- Domain: `backend/src/CulinaryBlog.Domain/Entities/Recipe.cs`, `RecipeNutrition.cs`, `RecipeIngredient.cs`.
+- Persistence: `backend/src/CulinaryBlog.Infrastructure/Persistence/ApplicationDbContext.cs`, `RecipeRepository.cs`.
+- Application write flow: `backend/src/CulinaryBlog.Application/Features/Recipes/RecipeWriteService.cs`.
 
-```text
-PTUDWNC-2026-Nhom12/
-├── docker-compose.yml                 # Khai báo các dịch vụ phát triển
-├── .env.example                       # Mẫu biến môi trường
-├── backend/
-│   ├── src/
-│   │   ├── CulinaryBlog.Api/          # Minimal API, endpoint, middleware, cấu hình host
-│   │   ├── CulinaryBlog.Application/  # Use case, DTO và interface
-│   │   ├── CulinaryBlog.Domain/       # Entity, enum và quy tắc nghiệp vụ
-│   │   └── CulinaryBlog.Infrastructure/ # EF Core, PostgreSQL, repository, migration
-│   ├── tests/
-│   │   └── CulinaryBlog.UnitTests/    # Unit test và PostgreSQL integration test
-│   └── tools/
-│       └── CulinaryBlog.DbSeeder/     # Công cụ khởi tạo dữ liệu
-├── frontend/
-│   ├── app/                           # Route và layout của Next.js App Router
-│   ├── components/                    # Component theo nhóm tính năng
-│   └── lib/api.ts                      # Tiện ích gọi API
-└── infrastructure/
-    └── docker/                        # Dockerfile cho backend và frontend
-```
+## Đã có
 
-### Backend
+### Entity và persistence
 
-- `CulinaryBlog.Api` đăng ký dịch vụ và cung cấp endpoint cho xác thực, danh mục, công thức, dashboard, tệp và health check.
-- `CulinaryBlog.Application` chứa các abstraction/use case như `IRecipeRepository`, `IUnitOfWork` và `IRecipeWriteService`.
-- `CulinaryBlog.Domain` chứa các entity như `Recipe`, `RecipeIngredient`, `RecipeNutrition`, `RecipeStep`, `RecipeImage`, `Category` và `ApplicationUser`.
-- `CulinaryBlog.Infrastructure` triển khai persistence bằng Entity Framework Core/Npgsql. Cấu hình model hiện tập trung trong `Persistence/ApplicationDbContext.cs` và các cấu hình entity trong `Persistence/Configurations/`; migration nằm trong `Persistence/Migrations/`.
+- Có các entity `Recipe`, `RecipeNutrition`, `RecipeIngredient`; Recipe liên kết với tác giả và Category, đồng thời chứa collection ingredient, step và image.
+- `RecipeNutrition` được cấu hình owned entity trong bảng Recipe; các giá trị số được lưu với precision `(8,2)`. `RecipeIngredient.Quantity` dùng precision `(10,3)`; `SortOrder` ánh xạ xuống cột `OrderIndex`.
+- `ApplicationDbContext` khai báo các quan hệ, index tra cứu và concurrency token dạng `RowVersion` do ứng dụng tự gán.
+- Có index unique trên slug; index cho lọc danh sách; GIN/trigram index cho title/description; index cho RecipeId của ingredient và thứ tự step/image.
 
-### Frontend
+### Recipe endpoints và nghiệp vụ hiện có
 
-Frontend sử dụng Next.js App Router và chia route thành các nhóm tính năng. Tên thư mục đặt trong ngoặc chỉ dùng để tổ chức mã nguồn, không xuất hiện trong URL.
+- `POST /api/v1/recipes`: chỉ nhận tác giả từ user đã xác thực, kiểm tra dữ liệu cơ bản/category, tạo Recipe ở trạng thái `Draft`.
+- Slug được sinh từ slug hoặc title. Nếu slug đang được dùng, request bị từ chối với `409`; hiện chưa tự nối hậu tố.
+- `PUT /api/v1/recipes/{id}`: kiểm tra owner/Admin, cập nhật Recipe và thay collection ingredient/step/image.
+- Các endpoint publish, unpublish, archive, unarchive đã có. Publish yêu cầu ít nhất một ingredient và một step; các Recipe không ở trạng thái Published bị loại khỏi truy vấn public.
+- `DELETE /api/v1/recipes/{id}` đặt `IsDeleted = true`; đây là soft delete, không xóa Recipe vật lý trong endpoint thông thường.
+- `RecipeRepository` xử lý truy vấn tracked/no-tracking, slug, thay nội dung aggregate và thao tác entity con. `RecipeWriteService` lưu qua Unit of Work.
 
-```text
-frontend/app/
-├── layout.tsx
-├── page.tsx
-├── globals.css
-├── (authentication-user-management)/ # Đăng nhập, đăng ký, hồ sơ
-├── (discovery-search)/                # Khám phá và tìm kiếm
-├── (recipe-management)/               # Danh sách, tạo mới, chi tiết công thức
-└── (admin-system)/                    # Trang quản trị
-```
+### Ingredient endpoints
 
-Các component dùng chung theo tính năng nằm trong `frontend/components/`, gồm `admin/`, `discovery/` và `recipe-management/`.
+- Đã có create/update/delete ingredient qua các endpoint dưới `/api/v1/recipes/{id}/ingredients`.
+- Có kiểm tra quyền owner/Admin, tên bắt buộc tối đa 200 ký tự, quantity nullable nhưng nếu có phải lớn hơn 0, unit tối đa 50 ký tự và thứ tự không âm.
+- Giá trị decimal được nhận dưới dạng JSON number theo kiểu .NET `decimal`.
 
-### Công nghệ chính
+### Nutrition source và model lifecycle mới bổ sung
 
-- Frontend: Next.js, React, TypeScript.
-- Backend: ASP.NET Core Minimal API, .NET 10.
-- Persistence: Entity Framework Core 10, Npgsql, PostgreSQL 16.
-- Dịch vụ phát triển: Docker Compose, Redis, MinIO.
+- `RecipeNutrition.Source` hiện mặc định `Manual`; request DTO không nhận trường Source nên client chưa thể truyền giá trị này qua API.
+- Đã thêm nền tảng source cho `DeletedAt`, PostgreSQL `xmin`, `RecipeSlugHistory` và `RecipeAuditLog` trong domain/EF model.
+- Các mục trên **chưa được hoàn tất thành tính năng chạy được**: chưa có migration mới, chưa có API/service sử dụng slug history/audit, và chưa dùng ETag/If-Match với xmin.
 
-## 2. Phần việc đã hoàn thành: Phạm Nguyễn Ngọc Phước - Recipe & Ingredient
+### Kiểm thử hiện có
 
-### 2.1. Entity và quan hệ dữ liệu
-
-- `Recipe` liên kết với `ApplicationUser` qua `AuthorId` và `Category` qua `CategoryId`. Hai quan hệ dùng `DeleteBehavior.Restrict`, tránh xóa tác giả/danh mục khi còn Recipe tham chiếu.
-- `RecipeIngredient`, `RecipeStep` và `RecipeImage` là các collection của Recipe, liên kết bằng `RecipeId`. Cấu hình FK dùng cascade cho thao tác xóa vật lý; xóa Recipe từ luồng nghiệp vụ hiện tại là soft-delete.
-- `RecipeIngredient` có các trường tên, số lượng, đơn vị, ghi chú và thứ tự. `Quantity` dùng precision `(10,3)`; `SortOrder` được lưu dưới tên cột `OrderIndex`.
-- `RecipeNutrition` được cấu hình là owned entity qua `OwnsOne`, lưu cùng bảng `Recipes` trong các cột `Nutrition_*`, không tạo bảng riêng. Các giá trị dinh dưỡng dùng precision `(8,2)`.
-- Cấu hình được lưu trong model của `ApplicationDbContext`; các file cấu hình riêng cho ingredient và nutrition cũng có trong `Persistence/Configurations/`.
-
-### 2.2. Index và migration
-
-- Recipe có unique index trên `Slug`, cùng các index đơn trên `AuthorId`, `CategoryId`, `Status` và `CreatedAt`.
-- Các index ghép `(IsDeleted, Status, CreatedAt)` và `(CategoryId, IsDeleted, Status, CreatedAt)` hỗ trợ nhóm điều kiện lọc/danh sách.
-- `Title` và `Description` có GIN index với `gin_trgm_ops`, phục vụ tìm kiếm chuỗi con trên PostgreSQL; model bật extension `pg_trgm`.
-- Ingredient có index theo `RecipeId`; step có unique index `(RecipeId, StepNumber)`; image có index `(RecipeId, SortOrder)`.
-- Migration `20260926025747_OptimizeRecipeIndexesAndSearch` ghi nhận các thay đổi index tìm kiếm/danh sách và index thứ tự của entity con. Migration cùng snapshot model được lưu tại `backend/src/CulinaryBlog.Infrastructure/Persistence/Migrations/`.
-
-### 2.3. Repository, Unit of Work và luồng ghi
-
-- `RecipeRepository` triển khai `IRecipeRepository`; `ApplicationUnitOfWork` triển khai `IUnitOfWork` và chuyển tiếp lời gọi `SaveChangesAsync()` tới `ApplicationDbContext`.
-- `GetForUpdateAsync` tải Recipe ở trạng thái tracked cùng ingredient, step, image và nutrition; dùng `AsSplitQuery()` để tránh nhân dòng khi tải nhiều collection.
-- `ExistsBySlugAsync` dùng `AnyAsync()` và nhận `excludeId` để kiểm tra slug khi cập nhật. Unique index ở database là lớp bảo vệ cuối trước slug trùng do các request đồng thời.
-- `RecipeWriteService` điều phối tạo/cập nhật/xóa mềm Recipe, thay thế nội dung và các thao tác thêm/sửa/xóa ingredient, step, image; service lưu thay đổi qua Unit of Work.
-- Khi thay nội dung, repository xóa các entity con cũ khỏi tập theo dõi, gắn các entity con mới và cập nhật aggregate trước một lần `SaveChangesAsync()`.
-- Mỗi thao tác ghi trong service gọi một lần `SaveChangesAsync()`. Với PostgreSQL, EF Core thực hiện các câu lệnh của một lần save trong transaction tự động. Luồng production hiện không mở explicit transaction bao quanh nhiều lần save.
-
-### 2.4. Truy vấn phục vụ Create/Update/Delete
-
-- Kiểm tra slug dùng truy vấn tồn tại dạng `AnyAsync()` thay vì tải cả Recipe về bộ nhớ; lúc cập nhật có thể loại trừ chính Recipe đang sửa.
-- Cập nhật aggregate tải Recipe tracked cùng các collection cần thay đổi bằng `GetForUpdateAsync`; việc thay ingredient, step và image được gom vào một lần lưu.
-- Xóa Recipe qua repository cập nhật cờ `IsDeleted` và `UpdatedAt`, không xóa vật lý Recipe trong luồng nghiệp vụ thông thường.
-- Tải Recipe để đọc chi tiết dùng các navigation cần thiết và `AsSplitQuery()`; các truy vấn danh sách/search được triển khai tại repository/endpoint theo projection và phân trang.
-
-### 2.5. Kiểm thử
-
-- `RecipeWriteServiceTests` kiểm tra service gọi đúng repository và số lần lưu cho các thao tác Recipe, ingredient, step và image.
-- `RecipePersistenceModelTests` kiểm tra metadata của các index tìm kiếm/danh sách và index thứ tự của entity con.
-- `RecipePersistenceIntegrationTests` dùng PostgreSQL thật để kiểm tra quan hệ User/Category, owned nutrition, tạo/cập nhật/xóa ingredient, thay thế collection con và soft-delete Recipe.
-- Integration test yêu cầu `CULINARYBLOG_TEST_CONNECTION` trỏ tới database riêng có tên kết thúc bằng `_test`. Test chạy migration và rollback transaction sau khi hoàn thành; không dùng database phát triển làm database test.
+- `RecipeWriteServiceTests`: kiểm tra delegation và số lần gọi Unit of Work.
+- `RecipePersistenceModelTests`: kiểm tra một số metadata/index của EF model.
+- `RecipePersistenceIntegrationTests`: PostgreSQL integration test cho quan hệ, nutrition, ingredient, thay collection con và soft delete.
+- `SlugTests`: kiểm tra chuyển tiếng Việt có dấu thành slug ASCII.
+- Integration test cần `CULINARYBLOG_TEST_CONNECTION` trỏ tới database riêng có hậu tố `_test`; khi không cấu hình, test được skip.
 
 Chạy test project:
 
@@ -106,10 +56,25 @@ Chạy test project:
 dotnet test backend/tests/CulinaryBlog.UnitTests/CulinaryBlog.UnitTests.csproj --nologo
 ```
 
-Khi chưa cấu hình `CULINARYBLOG_TEST_CONNECTION`, PostgreSQL integration test được skip có chủ đích; các unit test vẫn chạy. Để chạy integration test, tạo database test riêng rồi đặt connection string vào biến môi trường trước khi chạy lệnh trên.
+## Đã có một phần, cần hoàn thiện
 
-## 3. Trạng thái tổng quan
+- **Create Recipe:** các trường title, description, prep time, cook time, servings, difficulty và category đã được kiểm tra. Slug chưa tự thêm suffix khi trùng. Nutrition đang là owned entity và mặc định Manual ở object, nhưng cột `Nutrition_Source` cần migration để lưu được vào database.
+- **Update Recipe:** quyền owner/Admin và cập nhật nội dung đã có. Chưa bắt buộc `If-Match`; chưa trả/kiểm tra ETag từ PostgreSQL `xmin`; chưa lưu slug cũ; chưa giới hạn đổi slug theo trạng thái Draft/Published/Archived.
+- **Publish:** quyền, trạng thái và điều kiện có ingredient/step đã có. Chưa kiểm tra email tác giả xác nhận, category active khi publish, `If-Match` hoặc idempotency đầy đủ; `PublishedAt` hiện được gán lại mỗi lần publish.
+- **Unpublish:** chuyển về Draft và giữ `PublishedAt`; chưa có If-Match và thao tác vẫn cập nhật thời điểm sửa/concurrency token khi gọi lặp.
+- **Archive/Unarchive:** trạng thái được cập nhật và public query chỉ lấy Published. Unarchive hiện chuyển về Draft; chưa có cache invalidation.
+- **Soft delete:** hiện đặt `IsDeleted` và `UpdatedAt`; chưa gán `DeletedAt`, chưa áp dụng retention và chưa invalidation recipe/search/category cache. Child entity và MinIO file không bị xóa bởi soft-delete hiện tại.
+- **Ingredient:** API chưa nhận `Notes`, dù entity/schema có trường này. Chưa yêu cầu If-Match của Recipe. Chuỗi như `"1/2"` không phải JSON number hợp lệ cho decimal và hiện chưa có xử lý riêng để bảo đảm phản hồi `422`.
 
-Backend hiện có các luồng xác thực, quản lý danh mục/công thức, upload tệp, dashboard và health check. Frontend đã có route cho xác thực, khám phá, quản lý Recipe và quản trị; một số màn hình hoặc luồng dữ liệu vẫn đang dùng mock/placeholder, nên trạng thái UI chưa đồng nghĩa mọi chức năng backend đã được nối hoàn chỉnh.
-Thông tin trong tài liệu phản ánh cấu trúc mã nguồn và các kiểm thử hiện có trong repository.
+## Chưa triển khai
 
+- `POST /api/v1/admin/recipes/{id}/restore` và quy tắc restore trong thời hạn retention.
+- `DELETE /api/v1/admin/recipes/{id}/purge`: physical delete recipe/children, xóa MinIO files và ghi audit log.
+- Application service dùng chung cho purge endpoint và purge background job.
+- Invalidate cache Recipe, Search và Category khi status/delete/restore thay đổi.
+- `JOB-003 Sitemap Generation`: sitemap Recipe chỉ gồm Published, kèm category pages; loại Draft, Archived và Deleted.
+- Bộ test endpoint/service cho owner khác `403`, stale ETag `409`, email chưa xác nhận, thiếu ingredient/step, restore/purge, decimal invalid và sitemap job.
+
+## Phạm vi hiện tại
+
+Các endpoint được yêu cầu ở nhóm Recipe/Ingredient phần lớn đã có implementation cơ bản; những endpoint restore/purge và sitemap job chưa có. Các tiêu chí concurrency, retention, cache invalidation, audit và lưu lịch sử slug vẫn là phần công việc tiếp theo, không được xem là hoàn thành chỉ vì đã có model nền tảng.
