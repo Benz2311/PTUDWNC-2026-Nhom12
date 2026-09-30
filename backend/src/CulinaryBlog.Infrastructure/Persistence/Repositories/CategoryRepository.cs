@@ -1,4 +1,4 @@
-using CulinaryBlog.Application.Contracts.Persistence;
+﻿using CulinaryBlog.Application.Contracts.Persistence;
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Domain.Entities;
 using CulinaryBlog.Domain.Enums;
@@ -21,8 +21,7 @@ public class CategoryRepository : ICategoryRepository
     {
         return await _db.Categories
             .AsNoTracking()
-            .OrderBy(category => category.OrderIndex)
-            .ThenBy(category => category.Name)
+            .OrderBy(category => category.Name)
             .Select(category => new CategoryDto(
                 category.Id,
                 category.Name,
@@ -88,39 +87,70 @@ public class CategoryRepository : ICategoryRepository
             await _db.Categories.CountAsync(
                 cancellationToken);
 
-        var totalRecipes =
-            await _db.Recipes.CountAsync(
+        var recipeCountsByStatus = await _db.Recipes
+            .AsNoTracking()
+            .GroupBy(recipe => recipe.Status)
+            .Select(group => new
+            {
+                Status = group.Key,
+                Count = group.Count(),
+            })
+            .ToDictionaryAsync(
+                item => item.Status,
+                item => item.Count,
                 cancellationToken);
+        var totalRecipes = recipeCountsByStatus.Values.Sum();
+        var publishedRecipes = recipeCountsByStatus.GetValueOrDefault(RecipeStatus.Published);
+        var draftRecipes = recipeCountsByStatus.GetValueOrDefault(RecipeStatus.Draft);
+        var archivedRecipes = recipeCountsByStatus.GetValueOrDefault(RecipeStatus.Archived);
 
-        var publishedRecipes =
-            await _db.Recipes.CountAsync(
-                r => r.Status == RecipeStatus.Published,
-                cancellationToken);
-
-        var draftRecipes =
-            await _db.Recipes.CountAsync(
-                r => r.Status == RecipeStatus.Draft,
-                cancellationToken);
-
-        var categories =
+        var categoryCounts =
             await _db.Categories
                 .AsNoTracking()
-                .OrderBy(c => c.Name)
                 .Select(c =>
-                    new CulinaryBlog.Application.DTOs.CategoryStatisticItemDto(
+                    new
+                    {
                         c.Id,
                         c.Name,
-                        c.Recipes.Count(
-                            r => r.Status ==
-                                 RecipeStatus.Published)))
+                        RecipeCount = c.Recipes.Count(
+                            recipe => recipe.Status == RecipeStatus.Published),
+                    })
+                .OrderByDescending(item => item.RecipeCount)
+                .ThenBy(item => item.Name)
                 .ToArrayAsync(cancellationToken);
+
+        var categories = categoryCounts
+            .Select(item => new CulinaryBlog.Application.DTOs.CategoryStatisticItemDto(
+                item.Id,
+                item.Name,
+                item.RecipeCount,
+                CalculatePercentage(item.RecipeCount, publishedRecipes)))
+            .ToArray();
+
+        var recipesByMonth = await _db.Recipes
+            .AsNoTracking()
+            .GroupBy(recipe => new
+            {
+                recipe.CreatedAt.Year,
+                recipe.CreatedAt.Month,
+            })
+            .Select(group => new CulinaryBlog.Application.DTOs.RecipeMonthlyStatisticDto(
+                group.Key.Year,
+                group.Key.Month,
+                group.Count()))
+            .OrderBy(item => item.Year)
+            .ThenBy(item => item.Month)
+            .ToArrayAsync(cancellationToken);
 
         return new CulinaryBlog.Application.DTOs.CategoryStatisticsDto(
             totalCategories,
             totalRecipes,
             publishedRecipes,
             draftRecipes,
-            categories);
+            archivedRecipes,
+            categories,
+            categories.Take(5).ToArray(),
+            recipesByMonth);
     }
 
     public async Task AddAsync(
@@ -140,5 +170,12 @@ public class CategoryRepository : ICategoryRepository
     public void Remove(Category category)
     {
         _db.Categories.Remove(category);
+    }
+
+    private static decimal CalculatePercentage(int count, int total)
+    {
+        return total == 0
+            ? 0
+            : Math.Round(count * 100m / total, 2);
     }
 }

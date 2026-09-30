@@ -1,3 +1,5 @@
+﻿using CulinaryBlog.Application.Common.Interfaces;
+using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Features.Categories.Queries.GetCategories;
 using CulinaryBlog.Application.Features.Categories.Queries.GetCategoryStatistics;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipesByCategory;
@@ -7,6 +9,8 @@ namespace CulinaryBlog.API.Endpoints;
 
 public static class CategoryEndpoints
 {
+    private const string CategoryListCacheKey = "categories:all";
+
     public static void MapCategoryEndpoints(
         this WebApplication app)
     {
@@ -17,33 +21,13 @@ public static class CategoryEndpoints
         // GET /api/v1/categories & /api/categories
         group.MapGet(
             "/",
-            async (
-                ISender sender,
-                CancellationToken cancellationToken) =>
-            {
-                var result =
-                    await sender.Send(
-                        new GetCategoriesQuery(),
-                        cancellationToken);
-
-                return Results.Ok(result);
-            })
+            GetCategories)
             .WithName("GetCategories")
             .WithSummary("Lấy danh sách tất cả các danh mục");
 
         app.MapGet(
             "/api/categories",
-            async (
-                ISender sender,
-                CancellationToken cancellationToken) =>
-            {
-                var result =
-                    await sender.Send(
-                        new GetCategoriesQuery(),
-                        cancellationToken);
-
-                return Results.Ok(result);
-            })
+            GetCategories)
             .ExcludeFromDescription();
 
         // GET /api/v1/categories/statistics
@@ -126,5 +110,30 @@ public static class CategoryEndpoints
             })
             .WithName("GetCategoryRecipes")
             .WithSummary("Lấy danh sách công thức thuộc danh mục theo slug");
+    }
+
+    private static async Task<IResult> GetCategories(
+        ISender sender,
+        ICacheService cache,
+        CancellationToken cancellationToken)
+    {
+        var cachedCategories = await cache.GetAsync<IReadOnlyList<CategoryDto>>(
+            CategoryListCacheKey,
+            cancellationToken);
+        if (cachedCategories is not null)
+        {
+            return Results.Ok(cachedCategories);
+        }
+
+        var categories = await sender.Send(
+            new GetCategoriesQuery(),
+            cancellationToken);
+        await cache.SetAsync(
+            CategoryListCacheKey,
+            categories,
+            TimeSpan.FromMinutes(30),
+            cancellationToken);
+
+        return Results.Ok(categories);
     }
 }

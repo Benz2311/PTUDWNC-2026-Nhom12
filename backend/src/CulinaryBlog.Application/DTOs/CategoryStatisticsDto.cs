@@ -5,12 +5,20 @@ public record CategoryStatisticsDto(
     int TotalRecipes,
     int PublishedRecipes,
     int DraftRecipes,
-    CategoryStatisticItemDto[] Categories
+    int ArchivedRecipes,
+    CategoryStatisticItemDto[] Categories,
+    CategoryStatisticItemDto[] TopCategories,
+    RecipeMonthlyStatisticDto[] RecipesByMonth
 );
 
 public record CategoryStatisticItemDto(
     Guid CategoryId,
     string CategoryName,
-    int RecipeCount
-);
+    int RecipeCount,
+    decimal Percentage);
+
+public record RecipeMonthlyStatisticDto(
+    int Year,
+    int Month,
+    int RecipeCount);
 

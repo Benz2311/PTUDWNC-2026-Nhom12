@@ -86,12 +86,12 @@ public record RecipeImageDto(
 public record RecipeNutritionDto(
     decimal? Calories,
     decimal? Protein,
-    decimal? Carbs,
+    decimal? Carbohydrates,
     decimal? Fat,
     decimal? Fiber = null,
     decimal? Sodium = null)
 {
-    public decimal? Carbohydrates => Carbs;
+    public decimal? Carbs => Carbohydrates;
 }
 
 public record RecipeAuthorDto(
