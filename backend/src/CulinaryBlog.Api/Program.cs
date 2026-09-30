@@ -11,7 +11,8 @@ using Serilog;
 // ── Serilog — cấu hình trước khi build host ──────────────────────────────────
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(new ConfigurationBuilder()
-        .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+        .SetBasePath(AppContext.BaseDirectory)
+        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
         .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true)
         .AddEnvironmentVariables()
         .Build())
@@ -30,6 +31,7 @@ try
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
 
+    builder.Services.AddControllers();
     builder.Services.AddOpenApi();
 
     builder.Services.AddCors(options =>
@@ -88,6 +90,7 @@ try
 
     app.MapCategoryEndpoints();
     app.MapRecipeEndpoints();
+    app.MapControllers();
 
     app.Run();
 }

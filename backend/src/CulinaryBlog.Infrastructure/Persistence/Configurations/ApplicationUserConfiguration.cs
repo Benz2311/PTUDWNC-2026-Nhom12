@@ -47,6 +47,8 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.HasIndex(x => x.IsActive);
+
         builder.Property(x => x.CreatedAt)
             .IsRequired();
 

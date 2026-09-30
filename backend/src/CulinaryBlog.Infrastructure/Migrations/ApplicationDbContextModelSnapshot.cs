@@ -72,6 +72,8 @@ namespace CulinaryBlog.Infrastructure.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
+                    b.HasIndex("IsActive");
+
                     b.HasIndex("UserName")
                         .IsUnique();
 
@@ -487,6 +489,10 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("RevokedAt");
 
                     b.HasIndex("TokenHash")
                         .IsUnique();
