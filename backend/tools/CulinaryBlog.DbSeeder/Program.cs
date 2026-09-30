@@ -129,6 +129,146 @@ try
     }
 
     // =========================================================
+    // 1B. TẠO RECIPE DEMO "Phở bò Hà Nội" NẾU CHƯA TỒN TẠI (IDEMPOTENT)
+    // =========================================================
+
+    const string phoBoSlug = "pho-bo-ha-noi";
+    var existingPhoBo = await db.Recipes
+        .Include(r => r.Steps)
+        .Include(r => r.Images)
+        .FirstOrDefaultAsync(r => r.Slug == phoBoSlug);
+
+    if (existingPhoBo == null)
+    {
+        Console.WriteLine("Đang tạo Recipe demo: Phở bò Hà Nội...");
+
+        var author = await db.Users.FirstOrDefaultAsync()
+            ?? throw new InvalidOperationException("Không tìm thấy User nào trong database.");
+
+        var category = await db.Categories.FirstOrDefaultAsync(c => c.Slug == "cat-001" || c.Name.Contains("Việt"))
+            ?? await db.Categories.FirstAsync();
+
+        var phoBoId = Guid.NewGuid();
+        var phoBoRecipe = new Recipe
+        {
+            Id = phoBoId,
+            AuthorId = author.Id,
+            CategoryId = category.Id,
+            Title = "Phở bò Hà Nội",
+            Slug = phoBoSlug,
+            Description = "Phở bò truyền thống Hà Nội với nước dùng thơm và thịt bò.",
+            Content = "Phở bò là món ăn truyền thống nổi tiếng của Hà Nội với nước dùng trong veo, thơm mùi quế, hồi, thảo quả và vị ngọt thanh từ xương bò ninh nhừ.",
+            PrepTimeMinutes = 30,
+            CookTimeMinutes = 180,
+            Servings = 4,
+            Difficulty = CulinaryBlog.Domain.Enums.DifficultyLevel.Medium,
+            Status = CulinaryBlog.Domain.Enums.RecipeStatus.Published,
+            PublishedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            IsDeleted = false
+        };
+
+        db.Recipes.Add(phoBoRecipe);
+
+        // Thêm 5 bước nấu chuẩn cho Phở bò
+        var phoSteps = new List<RecipeStep>
+        {
+            new RecipeStep
+            {
+                Id = Guid.NewGuid(),
+                RecipeId = phoBoId,
+                StepNumber = 1,
+                Title = "Sơ chế xương và thịt bò",
+                Description = "Rửa sạch xương ống và nạm bò với nước muối loãng, chần qua nước sôi 5 phút để khử bọt và mùi hôi rồi rửa lại bằng nước lạnh.",
+                TimerMinutes = 15,
+                CreatedAt = DateTime.UtcNow,
+                IsDeleted = false
+            },
+            new RecipeStep
+            {
+                Id = Guid.NewGuid(),
+                RecipeId = phoBoId,
+                StepNumber = 2,
+                Title = "Nướng gia vị thơm",
+                Description = "Nướng hành tây, hành tím, gừng, hoa hồi, quế, thảo quả trên lửa đến khi dậy mùi thơm nồng, cạo sạch muội đen và rửa sơ.",
+                TimerMinutes = 10,
+                CreatedAt = DateTime.UtcNow,
+                IsDeleted = false
+            },
+            new RecipeStep
+            {
+                Id = Guid.NewGuid(),
+                RecipeId = phoBoId,
+                StepNumber = 3,
+                Title = "Ninh nước dùng phở",
+                Description = "Cho xương bò cùng hành gừng nướng và túi gia vị vào nồi, ninh nhỏ lửa trong 3 tiếng, vớt bọt liên tục để nước dùng trong vắt, nêm muối và nước mắm vừa ăn.",
+                TimerMinutes = 180,
+                CreatedAt = DateTime.UtcNow,
+                IsDeleted = false
+            },
+            new RecipeStep
+            {
+                Id = Guid.NewGuid(),
+                RecipeId = phoBoId,
+                StepNumber = 4,
+                Title = "Chần bánh phở và xếp thịt",
+                Description = "Chần bánh phở qua nước sôi rồi chia đều vào các tô. Thái mỏng thịt bò tái và nạm bò chín, xếp đẹp mắt lên trên mặt bánh phở kèm hành lá, rau mùi.",
+                TimerMinutes = 5,
+                CreatedAt = DateTime.UtcNow,
+                IsDeleted = false
+            },
+            new RecipeStep
+            {
+                Id = Guid.NewGuid(),
+                RecipeId = phoBoId,
+                StepNumber = 5,
+                Title = "Chan nước dùng và thưởng thức",
+                Description = "Đun nước dùng sôi sùng sục rồi chan ngập bánh phở và thịt bò. Dùng ngay khi còn nóng hổi kèm chanh tươi, ớt lát và quẩy giòn.",
+                TimerMinutes = 2,
+                CreatedAt = DateTime.UtcNow,
+                IsDeleted = false
+            }
+        };
+
+        // Thêm 2 ảnh chuẩn cho Phở bò (OrderIndex 0 là Primary)
+        var phoImages = new List<RecipeImage>
+        {
+            new RecipeImage
+            {
+                Id = Guid.NewGuid(),
+                RecipeId = phoBoId,
+                OriginalUrl = "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=800",
+                AltText = "Tô Phở bò Hà Nội thơm ngon nóng hổi",
+                IsPrimary = true,
+                OrderIndex = 0,
+                CreatedAt = DateTime.UtcNow,
+                IsDeleted = false
+            },
+            new RecipeImage
+            {
+                Id = Guid.NewGuid(),
+                RecipeId = phoBoId,
+                OriginalUrl = "https://images.unsplash.com/photo-1503764654157-724e030b1447?w=800",
+                AltText = "Nước dùng phở bò trong vắt chuẩn vị",
+                IsPrimary = false,
+                OrderIndex = 1,
+                CreatedAt = DateTime.UtcNow,
+                IsDeleted = false
+            }
+        };
+
+        db.RecipeSteps.AddRange(phoSteps);
+        db.RecipeImages.AddRange(phoImages);
+
+        await db.SaveChangesAsync();
+        Console.WriteLine("Đã thêm thành công Recipe 'Phở bò Hà Nội' kèm 5 Steps và 2 Images (Primary = true).");
+    }
+    else
+    {
+        Console.WriteLine("Recipe 'Phở bò Hà Nội' đã tồn tại, bỏ qua tạo mới (Idempotent).");
+    }
+
+    // =========================================================
     // 2. LẤY DANH SÁCH RECIPE
     // =========================================================
 

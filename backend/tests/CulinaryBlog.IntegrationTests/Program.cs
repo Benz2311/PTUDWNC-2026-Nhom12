@@ -492,9 +492,9 @@ public class Program
             var finalCategoryCount = await dbContext.Categories.CountAsync();
             var finalNullVectorCount = await dbContext.Recipes.CountAsync(r => EF.Property<NpgsqlTypes.NpgsqlTsVector>(r, "SearchVectorFts") == null);
 
-            Assert(finalRecipeCount == 10, $"Recipes count preserved: {finalRecipeCount} (expected 10)");
-            Assert(finalStepCount == 70 || finalStepCount == 72, $"RecipeSteps count preserved: {finalStepCount} (expected 70-72)");
-            Assert(finalImageCount == 30 || finalImageCount == 33, $"RecipeImages count preserved: {finalImageCount} (expected 30-33)");
+            Assert(finalRecipeCount == 11, $"Recipes count preserved: {finalRecipeCount} (expected 11)");
+            Assert(finalStepCount == 75 || finalStepCount == 77, $"RecipeSteps count preserved: {finalStepCount} (expected 75-77)");
+            Assert(finalImageCount == 32 || finalImageCount == 35, $"RecipeImages count preserved: {finalImageCount} (expected 32-35)");
             Assert(finalCategoryCount == 11, $"Categories count preserved: {finalCategoryCount} (expected 11)");
             Assert(finalNullVectorCount == 0, $"Null SearchVector count: {finalNullVectorCount} (expected 0)");
         }
