@@ -58,6 +58,7 @@ try
             Log.Warning(ex, "Database migration skipped or tables already exist.");
         }
 
+        await CategoryDataSeeder.SeedAsync(dbContext, targetCount: 20);
         try
         {
             await CategoryDataSeeder.SeedAsync(dbContext, targetCount: 20);
