@@ -9,11 +9,11 @@ namespace CulinaryBlog.IntegrationTests.Api;
 /// Requires a running database; skipped automatically via WebApplicationFactory
 /// if DI configuration fails (e.g., in CI without a DB).
 /// </summary>
-public class CategoriesEndpointTests : IClassFixture<WebApplicationFactory<Program>>
+public class CategoriesEndpointTests : IClassFixture<WebApplicationFactory<global::Program>>
 {
     private readonly HttpClient _client;
 
-    public CategoriesEndpointTests(WebApplicationFactory<Program> factory)
+    public CategoriesEndpointTests(WebApplicationFactory<global::Program> factory)
     {
         _client = factory.CreateClient();
     }

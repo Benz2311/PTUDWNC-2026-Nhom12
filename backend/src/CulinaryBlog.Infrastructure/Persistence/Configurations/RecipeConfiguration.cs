@@ -25,11 +25,7 @@ public class RecipeConfiguration
         builder.Property(r => r.Description)
             .HasColumnType("text");
 
-        builder.Property(r => r.Difficulty)
-            .HasConversion<string>();
 
-        builder.Property(r => r.Status)
-            .HasConversion<string>();
 
         builder.HasIndex(r => r.Slug)
             .IsUnique();
@@ -39,6 +35,18 @@ public class RecipeConfiguration
         builder.HasIndex(r => r.Status);
 
         builder.HasIndex(r => r.CreatedAt);
+
+        builder.HasIndex(r => new { r.IsDeleted, r.Status, r.CreatedAt });
+
+        builder.HasIndex(r => new { r.CategoryId, r.IsDeleted, r.Status, r.CreatedAt });
+
+        builder.HasIndex(r => r.Title)
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
+
+        builder.HasIndex(r => r.Description)
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
 
         builder.HasQueryFilter(r => !r.IsDeleted);
     }

@@ -24,6 +24,8 @@ public static class DependencyInjection
         // FluentValidation — tự scan toàn bộ validators trong assembly
         services.AddValidatorsFromAssembly(assembly);
 
+        services.AddScoped<Interfaces.IRecipeWriteService, Features.Recipes.RecipeWriteService>();
+
         return services;
     }
 }
