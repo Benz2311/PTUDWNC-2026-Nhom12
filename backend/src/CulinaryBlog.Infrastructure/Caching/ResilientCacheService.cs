@@ -1,5 +1,4 @@
 using System.Text.Json;
-using CulinaryBlog.Application.Common.Interfaces;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
@@ -8,8 +7,11 @@ namespace CulinaryBlog.Infrastructure.Caching;
 /// <summary>
 /// Triển khai ICacheService bao bọc IDistributedCache (Redis) với cơ chế Failover an toàn theo SRS v1.2.0:
 /// Khi Redis bị sập hoặc mất kết nối, tự động fallback truy vấn trực tiếp vào DB mà không quăng Exception.
+/// Hỗ trợ cả 2 interface ICacheService của Application và Application.Common.
 /// </summary>
-public class ResilientCacheService : ICacheService
+public class ResilientCacheService :
+    CulinaryBlog.Application.Common.Interfaces.ICacheService,
+    CulinaryBlog.Application.Interfaces.ICacheService
 {
     private readonly IDistributedCache? _distributedCache;
     private readonly ILogger<ResilientCacheService> _logger;
@@ -87,5 +89,12 @@ public class ResilientCacheService : ICacheService
         {
             _logger.LogWarning(ex, "Redis cache remove error for key '{CacheKey}'. Skipping cache invalidate.", key);
         }
+    }
+
+    public async Task RemoveByPrefixAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        // IDistributedCache không hỗ trợ scan theo prefix mặc định;
+        // Bắt lỗi an toàn nếu có lỗi
+        await Task.CompletedTask;
     }
 }

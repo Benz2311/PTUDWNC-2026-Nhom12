@@ -1,31 +1,118 @@
-using CulinaryBlog.Api.Endpoints.Recipes;
+using CulinaryBlog.API.Endpoints;
 using CulinaryBlog.Api.Middleware;
 using CulinaryBlog.Application;
 using CulinaryBlog.Infrastructure;
+using CulinaryBlog.Infrastructure.Persistence;
+using CulinaryBlog.Infrastructure.Persistence.Seed;
+using Hangfire;
+using Microsoft.EntityFrameworkCore;
+using Scalar.AspNetCore;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+// ── Serilog — cấu hình trước khi build host ──────────────────────────────────
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(new ConfigurationBuilder()
+        .SetBasePath(AppContext.BaseDirectory)
+        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+        .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true)
+        .AddEnvironmentVariables()
+        .Build())
+    .Enrich.FromLogContext()
+    .CreateLogger();
 
-// Cấu hình Global Exception Handling & RFC 7807 Problem Details (Lab 3)
-builder.Services.AddProblemDetails();
-builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+try
+{
+    Log.Information("Starting CulinaryBlog API");
 
-// Đăng ký Application Layer (MediatR Handlers)
-builder.Services.AddApplication();
+    var builder = WebApplication.CreateBuilder(args);
 
-// Đăng ký Infrastructure Layer (PostgreSQL DbContext, Redis Cache, Repositories, Unit of Work)
-builder.Services.AddInfrastructure(builder.Configuration);
+    // Dùng Serilog thay thế logging mặc định
+    builder.Host.UseSerilog();
 
-var app = builder.Build();
+    // Cấu hình Global Exception Handling & RFC 7807 Problem Details (Lab 3)
+    builder.Services.AddProblemDetails();
+    builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
-// Kích hoạt Global Exception Handling Middleware trong HTTP Request Pipeline (Lab 3)
-app.UseExceptionHandler();
+    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(builder.Configuration);
 
-app.MapGet("/", () => Results.Ok(new { status = "online", service = "CulinaryBlog.Api", version = "1.0.0" }));
+    builder.Services.AddControllers();
+    builder.Services.AddOpenApi();
 
-// Đăng ký Minimal API Endpoints
-app.MapRecipeEndpoints();
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("Frontend", policy =>
+        {
+            policy
+                .WithOrigins("http://localhost:5000", "http://localhost:3000")
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
+    });
 
-app.Run();
+    var app = builder.Build();
 
-// Hỗ trợ WebApplicationFactory trong Integration Tests
-public partial class Program { }
+    // Kích hoạt Global Exception Handling Middleware trong HTTP Request Pipeline (Lab 3)
+    app.UseExceptionHandler();
+
+    // ── Migrate + Seed ────────────────────────────────────────────────────────
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        try
+        {
+            await dbContext.Database.MigrateAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Database migration skipped or tables already exist.");
+        }
+
+        try
+        {
+            await CategoryDataSeeder.SeedAsync(dbContext, targetCount: 20);
+        }
+        catch (Exception seedEx)
+        {
+            Log.Warning(seedEx, "Seeding skipped: {Message}", seedEx.Message);
+        }
+    }
+
+    // ── Middleware pipeline ───────────────────────────────────────────────────
+    app.MapOpenApi();
+    app.MapScalarApiReference();
+
+    app.UseCors("Frontend");
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    // Hangfire Dashboard (chỉ môi trường dev)
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseHangfireDashboard("/hangfire");
+    }
+
+    // Serilog request logging
+    app.UseSerilogRequestLogging();
+
+    app.MapGet("/", () => Results.Ok(new { status = "online", service = "CulinaryBlog.Api", version = "1.0.0" }));
+
+    app.MapCategoryEndpoints();
+    app.MapRecipeEndpoints();
+    app.MapControllers();
+
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
+
+public partial class Program
+{
+}

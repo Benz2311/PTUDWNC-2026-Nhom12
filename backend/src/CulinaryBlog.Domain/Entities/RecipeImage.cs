@@ -10,6 +10,12 @@ public class RecipeImage
 
     public string OriginalUrl { get; set; } = string.Empty;
 
+    public string Url
+    {
+        get => OriginalUrl;
+        set => OriginalUrl = value;
+    }
+
     public string? MediumUrl { get; set; }
 
     public string? ThumbnailUrl { get; set; }
@@ -19,6 +25,12 @@ public class RecipeImage
     public bool IsPrimary { get; set; }
 
     public int OrderIndex { get; set; }
+
+    public int SortOrder
+    {
+        get => OrderIndex;
+        set => OrderIndex = value;
+    }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

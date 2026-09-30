@@ -3,6 +3,7 @@ using CulinaryBlog.Application.Exceptions;
 using CulinaryBlog.Application.Features.Recipes.Dtos;
 using CulinaryBlog.Application.Interfaces;
 using CulinaryBlog.Domain.Entities;
+using ICacheService = CulinaryBlog.Application.Common.Interfaces.ICacheService;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 

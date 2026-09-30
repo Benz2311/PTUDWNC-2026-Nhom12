@@ -27,7 +27,6 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
 
     public DbSet<RecipeStep> RecipeSteps => Set<RecipeStep>();
-
     public DbSet<RecipeImage> RecipeImages => Set<RecipeImage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

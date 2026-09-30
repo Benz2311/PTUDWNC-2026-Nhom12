@@ -19,7 +19,7 @@ public class UnitOfWork : IUnitOfWork
         _context = context;
     }
 
-    public IRecipeRepository Recipes => _recipeRepository ??= new RecipeRepository(_context);
+    public IRecipeRepository Recipes => _recipeRepository ??= new Repositories.RecipeRepository(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

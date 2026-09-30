@@ -36,26 +36,51 @@ try
             "Chưa có Recipe. Đang tạo dữ liệu Recipe mẫu...");
 
         var demoUserId = Guid.NewGuid();
-
-        var demoUser = new ApplicationUser
+        var demoUser = await db.Users.FirstOrDefaultAsync(u => u.UserName == "demo_user");
+        if (demoUser == null)
         {
-            Id = demoUserId,
-            UserName = "demo_user",
-            Email = "demo@culinary.local",
-            PasswordHash = "demo"
+            demoUser = new ApplicationUser
+            {
+                Id = demoUserId,
+                UserName = "demo_user",
+                Email = "demo@culinary.local",
+                PasswordHash = "demo"
+            };
+            db.Users.Add(demoUser);
+        }
+        else
+        {
+            demoUserId = demoUser.Id;
+        }
+
+        var demoCategory = await db.Categories.FirstOrDefaultAsync(c => c.Slug == "mon-an-mau");
+        if (demoCategory == null)
+        {
+            demoCategory = Category.Create(
+                name: "Món ăn mẫu",
+                slug: "mon-an-mau",
+                description: "Danh mục mẫu để kiểm tra Step và Image",
+                imageUrl: null,
+                orderIndex: 1
+            );
+            db.Categories.Add(demoCategory);
+        }
+
+        var predefinedCategories = new[]
+        {
+            Category.Create("Món Việt", "cat-001", "Công thức đậm đà hương vị Việt.", null, 2),
+            Category.Create("Món Á", "cat-002", "Những món ăn châu Á dễ thực hiện.", null, 3),
+            Category.Create("Món Âu", "cat-003", "Công thức phương Tây cho căn bếp gia đình.", null, 4),
+            Category.Create("Món Chay", "cat-004", "Món chay cân bằng và giàu dinh dưỡng.", null, 5),
+            Category.Create("Tráng Miệng", "cat-005", "Các món ngọt cho ngày thêm vui.", null, 6)
         };
-
-        db.Users.Add(demoUser);
-
-        var demoCategory = Category.Create(
-            name: "Món ăn mẫu",
-            slug: "mon-an-mau",
-            description: "Danh mục mẫu để kiểm tra Step và Image",
-            imageUrl: null,
-            orderIndex: 1
-        );
-
-        db.Categories.Add(demoCategory);
+        foreach (var cat in predefinedCategories)
+        {
+            if (!await db.Categories.AnyAsync(c => c.Slug == cat.Slug))
+            {
+                db.Categories.Add(cat);
+            }
+        }
 
         await db.SaveChangesAsync();
 
@@ -94,20 +119,6 @@ try
             };
 
             db.Recipes.Add(recipe);
-
-            // ===============================================
-            // TEMP FIX
-            // Recipe.AuthorId = string
-            // ApplicationUser.Id = Guid
-            //
-            // EF Core đang sinh shadow FK tên AuthorId1.
-            // Gán giá trị để Recipe mẫu insert được.
-            // Sau khi nhóm thống nhất kiểu FK thì bỏ đoạn này.
-            // ===============================================
-
-            db.Entry(recipe)
-                .Property<Guid>("AuthorId1")
-                .CurrentValue = demoUserId;
         }
 
         await db.SaveChangesAsync();

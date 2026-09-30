@@ -6,6 +6,32 @@ namespace CulinaryBlog.Domain.Entities;
 
 public class Recipe : BaseEntity
 {
+    public Recipe()
+    {
+    }
+
+    public Recipe(
+        string title,
+        string slug,
+        string? description,
+        int prepTimeMinutes,
+        int cookTimeMinutes,
+        int servings,
+        DifficultyLevel difficulty,
+        RecipeStatus status,
+        Guid categoryId)
+    {
+        Title = title;
+        Slug = slug;
+        Description = description ?? string.Empty;
+        PrepTimeMinutes = prepTimeMinutes;
+        CookTimeMinutes = cookTimeMinutes;
+        Servings = servings;
+        Difficulty = difficulty;
+        Status = status;
+        CategoryId = categoryId;
+    }
+
     public Guid AuthorId { get; set; }
     public ApplicationUser Author { get; set; } = null!;
 

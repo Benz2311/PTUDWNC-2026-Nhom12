@@ -22,6 +22,10 @@ public class RecipeImageConfiguration : IEntityTypeConfiguration<RecipeImage>
             .IsRequired()
             .HasMaxLength(2048);
 
+        // Bỏ qua các property alias cho C# backwards compatibility
+        builder.Ignore(x => x.Url);
+        builder.Ignore(x => x.SortOrder);
+
         // Đường dẫn hình ảnh cỡ trung (800x600)
         builder.Property(x => x.MediumUrl)
             .HasMaxLength(2048);
