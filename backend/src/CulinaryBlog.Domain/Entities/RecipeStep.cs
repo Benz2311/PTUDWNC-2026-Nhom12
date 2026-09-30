@@ -10,9 +10,13 @@ public class RecipeStep
 
     public int StepNumber { get; set; }
 
-    public string Title { get; set; } = string.Empty;
+    public string? Title { get; set; }
 
     public string Description { get; set; } = string.Empty;
+
+    public int? TimerMinutes { get; set; }
+
+    public string? ImageUrl { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
