@@ -61,11 +61,12 @@
 - Chuẩn bị dữ liệu mẫu cho bước nấu và hình ảnh.
 
 ---
-### Bữa 2 - Hoàn thiện cấu hình dữ liệu và tạo dữ liệu kiểm thử
+
+# Bữa 2 - Hoàn thiện cấu hình dữ liệu và tạo dữ liệu kiểm thử
 
 **Mục tiêu:** Hoàn thiện Entity, Configuration và dữ liệu ngẫu nhiên cho từng chức năng; tích hợp vào DbContext và Migration để tạo cơ sở dữ liệu phục vụ kiểm thử.
 
-#### Nguyễn Văn Quốc - User/Auth
+## Nguyễn Văn Quốc - User/Auth
 
 - Hoàn thiện `ApplicationUser` và `RefreshToken` theo cấu trúc chung của hệ thống.
 - Thiết lập Configuration cho các entity thuộc User/Auth.
@@ -73,7 +74,7 @@
 - Xử lý các điểm chưa thống nhất giữa Entity và Configuration thuộc chức năng User/Auth.
 - Chuẩn bị dữ liệu ngẫu nhiên cho người dùng và các dữ liệu liên quan phục vụ kiểm thử.
 
-#### Lê Thị Ánh Nhung - Category & Statistics
+## Lê Thị Ánh Nhung - Category & Statistics
 
 - Hoàn thiện `Category` và Configuration tương ứng.
 - Kiểm tra và hoàn thiện quan hệ giữa `Category` và `Recipe`.
@@ -81,7 +82,7 @@
 - Xây dựng dữ liệu ngẫu nhiên cho danh mục.
 - Đảm bảo cơ sở dữ liệu sau khi tích hợp có ít nhất **20 Categories** phục vụ truy vấn và thống kê.
 
-#### Phạm Nguyễn Ngọc Phước - Recipe & Ingredient
+## Phạm Nguyễn Ngọc Phước - Recipe & Ingredient
 
 - Hoàn thiện `Recipe`, `RecipeIngredient`, `RecipeNutrition` và các Configuration tương ứng.
 - Kiểm tra và hoàn thiện quan hệ giữa `Recipe`, `RecipeIngredient`, `RecipeNutrition`, User và Category.
@@ -89,22 +90,81 @@
 - Xây dựng dữ liệu ngẫu nhiên cho công thức, nguyên liệu và dinh dưỡng.
 - Đảm bảo cơ sở dữ liệu sau khi tích hợp có ít nhất **100 Recipes** và mỗi Recipe có ít nhất **10 nguyên liệu**.
 
-#### Võ Hùng Mạnh - Step & Image
+## Võ Hùng Mạnh - Step & Image
 
 - Hoàn thiện `RecipeStep`, `RecipeImage` và các Configuration tương ứng.
 - Kiểm tra và hoàn thiện quan hệ giữa `RecipeStep`, `RecipeImage` và `Recipe`.
 - Xử lý các điểm chưa thống nhất giữa Entity và Configuration thuộc chức năng Step & Image.
 - Xây dựng dữ liệu ngẫu nhiên cho các bước chế biến và hình ảnh.
 - Đảm bảo mỗi Recipe sau khi tích hợp có ít nhất **5 bước chế biến**.
-# 👥 Phân công công việc nhóm
 
-## Mục tiêu hiện tại
+---
 
-### Hoàn thành việc cài đặt tất cả API Endpoints
+# Bữa 3 - Thiết kế dữ liệu và tối ưu truy vấn
+
+**Mục tiêu:** Hoàn thiện Repository, Unit of Work, tối ưu các truy vấn dữ liệu, kiểm tra Index và triển khai Full-Text Search theo nội dung Chương 3; đảm bảo từng thành viên tiếp tục xử lý đúng nhóm Entity đã được phân công.
+
+## Nguyễn Văn Quốc - User/Auth
+
+- Rà soát các truy vấn liên quan đến `ApplicationUser` và `RefreshToken`.
+- Kiểm tra việc sử dụng Repository và Unit of Work cho chức năng User/Auth.
+- Tối ưu các truy vấn đăng nhập, lấy thông tin người dùng và Refresh Token.
+- Sử dụng `AsNoTracking()` cho các truy vấn chỉ đọc khi phù hợp.
+- Kiểm tra các Index phục vụ tra cứu thường xuyên như `Email`, `UserName` và `RefreshToken`.
+- Kiểm tra SQL được EF Core sinh ra và xử lý các truy vấn lấy dư dữ liệu nếu có.
+- Kiểm thử các truy vấn User/Auth sau khi tối ưu.
+
+## Lê Thị Ánh Nhung - Category & Recipe Read
+
+- Rà soát `Category` và các truy vấn đọc dữ liệu liên quan đến Recipe.
+- Hoàn thiện các truy vấn danh sách Recipe, chi tiết Recipe và Recipe theo Category.
+- Hoàn thiện Filter, Sort và Pagination cho danh sách Recipe.
+- Sử dụng `AsNoTracking()` cho các truy vấn chỉ đọc.
+- Sử dụng Projection/DTO để chỉ lấy các trường dữ liệu cần thiết.
+- Kiểm tra và xử lý N+1 Query Problem trong các truy vấn Category và Recipe.
+- Sử dụng `Include()` và `AsSplitQuery()` khi cần lấy nhiều dữ liệu liên quan.
+- Kiểm tra các Index phục vụ truy vấn như `CategoryId`, `Status`, `CreatedAt` và `Slug`.
+- Sử dụng `EXPLAIN ANALYZE` để kiểm tra các truy vấn `GetAll`, `GetById` và `GetByCategory`.
+- Kiểm thử Filter, Sort, Pagination và các truy vấn đọc sau khi tối ưu.
+
+## Phạm Nguyễn Ngọc Phước - Recipe & Ingredient
+
+- Rà soát cấu hình dữ liệu của `Recipe`, `RecipeIngredient` và `RecipeNutrition`.
+- Kiểm tra lại quan hệ giữa Recipe, User, Category và RecipeIngredient.
+- Kiểm tra cấu hình `RecipeNutrition` dưới dạng Owned Entity.
+- Kiểm tra các Index của Recipe như `Slug`, `AuthorId`, `CategoryId`, `Status` và `CreatedAt`.
+- Hoàn thiện Repository và Unit of Work cho các thao tác ghi dữ liệu Recipe.
+- Kiểm tra việc sử dụng `SaveChangesAsync()` và Transaction trong các nghiệp vụ cập nhật dữ liệu.
+- Tối ưu các truy vấn kiểm tra Slug và truy vấn lấy Recipe phục vụ Create/Update/Delete.
+- Tạo và Apply Migration nếu cấu trúc dữ liệu có thay đổi.
+- Kiểm thử các thao tác ghi dữ liệu Recipe và Ingredient sau khi tích hợp.
+
+## Võ Hùng Mạnh - Step, Image & Full-Text Search
+
+- Rà soát `RecipeStep`, `RecipeImage` và các Configuration tương ứng.
+- Kiểm tra quan hệ giữa `RecipeStep`, `RecipeImage` và `Recipe`.
+- Kiểm tra thứ tự các bước chế biến bằng `StepNumber`.
+- Kiểm tra thứ tự hiển thị hình ảnh bằng `SortOrder` và ảnh chính của Recipe.
+- Tối ưu các truy vấn đọc Step và Image bằng `AsNoTracking()` khi phù hợp.
+- Kiểm tra việc load Step/Image trong Recipe Detail để hạn chế N+1 Query.
+- Triển khai Full-Text Search cho Recipe bằng PostgreSQL.
+- Cấu hình `SearchVector` và GIN Index phục vụ tìm kiếm.
+- Sử dụng `PlainToTsQuery()` và `unaccent` để hỗ trợ tìm kiếm tiếng Việt không dấu.
+- Kiểm thử tìm kiếm từ khóa `"pho bo"` và đảm bảo có thể tìm được Recipe `"Phở bò"`.
+- Tạo Migration cho SearchVector/GIN Index nếu cần.
+- Kiểm thử lại Step, Image và Full-Text Search sau khi tích hợp.
+
+---
+
+# Bữa 4 - Hoàn thiện API Endpoints
+
+## Mục tiêu
+
+Hoàn thành việc cài đặt tất cả API Endpoints.
 
 Việc triển khai Backend tuân theo tài liệu SRS v1.2.0 của dự án.
 
-Nguyên tắc phân công:
+### Nguyên tắc phân công
 
 - Mỗi thành viên tiếp tục phụ trách đúng module/entity đã được giao.
 - Hạn chế chỉnh sửa trực tiếp phần code của thành viên khác.
@@ -119,7 +179,7 @@ Nguyên tắc phân công:
 
 ---
 
-# Nguyễn Văn Quốc – User / Authentication
+# Nguyễn Văn Quốc - User / Authentication
 
 ## Entity phụ trách
 
@@ -238,7 +298,7 @@ Nguyên tắc phân công:
 
 ---
 
-# Lê Thị Ánh Nhung – Category / Recipe Read / Dashboard
+# Lê Thị Ánh Nhung - Category / Recipe Read / Dashboard
 
 ## Entity phụ trách
 
@@ -260,12 +320,9 @@ Nguyên tắc phân công:
 - [ ] `POST /api/v1/categories`
 - [ ] `PUT /api/v1/categories/{id}`
 - [ ] `DELETE /api/v1/categories/{id}`
-
 - [ ] `GET /api/v1/recipes`
 - [ ] `GET /api/v1/recipes/{slug}`
-
 - [ ] `GET /api/v1/admin/recipes/trash`
-
 - [ ] API Dashboard/Statistics của nhóm.
 
 ## Công việc chi tiết
@@ -399,7 +456,7 @@ Nguyên tắc phân công:
 
 ---
 
-# Phạm Nguyễn Ngọc Phước – Recipe / Ingredient
+# Phạm Nguyễn Ngọc Phước - Recipe / Ingredient
 
 ## Entity phụ trách
 
@@ -416,10 +473,8 @@ Nguyên tắc phân công:
 - [ ] `PATCH /api/v1/recipes/{id}/archive`
 - [ ] `PATCH /api/v1/recipes/{id}/unarchive`
 - [ ] `DELETE /api/v1/recipes/{id}`
-
 - [ ] `POST /api/v1/admin/recipes/{id}/restore`
 - [ ] `DELETE /api/v1/admin/recipes/{id}/purge`
-
 - [ ] `POST /api/v1/recipes/{id}/ingredients`
 - [ ] `PUT /api/v1/recipes/{id}/ingredients/{ingredientId}`
 - [ ] `DELETE /api/v1/recipes/{id}/ingredients/{ingredientId}`
@@ -559,7 +614,7 @@ Nguyên tắc phân công:
 
 ---
 
-# Võ Hùng Mạnh – Step / Image / Search / MinIO / Observability
+# Võ Hùng Mạnh - Step / Image / Search / MinIO / Observability
 
 ## Entity phụ trách
 
@@ -738,6 +793,9 @@ Nguyên tắc phân công:
 - [ ] Logging có UserId.
 - [ ] Trace xuất hiện.
 - [ ] Metrics hoạt động.
+
+---
+
 # Cài đặt PostgreSQL bằng Docker
 
 Project sử dụng **PostgreSQL 16** chạy bằng Docker.
@@ -758,325 +816,170 @@ Có thể kiểm tra bằng:
 
 ```powershell
 docker info
-```
-
 Nếu Docker hoạt động bình thường, lệnh sẽ hiển thị thông tin của cả Client và Server.
-
----
-
-## 2. Lấy code mới nhất
-
+2. Lấy code mới nhất
 Clone repository nếu chưa có project:
-
-```powershell
 git clone <URL_REPOSITORY>
 cd PTUDWNC-2026-Nhom12
-```
 
 Nếu đã có project:
-
-```powershell
 git pull
-```
 
----
-
-## 3. Tạo file `.env`
-
+3. Tạo file .env
 Project có sẵn file:
-
-```text
 .env.example
-```
 
 File này chỉ chứa cấu hình mẫu và được đưa lên Git.
-
-Mỗi thành viên cần tạo một file `.env` riêng.
-
+Mỗi thành viên cần tạo một file .env riêng.
 Trên PowerShell:
-
-```powershell
 Copy-Item .env.example .env
-```
 
-Sau đó mở `.env`.
-
+Sau đó mở .env.
 Ví dụ:
-
-```env
 POSTGRES_DB=culinary_blog
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=your_password
 POSTGRES_PORT=5432
-```
 
 Trong đó:
-
-- `POSTGRES_DB`: tên database của project.
-- `POSTGRES_USER`: tài khoản PostgreSQL.
-- `POSTGRES_PASSWORD`: mật khẩu PostgreSQL do mỗi thành viên tự đặt.
-- `POSTGRES_PORT`: port PostgreSQL được mở trên máy.
-
+- POSTGRES_DB: tên database của project.
+- POSTGRES_USER: tài khoản PostgreSQL.
+- POSTGRES_PASSWORD: mật khẩu PostgreSQL do mỗi thành viên tự đặt.
+- POSTGRES_PORT: port PostgreSQL được mở trên máy.
 Ví dụ:
-
-```env
 POSTGRES_DB=culinary_blog
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=abc123
 POSTGRES_PORT=5432
-```
 
-> Không commit file `.env` lên Git.
+Không commit file .env lên Git.
 
-File `.env` đã được thêm vào `.gitignore`.
-
----
-
-## 4. Trường hợp port 5432 đã được sử dụng
-
-Một số máy đã cài PostgreSQL trực tiếp nên port `5432` có thể đang được sử dụng.
-
-Khi đó chỉ cần đổi trong `.env`:
-
-```env
+File .env đã được thêm vào .gitignore.
+4. Trường hợp port 5432 đã được sử dụng
+Một số máy đã cài PostgreSQL trực tiếp nên port 5432 có thể đang được sử dụng.
+Khi đó chỉ cần đổi trong .env:
 POSTGRES_PORT=5433
-```
 
 Docker sẽ kết nối theo dạng:
-
-```text
 localhost:5433 -> PostgreSQL Docker:5432
-```
 
-Không cần sửa `docker-compose.yml`.
-
-Ví dụ `.env`:
-
-```env
+Không cần sửa docker-compose.yml.
+Ví dụ .env:
 POSTGRES_DB=culinary_blog
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=abc123
 POSTGRES_PORT=5433
-```
 
 Mỗi thành viên có thể sử dụng port khác nhau tùy cấu hình máy.
-
----
-
-## 5. Khởi động PostgreSQL
-
+5. Khởi động PostgreSQL
 Tại thư mục gốc của project chạy:
-
-```powershell
 docker compose up -d
-```
 
 Kiểm tra:
-
-```powershell
 docker compose ps
-```
 
-Nếu sử dụng port `5432`, kết quả sẽ có dạng:
-
-```text
+Nếu sử dụng port 5432, kết quả sẽ có dạng:
 0.0.0.0:5432->5432/tcp
-```
 
-Nếu sử dụng port `5433`:
-
-```text
+Nếu sử dụng port 5433:
 0.0.0.0:5433->5432/tcp
-```
 
 Container PostgreSQL của project có tên:
-
-```text
 culinary-blog-postgres
-```
 
----
-
-## 6. Kiểm tra database
-
+6. Kiểm tra database
 Kiểm tra danh sách database bên trong container:
-
-```powershell
 docker exec -it culinary-blog-postgres psql -U postgres -l
-```
 
 Nếu khởi tạo thành công sẽ có database:
-
-```text
 culinary_blog
-```
 
 Có thể truy cập trực tiếp database bằng:
-
-```powershell
 docker exec -it culinary-blog-postgres psql -U postgres -d culinary_blog
-```
 
 Khi thấy:
-
-```text
 culinary_blog=#
-```
 
 nghĩa là đã truy cập được PostgreSQL.
-
 Để thoát:
-
-```text
 \q
-```
 
 Nếu màn hình đang hiển thị danh sách và phía dưới có:
-
-```text
 (END)
-```
 
 nhấn phím:
-
-```text
 q
-```
 
 để quay lại terminal.
-
----
-
-# Kết nối PostgreSQL Docker bằng pgAdmin 4
-
-## 1. Tạo Server
-
+Kết nối PostgreSQL Docker bằng pgAdmin 4
+1. Tạo Server
 Trong pgAdmin chọn:
-
-```text
 Servers
 → Register
 → Server...
-```
 
-### Tab General
-
+Tab General
 Nhập:
-
-```text
 Name: Culinary Blog Docker
-```
 
-### Tab Connection
-
+Tab Connection
 Nhập:
-
-```text
 Host name/address: localhost
 Port: POSTGRES_PORT trong file .env
 Maintenance database: culinary_blog
 Username: postgres
 Password: POSTGRES_PASSWORD trong file .env
-```
 
 Có thể bật:
-
-```text
 Save password
-```
 
-sau đó chọn **Save**.
-
----
-
-## 2. Ví dụ kết nối
-
-Nếu `.env`:
-
-```env
+sau đó chọn Save.
+2. Ví dụ kết nối
+Nếu .env:
 POSTGRES_DB=culinary_blog
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=abc123
 POSTGRES_PORT=5433
-```
 
 thì pgAdmin sử dụng:
-
-```text
 Host: localhost
 Port: 5433
 Maintenance database: culinary_blog
 Username: postgres
 Password: abc123
-```
 
 Sau khi kết nối thành công sẽ thấy:
-
-```text
 Culinary Blog Docker
 └── Databases
     ├── culinary_blog
     └── postgres
-```
 
----
-
-# Quản lý Docker
-
-## Kiểm tra container
-
-```powershell
+Quản lý Docker
+Kiểm tra container
 docker compose ps
-```
 
-## Dừng container nhưng giữ database
-
-```powershell
+Dừng container nhưng giữ database
 docker compose down
-```
 
 Dữ liệu PostgreSQL vẫn được giữ trong Docker volume.
-
 Khởi động lại:
-
-```powershell
 docker compose up -d
-```
 
-## Xem log PostgreSQL
-
-```powershell
+Xem log PostgreSQL
 docker compose logs postgres
-```
 
 Theo dõi log liên tục:
-
-```powershell
 docker compose logs -f postgres
-```
 
----
-
-# Reset database
-
+Reset database
 Chỉ sử dụng khi thật sự muốn xóa database local và tạo lại từ đầu:
-
-```powershell
 docker compose down -v
 docker compose up -d
-```
 
-**Lưu ý:** `docker compose down -v` sẽ xóa Docker volume và toàn bộ dữ liệu PostgreSQL local.
-
+Lưu ý: docker compose down -v sẽ xóa Docker volume và toàn bộ dữ liệu PostgreSQL local.
 Không sử dụng lệnh này nếu database đang có dữ liệu cần giữ.
-
----
-
-# Cấu hình Docker Compose
-
-File `docker-compose.yml` của project sử dụng các biến trong `.env`:
-
-```yaml
+Cấu hình Docker Compose
+File docker-compose.yml của project sử dụng các biến trong .env:
 services:
   postgres:
     image: postgres:16
@@ -1096,103 +999,57 @@ services:
 
 volumes:
   postgres_data:
-```
 
-Không ghi trực tiếp mật khẩu cá nhân vào `docker-compose.yml`.
-
----
-
-# Cấu hình `.env.example`
-
-File `.env.example` được commit lên Git để các thành viên sử dụng làm mẫu:
-
-```env
+Không ghi trực tiếp mật khẩu cá nhân vào docker-compose.yml.
+Cấu hình .env.example
+File .env.example được commit lên Git để các thành viên sử dụng làm mẫu:
 POSTGRES_DB=culinary_blog
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=your_password
 POSTGRES_PORT=5432
-```
 
-Mỗi thành viên copy file này thành `.env` rồi thay đổi thông tin phù hợp với máy của mình.
-
----
-
-# Một số lỗi thường gặp
-
-## Docker Engine chưa chạy
-
+Mỗi thành viên copy file này thành .env rồi thay đổi thông tin phù hợp với máy của mình.
+Một số lỗi thường gặp
+Docker Engine chưa chạy
 Nếu gặp lỗi dạng:
-
-```text
 failed to connect to the docker API
 dockerDesktopLinuxEngine
-```
 
 mở Docker Desktop và chờ Docker Engine chạy.
-
 Sau đó kiểm tra:
-
-```powershell
 docker info
-```
 
----
-
-## Port 5432 bị trùng
-
-Nếu máy đang có PostgreSQL khác chạy trên port `5432`, đổi trong `.env`:
-
-```env
+Port 5432 bị trùng
+Nếu máy đang có PostgreSQL khác chạy trên port 5432, đổi trong .env:
 POSTGRES_PORT=5433
-```
 
 Sau đó chạy lại:
-
-```powershell
 docker compose down
 docker compose up -d
-```
 
 Kiểm tra:
-
-```powershell
 docker compose ps
-```
 
----
-
-## Thay đổi password nhưng password mới không hoạt động
-
+Thay đổi password nhưng password mới không hoạt động
 Các biến:
-
-```text
 POSTGRES_DB
 POSTGRES_USER
 POSTGRES_PASSWORD
-```
 
 được PostgreSQL sử dụng khi database được khởi tạo lần đầu.
-
-Nếu Docker volume cũ đã tồn tại, chỉ sửa `.env` sẽ không tự thay đổi user/password bên trong database cũ.
-
+Nếu Docker volume cũ đã tồn tại, chỉ sửa .env sẽ không tự thay đổi user/password bên trong database cũ.
 Trong trường hợp database local chưa có dữ liệu cần giữ và muốn khởi tạo lại hoàn toàn:
-
-```powershell
 docker compose down -v
 docker compose up -d
-```
 
----
-
-# Lưu ý khi làm việc nhóm
-
-- Cả nhóm sử dụng chung `docker-compose.yml`.
-- Mỗi thành viên sử dụng `.env` riêng.
-- Không push `.env` lên Git.
-- Không đưa password cá nhân vào `docker-compose.yml`.
-- `.env.example` được phép push lên Git vì chỉ chứa cấu hình mẫu.
-- Tên database của project thống nhất là `culinary_blog`.
+Lưu ý khi làm việc nhóm
+- Cả nhóm sử dụng chung docker-compose.yml.
+- Mỗi thành viên sử dụng .env riêng.
+- Không push .env lên Git.
+- Không đưa password cá nhân vào docker-compose.yml.
+- .env.example được phép push lên Git vì chỉ chứa cấu hình mẫu.
+- Tên database của project thống nhất là culinary_blog.
 - Port có thể khác nhau trên từng máy.
 - Trước khi làm task mới cần pull code mới nhất.
 - Mỗi chức năng thực hiện trên branch riêng.
-- Không sử dụng `docker compose down -v` nếu đang có dữ liệu cần giữ.
+- Không sử dụng docker compose down -v nếu đang có dữ liệu cần giữ.
