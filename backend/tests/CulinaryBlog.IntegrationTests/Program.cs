@@ -2,6 +2,7 @@ using CulinaryBlog.Application;
 using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Application.Exceptions;
 using CulinaryBlog.Application.Features.Recipes.Commands.RecipeImages;
+using CulinaryBlog.Application.Features.Recipes.Commands.RecipeSteps;
 using CulinaryBlog.Application.Features.Recipes.Dtos;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipeBySlug;
 using CulinaryBlog.Application.Features.Search.Queries.SearchRecipes;
@@ -481,6 +482,278 @@ public class Program
             // Fail-safe check: Gọi cache với giá trị rỗng/lỗi không quăng exception
             await cacheService.SetAsync<string?>(testCacheKey, null, TimeSpan.FromMinutes(1));
             Assert(true, "ResilientCacheService handles null/edge cases gracefully without exceptions");
+
+            // ----------------------------------------------------
+            // TEST SUITE 8: Recipe Step Complete Flow (12 Test Cases)
+            // ----------------------------------------------------
+            Console.WriteLine("\n--- TEST SUITE 8: Recipe Step Business Logic & DB Flow (12 Cases) ---");
+            var stepTestRecipeAId = Guid.NewGuid();
+            var stepTestRecipeBId = Guid.NewGuid();
+            var stepSlugA = "step-test-recipe-a-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            var stepSlugB = "step-test-recipe-b-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+
+            var recipeA = new Recipe
+            {
+                Id = stepTestRecipeAId,
+                Title = "Step Test Recipe A",
+                Slug = stepSlugA,
+                Description = "Description A",
+                Content = "Content A",
+                CategoryId = category.Id,
+                AuthorId = author.Id,
+                Status = RecipeStatus.Published,
+                IsDeleted = false
+            };
+
+            var recipeB = new Recipe
+            {
+                Id = stepTestRecipeBId,
+                Title = "Step Test Recipe B",
+                Slug = stepSlugB,
+                Description = "Description B",
+                Content = "Content B",
+                CategoryId = category.Id,
+                AuthorId = author.Id,
+                Status = RecipeStatus.Published,
+                IsDeleted = false
+            };
+
+            dbContext.Recipes.AddRange(recipeA, recipeB);
+            await dbContext.SaveChangesAsync();
+
+            try
+            {
+                // 1. Create Step thành công
+                var s1 = await mediator.Send(new CreateRecipeStepCommand(
+                    stepTestRecipeAId,
+                    "Sơ chế",
+                    "Rửa sạch nguyên liệu",
+                    15,
+                    null,
+                    author.Id,
+                    false));
+
+                Assert(s1 != null && s1.Id != Guid.Empty && s1.Title == "Sơ chế" && s1.TimerMinutes == 15,
+                    "Case 1: Create Step thành công");
+
+                // 2. Server tự cấp StepNumber
+                var s2 = await mediator.Send(new CreateRecipeStepCommand(
+                    stepTestRecipeAId,
+                    "Nấu nước dùng",
+                    "Ninh xương trong nồi",
+                    60,
+                    null,
+                    author.Id,
+                    false));
+
+                var s3 = await mediator.Send(new CreateRecipeStepCommand(
+                    stepTestRecipeAId,
+                    "Hoàn thành",
+                    "Bày ra bát và thưởng thức",
+                    5,
+                    null,
+                    author.Id,
+                    false));
+
+                Assert(s1.StepNumber == 1 && s2.StepNumber == 2 && s3.StepNumber == 3,
+                    "Case 2: Server tự cấp StepNumber liên tục (1, 2, 3)");
+
+                // 3. Update Step thành công
+                var updatedS2 = await mediator.Send(new UpdateRecipeStepCommand(
+                    stepTestRecipeAId,
+                    s2.Id,
+                    "Ninh xương kỹ",
+                    "Ninh xương 2 tiếng",
+                    120,
+                    null,
+                    author.Id,
+                    false));
+
+                Assert(updatedS2.Title == "Ninh xương kỹ" && updatedS2.TimerMinutes == 120 && updatedS2.StepNumber == 2,
+                    "Case 3: Update Step thành công (StepNumber không bị đổi)");
+
+                // 4. Update Step sai Recipe -> lỗi
+                bool crossRecipeUpdateBlocked = false;
+                try
+                {
+                    await mediator.Send(new UpdateRecipeStepCommand(
+                        stepTestRecipeBId,
+                        s2.Id,
+                        "Update sai recipe",
+                        "Nội dung sai",
+                        30,
+                        null,
+                        author.Id,
+                        false));
+                }
+                catch (Exception ex) when (ex is ValidationException or NotFoundException)
+                {
+                    crossRecipeUpdateBlocked = true;
+                }
+                Assert(crossRecipeUpdateBlocked, "Case 4: Update Step sai Recipe ném lỗi");
+
+                // 5. timerMinutes < 0 -> lỗi
+                bool negativeTimerCreateBlocked = false;
+                try
+                {
+                    await mediator.Send(new CreateRecipeStepCommand(
+                        stepTestRecipeAId,
+                        "Timer âm",
+                        "Mô tả",
+                        -5,
+                        null,
+                        author.Id,
+                        false));
+                }
+                catch (ValidationException)
+                {
+                    negativeTimerCreateBlocked = true;
+                }
+                Assert(negativeTimerCreateBlocked, "Case 5: timerMinutes < 0 ném lỗi ValidationException");
+
+                // 6. Delete Step thành công
+                var sTemp = await mediator.Send(new CreateRecipeStepCommand(
+                    stepTestRecipeAId,
+                    "Bước tạm",
+                    "Xóa ngay sau đây",
+                    1,
+                    null,
+                    author.Id,
+                    false));
+
+                var deleteTempSuccess = await mediator.Send(new DeleteRecipeStepCommand(
+                    stepTestRecipeAId,
+                    sTemp.Id,
+                    author.Id,
+                    false));
+                Assert(deleteTempSuccess, "Case 6: Delete Step thành công");
+
+                // 7. Delete -> Renumber liên tục
+                // Hiện tại: s1 (num 1), s2 (num 2), s3 (num 3). Xóa s2:
+                await mediator.Send(new DeleteRecipeStepCommand(
+                    stepTestRecipeAId,
+                    s2.Id,
+                    author.Id,
+                    false));
+
+                var remainingStepsAfterDelete = await dbContext.RecipeSteps
+                    .AsNoTracking()
+                    .Where(s => s.RecipeId == stepTestRecipeAId && !s.IsDeleted)
+                    .OrderBy(s => s.StepNumber)
+                    .ToListAsync();
+
+                bool renumberContinuous = remainingStepsAfterDelete.Count == 2
+                    && remainingStepsAfterDelete[0].Id == s1.Id && remainingStepsAfterDelete[0].StepNumber == 1
+                    && remainingStepsAfterDelete[1].Id == s3.Id && remainingStepsAfterDelete[1].StepNumber == 2;
+                Assert(renumberContinuous, "Case 7: Delete -> Renumber liên tục không có khoảng trống (1, 2)");
+
+                // 8. Reorder đúng -> PASS
+                // Thêm bước s4 để có 3 bước: s1 (num 1), s3 (num 2), s4 (num 3)
+                var s4 = await mediator.Send(new CreateRecipeStepCommand(
+                    stepTestRecipeAId,
+                    "Bước mới s4",
+                    "Mô tả s4",
+                    10,
+                    null,
+                    author.Id,
+                    false));
+
+                var reorderedResult = await mediator.Send(new ReorderRecipeStepsCommand(
+                    stepTestRecipeAId,
+                    new List<Guid> { s4.Id, s1.Id, s3.Id },
+                    author.Id,
+                    false));
+
+                Assert(reorderedResult.Count == 3 && reorderedResult[0].Id == s4.Id && reorderedResult[1].Id == s1.Id && reorderedResult[2].Id == s3.Id,
+                    "Case 8: Reorder đúng -> PASS");
+
+                // 9. Reorder thiếu Step -> lỗi
+                bool missingStepReorderBlocked = false;
+                try
+                {
+                    await mediator.Send(new ReorderRecipeStepsCommand(
+                        stepTestRecipeAId,
+                        new List<Guid> { s4.Id, s1.Id },
+                        author.Id,
+                        false));
+                }
+                catch (ValidationException)
+                {
+                    missingStepReorderBlocked = true;
+                }
+                Assert(missingStepReorderBlocked, "Case 9: Reorder thiếu Step ném lỗi ValidationException");
+
+                // 10. Reorder duplicate -> lỗi
+                bool duplicateStepReorderBlocked = false;
+                try
+                {
+                    await mediator.Send(new ReorderRecipeStepsCommand(
+                        stepTestRecipeAId,
+                        new List<Guid> { s4.Id, s4.Id, s3.Id },
+                        author.Id,
+                        false));
+                }
+                catch (ValidationException)
+                {
+                    duplicateStepReorderBlocked = true;
+                }
+                Assert(duplicateStepReorderBlocked, "Case 10: Reorder duplicate Step ném lỗi ValidationException");
+
+                // 11. Reorder chứa Step Recipe khác -> lỗi
+                var stepOnRecipeB = await mediator.Send(new CreateRecipeStepCommand(
+                    stepTestRecipeBId,
+                    "Bước của Recipe B",
+                    "Mô tả thuộc recipe B",
+                    10,
+                    null,
+                    author.Id,
+                    false));
+
+                bool foreignStepReorderBlocked = false;
+                try
+                {
+                    await mediator.Send(new ReorderRecipeStepsCommand(
+                        stepTestRecipeAId,
+                        new List<Guid> { s4.Id, s1.Id, stepOnRecipeB.Id },
+                        author.Id,
+                        false));
+                }
+                catch (ValidationException)
+                {
+                    foreignStepReorderBlocked = true;
+                }
+                Assert(foreignStepReorderBlocked, "Case 11: Reorder chứa Step của Recipe khác ném lỗi ValidationException");
+
+                // 12. StepNumber sau reorder liên tục
+                var dbStepsAfterReorder = await dbContext.RecipeSteps
+                    .AsNoTracking()
+                    .Where(s => s.RecipeId == stepTestRecipeAId && !s.IsDeleted)
+                    .OrderBy(s => s.StepNumber)
+                    .ToListAsync();
+
+                bool reorderInDbContinuous = dbStepsAfterReorder.Count == 3
+                    && dbStepsAfterReorder[0].Id == s4.Id && dbStepsAfterReorder[0].StepNumber == 1
+                    && dbStepsAfterReorder[1].Id == s1.Id && dbStepsAfterReorder[1].StepNumber == 2
+                    && dbStepsAfterReorder[2].Id == s3.Id && dbStepsAfterReorder[2].StepNumber == 3;
+                Assert(reorderInDbContinuous, "Case 12: StepNumber trong Database sau reorder liên tục (1, 2, 3)");
+            }
+            finally
+            {
+                // Dọn dẹp dữ liệu test để bảo toàn trạng thái DB cho TEST SUITE 7
+                var stepsA = await dbContext.RecipeSteps.Where(s => s.RecipeId == stepTestRecipeAId).ToListAsync();
+                var stepsB = await dbContext.RecipeSteps.Where(s => s.RecipeId == stepTestRecipeBId).ToListAsync();
+                dbContext.RecipeSteps.RemoveRange(stepsA);
+                dbContext.RecipeSteps.RemoveRange(stepsB);
+
+                var rA = await dbContext.Recipes.FirstOrDefaultAsync(r => r.Id == stepTestRecipeAId);
+                var rB = await dbContext.Recipes.FirstOrDefaultAsync(r => r.Id == stepTestRecipeBId);
+                if (rA != null) dbContext.Recipes.Remove(rA);
+                if (rB != null) dbContext.Recipes.Remove(rB);
+                await dbContext.SaveChangesAsync();
+
+                await cacheService.RemoveAsync($"recipe:{stepSlugA.ToLowerInvariant()}");
+                await cacheService.RemoveAsync($"recipe:{stepSlugB.ToLowerInvariant()}");
+            }
 
             // ----------------------------------------------------
             // TEST 7: Data Preservation in Database

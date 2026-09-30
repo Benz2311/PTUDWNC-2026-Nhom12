@@ -4,6 +4,7 @@ using CulinaryBlog.Application.Common.Models;
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Exceptions;
 using CulinaryBlog.Application.Features.Recipes.Commands.RecipeImages;
+using CulinaryBlog.Application.Features.Recipes.Commands.RecipeSteps;
 using CulinaryBlog.Application.Features.Recipes.Dtos;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipeBySlug;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipes;
@@ -57,6 +58,26 @@ public static class RecipeEndpoints
         group.MapDelete("/{recipeId:guid}/images/{imageId:guid}", DeleteRecipeImage)
             .WithName("DeleteRecipeImage")
             .WithSummary("Xóa mềm ảnh công thức");
+
+        // TV4: Thêm bước cho công thức (Server tự cấp StepNumber)
+        group.MapPost("/{id:guid}/steps", AddRecipeStep)
+            .WithName("AddRecipeStep")
+            .WithSummary("Thêm bước thực hiện cho công thức");
+
+        // TV4: Cập nhật bước thực hiện
+        group.MapPut("/{id:guid}/steps/{stepId:guid}", UpdateRecipeStep)
+            .WithName("UpdateRecipeStep")
+            .WithSummary("Cập nhật bước thực hiện");
+
+        // TV4: Sắp xếp lại các bước thực hiện
+        group.MapPut("/{id:guid}/steps/reorder", ReorderRecipeSteps)
+            .WithName("ReorderRecipeSteps")
+            .WithSummary("Sắp xếp lại các bước thực hiện");
+
+        // TV4: Xóa mềm bước thực hiện và tự động đánh số lại
+        group.MapDelete("/{id:guid}/steps/{stepId:guid}", DeleteRecipeStep)
+            .WithName("DeleteRecipeStep")
+            .WithSummary("Xóa mềm bước thực hiện và tự động đánh số lại");
     }
 
     private static async Task<IResult> GetRecipes(
@@ -309,6 +330,190 @@ public static class RecipeEndpoints
         }
     }
 
+    private static async Task<IResult> AddRecipeStep(
+        Guid id,
+        [FromBody] CreateRecipeStepRequest request,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            var command = new CreateRecipeStepCommand(
+                id,
+                request.Title,
+                request.Description,
+                request.TimerMinutes,
+                request.ImageUrl,
+                currentUserId,
+                isAdmin);
+
+            var step = await sender.Send(command, ct);
+
+            return Results.Created($"/api/v1/recipes/{id}/steps/{step.Id}", step);
+        }
+        catch (NotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+        catch (ValidationException ex)
+        {
+            return Results.ValidationProblem(
+                ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+    }
+
+    private static async Task<IResult> UpdateRecipeStep(
+        Guid id,
+        Guid stepId,
+        [FromBody] UpdateRecipeStepRequest request,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            var command = new UpdateRecipeStepCommand(
+                id,
+                stepId,
+                request.Title,
+                request.Description,
+                request.TimerMinutes,
+                request.ImageUrl,
+                currentUserId,
+                isAdmin);
+
+            var step = await sender.Send(command, ct);
+
+            return Results.Ok(step);
+        }
+        catch (NotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+        catch (ValidationException ex)
+        {
+            return Results.ValidationProblem(
+                ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+    }
+
+    private static async Task<IResult> ReorderRecipeSteps(
+        Guid id,
+        [FromBody] ReorderRecipeStepsRequest request,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            var command = new ReorderRecipeStepsCommand(
+                id,
+                request.StepIds,
+                currentUserId,
+                isAdmin);
+
+            var steps = await sender.Send(command, ct);
+
+            return Results.Ok(steps);
+        }
+        catch (NotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+        catch (ValidationException ex)
+        {
+            return Results.ValidationProblem(
+                ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+    }
+
+    private static async Task<IResult> DeleteRecipeStep(
+        Guid id,
+        Guid stepId,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            var command = new DeleteRecipeStepCommand(
+                id,
+                stepId,
+                currentUserId,
+                isAdmin);
+
+            await sender.Send(command, ct);
+
+            return Results.NoContent();
+        }
+        catch (NotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+        catch (ValidationException ex)
+        {
+            return Results.ValidationProblem(
+                ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+    }
+
     private static IResult? ValidateListOptions(
         string? search,
         string? difficulty,
@@ -456,4 +661,22 @@ public record AddRecipeImageRequest(
     string? AltText = null,
     bool? IsPrimary = null,
     int? OrderIndex = null
+);
+
+public record CreateRecipeStepRequest(
+    string? Title,
+    string Description,
+    int? TimerMinutes = null,
+    string? ImageUrl = null
+);
+
+public record UpdateRecipeStepRequest(
+    string? Title,
+    string Description,
+    int? TimerMinutes = null,
+    string? ImageUrl = null
+);
+
+public record ReorderRecipeStepsRequest(
+    List<Guid> StepIds
 );
