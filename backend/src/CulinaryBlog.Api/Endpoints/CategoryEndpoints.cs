@@ -2,6 +2,7 @@
 using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Features.Categories.Commands.CreateCategory;
+using CulinaryBlog.Application.Features.Categories.Commands.UpdateCategory;
 using CulinaryBlog.Application.Features.Categories.Queries.GetCategories;
 using CulinaryBlog.Application.Features.Categories.Queries.GetCategoryStatistics;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipesByCategory;
@@ -40,6 +41,17 @@ public static class CategoryEndpoints
             .WithSummary("Tạo danh mục mới")
             .Produces<CategoryDto>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPut(
+            "/{id:guid}",
+            UpdateCategory)
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithName("UpdateCategory")
+            .WithSummary("Cập nhật danh mục")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         // GET /api/v1/categories/statistics
@@ -152,6 +164,43 @@ public static class CategoryEndpoints
             }
 
             return Results.Created($"/api/v1/categories/{category.Slug}", category);
+        }
+        catch (FluentValidation.ValidationException exception)
+        {
+            var errors = exception.Errors
+                .GroupBy(error => error.PropertyName)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(error => error.ErrorMessage).ToArray());
+
+            return Results.ValidationProblem(errors);
+        }
+    }
+
+    private static async Task<IResult> UpdateCategory(
+        Guid id,
+        UpdateCategoryRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await sender.Send(
+                new UpdateCategoryCommand(id, request.Name, request.Description),
+                cancellationToken);
+
+            return result switch
+            {
+                UpdateCategoryResult.Updated => Results.NoContent(),
+                UpdateCategoryResult.NotFound => Results.Problem(
+                    title: "Category not found",
+                    statusCode: StatusCodes.Status404NotFound),
+                UpdateCategoryResult.NameAlreadyExists => Results.Problem(
+                    title: "Category name already exists",
+                    statusCode: StatusCodes.Status409Conflict),
+                _ => throw new InvalidOperationException(
+                    $"Unsupported category update result: {result}."),
+            };
         }
         catch (FluentValidation.ValidationException exception)
         {
