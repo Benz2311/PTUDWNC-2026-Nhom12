@@ -8,15 +8,25 @@ namespace CulinaryBlog.UnitTests.Domain;
 
 public class DeterministicSeederTests
 {
+    private sealed class TestRecipe : Recipe
+    {
+        public TestRecipe(Guid id, DateTime createdAt)
+        {
+            Id = id;
+            CreatedAt = createdAt;
+        }
+    }
+
     private static List<Recipe> CreateSampleRecipes(int count = 5)
     {
         var list = new List<Recipe>();
         for (var i = 1; i <= count; i++)
         {
             var recipeId = Guid.Parse($"00000000-0000-0000-0000-00000000000{i:D1}");
-            var recipe = new Recipe
+            var recipe = new TestRecipe(
+                recipeId,
+                new DateTime(2026, 9, 29, 0, 0, 0, DateTimeKind.Utc))
             {
-                Id = recipeId,
                 Title = $"Món ăn thử nghiệm {i}",
                 Slug = $"mon-an-thu-nghiem-{i}",
                 Description = $"Mô tả món ăn thử nghiệm {i}",
@@ -25,9 +35,7 @@ public class DeterministicSeederTests
                 CookTimeMinutes = 30,
                 Servings = 4,
                 Difficulty = DifficultyLevel.Medium,
-                Status = RecipeStatus.Published,
-                CreatedAt = new DateTime(2026, 9, 29, 0, 0, 0, DateTimeKind.Utc),
-                IsDeleted = false
+                Status = RecipeStatus.Published
             };
 
             recipe.Ingredients.Add(new RecipeIngredient

@@ -66,4 +66,10 @@ public class Recipe : BaseEntity
         = new List<RecipeImage>();
 
     public RecipeNutrition Nutrition { get; set; } = new();
+
+    public void SoftDelete()
+    {
+        IsDeleted = true;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }

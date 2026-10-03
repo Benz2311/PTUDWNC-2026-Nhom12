@@ -103,8 +103,7 @@ public class RecipeRepository : IRecipeRepository
 
     public Task DeleteAsync(Recipe recipe, CancellationToken cancellationToken = default)
     {
-        recipe.IsDeleted = true;
-        recipe.UpdatedAt = DateTime.UtcNow;
+        recipe.SoftDelete();
         var entry = _dbContext.Entry(recipe);
         if (entry.State == EntityState.Detached)
         {
