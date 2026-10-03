@@ -106,3 +106,10 @@ finally
 public partial class Program
 {
 }
+
+namespace CulinaryBlog.API
+{
+    public class ApiEntryPoint
+    {
+    }
+}

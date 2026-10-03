@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Features.Categories.Commands.CreateCategory;
@@ -41,7 +41,7 @@ public static class CategoryEndpoints
             .WithName("CreateCategory")
             .WithSummary("Tạo danh mục mới")
             .Produces<CategoryDto>(StatusCodes.Status201Created)
-            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPut(
@@ -50,10 +50,11 @@ public static class CategoryEndpoints
             .RequireAuthorization(policy => policy.RequireRole("Admin"))
             .WithName("UpdateCategory")
             .WithSummary("Cập nhật danh mục")
+            .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status204NoContent)
-            .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status409Conflict);
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         group.MapDelete(
             "/{id:guid}",
@@ -155,7 +156,11 @@ public static class CategoryEndpoints
             cancellationToken);
 
         return result is null
-            ? Results.NotFound()
+            ? Results.Problem(
+                title: "Category not found",
+                detail: $"Category with slug '{slug}' was not found.",
+                statusCode: StatusCodes.Status404NotFound,
+                type: "CATEGORY_NOT_FOUND")
             : Results.Ok(result);
     }
 
@@ -171,7 +176,9 @@ public static class CategoryEndpoints
             {
                 return Results.Problem(
                     title: "Category name already exists",
-                    statusCode: StatusCodes.Status409Conflict);
+                    detail: "A category with this name already exists.",
+                    statusCode: StatusCodes.Status409Conflict,
+                    type: "CATEGORY_NAME_EXISTS");
             }
 
             return Results.Created($"/api/v1/categories/{category.Slug}", category);
@@ -184,7 +191,10 @@ public static class CategoryEndpoints
                     group => group.Key,
                     group => group.Select(error => error.ErrorMessage).ToArray());
 
-            return Results.ValidationProblem(errors);
+            return Results.ValidationProblem(
+                errors,
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
         }
     }
 
@@ -205,10 +215,14 @@ public static class CategoryEndpoints
                 UpdateCategoryResult.Updated => Results.NoContent(),
                 UpdateCategoryResult.NotFound => Results.Problem(
                     title: "Category not found",
-                    statusCode: StatusCodes.Status404NotFound),
+                    detail: $"Category with id '{id}' was not found.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    type: "CATEGORY_NOT_FOUND"),
                 UpdateCategoryResult.NameAlreadyExists => Results.Problem(
                     title: "Category name already exists",
-                    statusCode: StatusCodes.Status409Conflict),
+                    detail: "A category with this name already exists.",
+                    statusCode: StatusCodes.Status409Conflict,
+                    type: "CATEGORY_NAME_EXISTS"),
                 _ => throw new InvalidOperationException(
                     $"Unsupported category update result: {result}."),
             };
@@ -221,7 +235,10 @@ public static class CategoryEndpoints
                     group => group.Key,
                     group => group.Select(error => error.ErrorMessage).ToArray());
 
-            return Results.ValidationProblem(errors);
+            return Results.ValidationProblem(
+                errors,
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
         }
     }
 
@@ -239,10 +256,14 @@ public static class CategoryEndpoints
             DeleteCategoryResult.Deleted => Results.NoContent(),
             DeleteCategoryResult.NotFound => Results.Problem(
                 title: "Category not found",
-                statusCode: StatusCodes.Status404NotFound),
+                detail: $"Category with id '{id}' was not found.",
+                statusCode: StatusCodes.Status404NotFound,
+                type: "CATEGORY_NOT_FOUND"),
             DeleteCategoryResult.HasRecipes => Results.Problem(
                 title: "Category still contains active recipes",
-                statusCode: StatusCodes.Status409Conflict),
+                detail: "Cannot delete category that still contains active recipes.",
+                statusCode: StatusCodes.Status409Conflict,
+                type: "CATEGORY_DELETE_HAS_RECIPES"),
             _ => throw new InvalidOperationException(
                 $"Unsupported category delete result: {result}."),
         };

@@ -111,7 +111,9 @@ public static class RecipeEndpoints
                 new Dictionary<string, string[]>
                 {
                     ["authorId"] = ["Không thể kết hợp mine=true với authorId."]
-                });
+                },
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
         }
 
         Guid? currentUserId = null;
@@ -124,12 +126,20 @@ public static class RecipeEndpoints
 
         if (isMine && (!user.IsInRole("Author") || !currentUserId.HasValue))
         {
-            return Results.Forbid();
+            return Results.Problem(
+                title: "Forbidden",
+                detail: "Chỉ tác giả (Author) mới có quyền xem công thức của chính mình.",
+                statusCode: StatusCodes.Status403Forbidden,
+                type: "RECIPE_FORBIDDEN");
         }
 
         if (authorId.HasValue && !isAdmin)
         {
-            return Results.Forbid();
+            return Results.Problem(
+                title: "Forbidden",
+                detail: "Chỉ Admin mới có quyền lọc theo authorId.",
+                statusCode: StatusCodes.Status403Forbidden,
+                type: "RECIPE_FORBIDDEN");
         }
 
         RecipeStatus? parsedStatus = null;
@@ -148,7 +158,8 @@ public static class RecipeEndpoints
                     {
                         ["status"] = ["Status phải là Draft, Published hoặc Archived."]
                     },
-                    statusCode: StatusCodes.Status422UnprocessableEntity);
+                    statusCode: StatusCodes.Status422UnprocessableEntity,
+                    type: "VALIDATION_ERROR");
             }
 
             parsedStatus = matchedStatus;
@@ -159,7 +170,8 @@ public static class RecipeEndpoints
                     {
                         ["status"] = ["Status chỉ được dùng cùng mine=true hoặc authorId của Admin."]
                     },
-                    statusCode: StatusCodes.Status422UnprocessableEntity);
+                    statusCode: StatusCodes.Status422UnprocessableEntity,
+                    type: "VALIDATION_ERROR");
             }
         }
 
@@ -240,9 +252,16 @@ public static class RecipeEndpoints
             new GetRecipesByCategoryQuery(categorySlug, page ?? 1, pageSize ?? 12),
             cancellationToken);
 
-        return result is null
-            ? Results.NotFound()
-            : Results.Ok(result);
+        if (result is null)
+        {
+            return Results.Problem(
+                title: "Category not found",
+                detail: $"Category with slug '{categorySlug}' was not found.",
+                statusCode: StatusCodes.Status404NotFound,
+                type: "CATEGORY_NOT_FOUND");
+        }
+
+        return Results.Ok(result);
     }
 
     private static async Task<IResult> GetDeletedRecipes(
@@ -332,11 +351,19 @@ public static class RecipeEndpoints
         }
         catch (NotFoundException ex)
         {
-            return Results.NotFound(new { error = ex.Message });
+            return Results.Problem(
+                title: "Recipe not found",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status404NotFound,
+                type: "RECIPE_NOT_FOUND");
         }
         catch (ForbiddenException ex)
         {
-            return Results.Json(new { error = ex.Message }, statusCode: 403);
+            return Results.Problem(
+                title: "Forbidden",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status403Forbidden,
+                type: "RECIPE_FORBIDDEN");
         }
     }
 
@@ -468,7 +495,8 @@ public static class RecipeEndpoints
                 {
                     ["search"] = ["Từ khóa tìm kiếm không được vượt quá 200 ký tự."]
                 },
-                statusCode: StatusCodes.Status422UnprocessableEntity);
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
         }
 
         DifficultyLevel? parsedDifficulty = null;
@@ -486,9 +514,10 @@ public static class RecipeEndpoints
                 return Results.ValidationProblem(
                     new Dictionary<string, string[]>
                     {
-                        ["difficulty"] = ["Difficulty phải là Easy, Medium hoặc Hard."]
+                        ["difficulty"] = ["Difficulty phải là Easy, Medium, Hard hoặc Expert."]
                     },
-                    statusCode: StatusCodes.Status422UnprocessableEntity);
+                    statusCode: StatusCodes.Status422UnprocessableEntity,
+                    type: "VALIDATION_ERROR");
             }
 
             parsedDifficulty = matchedDifficulty;
@@ -501,7 +530,8 @@ public static class RecipeEndpoints
                 {
                     ["maxCookTimeMinutes"] = ["Thời gian nấu phải lớn hơn 0."]
                 },
-                statusCode: StatusCodes.Status422UnprocessableEntity);
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
         }
 
         if (maxTotalTimeMinutes.HasValue && maxTotalTimeMinutes.Value <= 0)
@@ -511,7 +541,8 @@ public static class RecipeEndpoints
                 {
                     ["maxTotalTimeMinutes"] = ["Tổng thời gian phải lớn hơn 0."]
                 },
-                statusCode: StatusCodes.Status422UnprocessableEntity);
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
         }
 
         if (!string.IsNullOrWhiteSpace(sort))
@@ -555,7 +586,8 @@ public static class RecipeEndpoints
                 {
                     ["sortBy"] = ["SortBy phải là publishedAt, createdAt, title, prepTime, cookTime hoặc totalTime."]
                 },
-                statusCode: StatusCodes.Status422UnprocessableEntity);
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
         }
 
         var sortDirectionValue = string.IsNullOrWhiteSpace(sortDirection)
@@ -575,7 +607,8 @@ public static class RecipeEndpoints
                 {
                     ["sortDirection"] = ["SortDirection phải là asc hoặc desc."]
                 },
-                statusCode: StatusCodes.Status422UnprocessableEntity);
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
         }
 
         options = new RecipeListOptions(

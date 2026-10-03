@@ -21,6 +21,7 @@ public sealed class CreateCategoryCommandValidator : AbstractValidator<CreateCat
     {
         RuleFor(command => command.Name)
             .NotEmpty()
+            .MinimumLength(2)
             .MaximumLength(100);
     }
 }
