@@ -158,17 +158,15 @@ public class Program
             var author = await dbContext.Users.FirstAsync();
 
             var draftSlug = "draft-test-recipe-" + Guid.NewGuid().ToString("N").Substring(0, 8);
-            var draftRecipe = new Recipe
+            var draftRecipe = new TestRecipe(draftTestId)
             {
-                Id = draftTestId,
                 Title = "Draft Test Recipe",
                 Slug = draftSlug,
                 Description = "Draft description",
                 Content = "Draft content",
                 CategoryId = category.Id,
                 AuthorId = author.Id,
-                Status = RecipeStatus.Draft,
-                IsDeleted = false
+                Status = RecipeStatus.Draft
             };
             dbContext.Recipes.Add(draftRecipe);
             await dbContext.SaveChangesAsync();
@@ -211,9 +209,8 @@ public class Program
             // ----------------------------------------------------
             Console.WriteLine("\n--- TEST SUITE 4: Full-Text Search & pg_trgm Fuzzy Fallback ---");
             var ftsTestId = Guid.NewGuid();
-            var ftsRecipe = new Recipe
+            var ftsRecipe = new TestRecipe(ftsTestId)
             {
-                Id = ftsTestId,
                 Title = "Phở bò Hà Nội",
                 Slug = "fts-integration-pho-bo-ha-noi",
                 Description = "Món phở truyền thống với nước dùng và thịt bò thơm ngon.",
@@ -221,8 +218,7 @@ public class Program
                 CategoryId = category.Id,
                 AuthorId = author.Id,
                 Status = RecipeStatus.Published,
-                PublishedAt = DateTime.UtcNow,
-                IsDeleted = false
+                PublishedAt = DateTime.UtcNow
             };
             dbContext.Recipes.Add(ftsRecipe);
             await dbContext.SaveChangesAsync();
@@ -262,17 +258,15 @@ public class Program
             Console.WriteLine("\n--- TEST SUITE 5: Primary Image Business Logic & Cache Invalidation (FR-RCP-008, Major-02, Major-03) ---");
             var imgTestRecipeId = Guid.NewGuid();
             var imgSlug = "image-test-recipe-" + Guid.NewGuid().ToString("N").Substring(0, 8);
-            var imgRecipe = new Recipe
+            var imgRecipe = new TestRecipe(imgTestRecipeId)
             {
-                Id = imgTestRecipeId,
                 Title = "Image Test Recipe",
                 Slug = imgSlug,
                 Description = "Description",
                 Content = "Content",
                 CategoryId = category.Id,
                 AuthorId = author.Id,
-                Status = RecipeStatus.Published,
-                IsDeleted = false
+                Status = RecipeStatus.Published
             };
             dbContext.Recipes.Add(imgRecipe);
             await dbContext.SaveChangesAsync();
@@ -511,5 +505,13 @@ public class Program
         Console.WriteLine("==========================================================");
 
         return failedAssertions == 0 ? 0 : 1;
+    }
+}
+
+internal sealed class TestRecipe : Recipe
+{
+    public TestRecipe(Guid id)
+    {
+        Id = id;
     }
 }
