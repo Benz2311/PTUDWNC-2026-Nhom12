@@ -1,6 +1,7 @@
 using CulinaryBlog.Application.Contracts.Persistence;
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipeBySlug;
+using CulinaryBlog.Application.Features.Recipes.Queries.GetDeletedRecipes;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipes;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipesByCategory;
 using CulinaryBlog.Domain.Enums;
@@ -76,6 +77,25 @@ public class RecipeQueryHandlerTests
         result.Items.Should().HaveCount(2);
         result.TotalCount.Should().Be(2);
         result.Page.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetDeletedRecipes_PassesPaginationToRepository()
+    {
+        var expected = new PagedResultDto<RecipeTrashItemDto>([], 0, 2, 6, 0);
+        _recipeRepoMock
+            .Setup(repository => repository.GetDeletedAsync(
+                2,
+                6,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+
+        var handler = new GetDeletedRecipesQueryHandler(_recipeRepoMock.Object);
+        var result = await handler.Handle(
+            new GetDeletedRecipesQuery(2, 6),
+            CancellationToken.None);
+
+        result.Should().BeSameAs(expected);
     }
 
     [Fact]

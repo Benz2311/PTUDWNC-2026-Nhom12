@@ -10,6 +10,11 @@ public interface IRecipeRepository
         RecipeListOptions options,
         CancellationToken cancellationToken = default);
 
+    Task<PagedResultDto<RecipeTrashItemDto>> GetDeletedAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
     Task<RecipeDetailDto?> GetPublishedBySlugAsync(
         string slug,
         CancellationToken cancellationToken = default);

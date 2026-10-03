@@ -62,6 +62,13 @@ public record RecipeListItemDto(
     RecipeCategoryDto Category,
     DateTime? PublishedAt);
 
+public record RecipeTrashItemDto(
+    Guid Id,
+    string Title,
+    string Slug,
+    string Status,
+    DateTime? DeletedAt);
+
 public record RecipeIngredientDto(
     Guid Id,
     string Name,

@@ -107,6 +107,46 @@ public class RecipeRepository : IRecipeRepository
             cancellationToken);
     }
 
+    public async Task<PagedResultDto<RecipeTrashItemDto>> GetDeletedAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(page, 1);
+        pageSize = pageSize <= 0
+            ? DefaultPageSize
+            : Math.Min(pageSize, MaximumPageSize);
+
+        var query = _db.Recipes
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(recipe => recipe.IsDeleted);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var skip = (int)Math.Min((long)(page - 1) * pageSize, int.MaxValue);
+        var items = await query
+            .OrderByDescending(recipe => recipe.UpdatedAt.HasValue)
+            .ThenByDescending(recipe => recipe.UpdatedAt)
+            .ThenByDescending(recipe => recipe.Id)
+            .Select(recipe => new RecipeTrashItemDto(
+                recipe.Id,
+                recipe.Title,
+                recipe.Slug,
+                recipe.Status.ToString(),
+                recipe.UpdatedAt))
+            .Skip(skip)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+        return new PagedResultDto<RecipeTrashItemDto>(
+            items,
+            totalCount,
+            page,
+            pageSize,
+            totalPages);
+    }
+
     public Task<RecipeDetailDto?> GetPublishedBySlugAsync(
         string slug,
         CancellationToken cancellationToken = default)

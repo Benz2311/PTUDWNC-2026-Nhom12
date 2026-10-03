@@ -6,6 +6,7 @@ using CulinaryBlog.Application.Exceptions;
 using CulinaryBlog.Application.Features.Recipes.Commands.RecipeImages;
 using CulinaryBlog.Application.Features.Recipes.Dtos;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipeBySlug;
+using CulinaryBlog.Application.Features.Recipes.Queries.GetDeletedRecipes;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipes;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipesByCategory;
 using CulinaryBlog.Application.Features.Search.Dtos;
@@ -27,6 +28,14 @@ public static class RecipeEndpoints
         group.MapGet("/", GetRecipes)
             .WithName("GetRecipes")
             .WithSummary("Lấy danh sách công thức đã xuất bản");
+
+        app.MapGet("/api/v1/admin/recipes/trash", GetDeletedRecipes)
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithName("GetDeletedRecipes")
+            .WithSummary("Lấy danh sách công thức đã xóa mềm")
+            .Produces<PagedResultDto<RecipeTrashItemDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
 
         // TV2: Danh sách công thức theo danh mục
         group.MapGet("/category/{categorySlug}", GetRecipesByCategory)
@@ -234,6 +243,19 @@ public static class RecipeEndpoints
         return result is null
             ? Results.NotFound()
             : Results.Ok(result);
+    }
+
+    private static async Task<IResult> GetDeletedRecipes(
+        int? page,
+        int? pageSize,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new GetDeletedRecipesQuery(page ?? 1, pageSize ?? 12),
+            cancellationToken);
+
+        return Results.Ok(result);
     }
 
     private static async Task<IResult> SearchRecipes(
