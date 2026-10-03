@@ -122,8 +122,7 @@ public class CategoryRepository : ICategoryRepository
                     {
                         c.Id,
                         c.Name,
-                        RecipeCount = c.Recipes.Count(
-                            recipe => recipe.Status == RecipeStatus.Published),
+                        RecipeCount = c.Recipes.Count,
                     })
                 .OrderByDescending(item => item.RecipeCount)
                 .ThenBy(item => item.Name)
@@ -134,7 +133,7 @@ public class CategoryRepository : ICategoryRepository
                 item.Id,
                 item.Name,
                 item.RecipeCount,
-                CalculatePercentage(item.RecipeCount, publishedRecipes)))
+                CalculatePercentage(item.RecipeCount, totalRecipes)))
             .ToArray();
 
         var recipesByMonth = await _db.Recipes
