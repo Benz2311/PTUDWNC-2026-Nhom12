@@ -2,6 +2,7 @@
 using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Features.Categories.Commands.CreateCategory;
+using CulinaryBlog.Application.Features.Categories.Commands.DeleteCategory;
 using CulinaryBlog.Application.Features.Categories.Commands.UpdateCategory;
 using CulinaryBlog.Application.Features.Categories.Queries.GetCategories;
 using CulinaryBlog.Application.Features.Categories.Queries.GetCategoryStatistics;
@@ -51,6 +52,16 @@ public static class CategoryEndpoints
             .WithSummary("Cập nhật danh mục")
             .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapDelete(
+            "/{id:guid}",
+            DeleteCategory)
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithName("DeleteCategory")
+            .WithSummary("Xóa mềm danh mục")
+            .Produces(StatusCodes.Status204NoContent)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
@@ -212,5 +223,28 @@ public static class CategoryEndpoints
 
             return Results.ValidationProblem(errors);
         }
+    }
+
+    private static async Task<IResult> DeleteCategory(
+        Guid id,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new DeleteCategoryCommand(id),
+            cancellationToken);
+
+        return result switch
+        {
+            DeleteCategoryResult.Deleted => Results.NoContent(),
+            DeleteCategoryResult.NotFound => Results.Problem(
+                title: "Category not found",
+                statusCode: StatusCodes.Status404NotFound),
+            DeleteCategoryResult.HasRecipes => Results.Problem(
+                title: "Category still contains active recipes",
+                statusCode: StatusCodes.Status409Conflict),
+            _ => throw new InvalidOperationException(
+                $"Unsupported category delete result: {result}."),
+        };
     }
 }

@@ -1,6 +1,7 @@
 using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Application.Contracts.Persistence;
 using CulinaryBlog.Application.Features.Categories.Commands.CreateCategory;
+using CulinaryBlog.Application.Features.Categories.Commands.DeleteCategory;
 using CulinaryBlog.Application.Features.Categories.Commands.UpdateCategory;
 using CulinaryBlog.Application.Interfaces;
 using CulinaryBlog.Domain.Entities;
@@ -184,6 +185,89 @@ public class CategoryCommandHandlerTests
             CancellationToken.None);
 
         result.Should().Be(UpdateCategoryResult.NameAlreadyExists);
+        unitOfWork.Verify(
+            item => item.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
+        cache.Verify(
+            item => item.RemoveAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteCategory_WhenNoActiveRecipes_SoftDeletesAndInvalidatesCache()
+    {
+        var category = Category.Create("Empty category", "empty-category");
+        var categoryRepository = new Mock<ICategoryRepository>();
+        var unitOfWork = new Mock<IUnitOfWork>();
+        var cache = new Mock<CulinaryBlog.Application.Common.Interfaces.ICacheService>();
+        categoryRepository
+            .Setup(repository => repository.GetByIdAsync(
+                category.Id,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(category);
+        categoryRepository
+            .Setup(repository => repository.CountRecipesAsync(
+                category.Id,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+        unitOfWork
+            .Setup(item => item.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+        cache
+            .Setup(item => item.RemoveAsync(
+                "categories:all",
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var handler = new DeleteCategoryCommandHandler(
+            categoryRepository.Object,
+            unitOfWork.Object,
+            cache.Object);
+
+        var result = await handler.Handle(
+            new DeleteCategoryCommand(category.Id),
+            CancellationToken.None);
+
+        result.Should().Be(DeleteCategoryResult.Deleted);
+        category.IsDeleted.Should().BeTrue();
+        categoryRepository.Verify(repository => repository.Update(category), Times.Once);
+        unitOfWork.Verify(
+            item => item.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Once);
+        cache.Verify(
+            item => item.RemoveAsync("categories:all", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteCategory_WhenActiveRecipesRemain_DoesNotDeleteOrSave()
+    {
+        var category = Category.Create("Category with recipes", "category-with-recipes");
+        var categoryRepository = new Mock<ICategoryRepository>();
+        var unitOfWork = new Mock<IUnitOfWork>();
+        var cache = new Mock<CulinaryBlog.Application.Common.Interfaces.ICacheService>();
+        categoryRepository
+            .Setup(repository => repository.GetByIdAsync(
+                category.Id,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(category);
+        categoryRepository
+            .Setup(repository => repository.CountRecipesAsync(
+                category.Id,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2);
+
+        var handler = new DeleteCategoryCommandHandler(
+            categoryRepository.Object,
+            unitOfWork.Object,
+            cache.Object);
+
+        var result = await handler.Handle(
+            new DeleteCategoryCommand(category.Id),
+            CancellationToken.None);
+
+        result.Should().Be(DeleteCategoryResult.HasRecipes);
+        category.IsDeleted.Should().BeFalse();
         unitOfWork.Verify(
             item => item.SaveChangesAsync(It.IsAny<CancellationToken>()),
             Times.Never);
