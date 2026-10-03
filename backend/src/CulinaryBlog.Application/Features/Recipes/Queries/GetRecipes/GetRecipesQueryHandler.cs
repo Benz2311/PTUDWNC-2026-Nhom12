@@ -18,7 +18,7 @@ public class GetRecipesQueryHandler
         GetRecipesQuery request,
         CancellationToken cancellationToken)
     {
-        return _recipeRepository.GetPublishedAsync(
+        return _recipeRepository.GetListAsync(
             request.Page,
             request.PageSize,
             request.Options ?? new RecipeListOptions(),

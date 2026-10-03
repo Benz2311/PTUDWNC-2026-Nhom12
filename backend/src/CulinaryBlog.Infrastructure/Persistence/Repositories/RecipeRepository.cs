@@ -43,15 +43,25 @@ public class RecipeRepository : IRecipeRepository
         _db = db;
     }
 
-    public Task<PagedResultDto<RecipeListItemDto>> GetPublishedAsync(
+    public Task<PagedResultDto<RecipeListItemDto>> GetListAsync(
         int page,
         int pageSize,
         RecipeListOptions options,
         CancellationToken cancellationToken = default)
     {
-        var query = _db.Recipes
-            .AsNoTracking()
-            .Where(recipe => recipe.Status == RecipeStatus.Published);
+        var query = _db.Recipes.AsNoTracking();
+        if (options.AuthorId.HasValue)
+        {
+            query = query.Where(recipe => recipe.AuthorId == options.AuthorId.Value);
+            if (options.Status.HasValue)
+            {
+                query = query.Where(recipe => recipe.Status == options.Status.Value);
+            }
+        }
+        else
+        {
+            query = query.Where(recipe => recipe.Status == RecipeStatus.Published);
+        }
 
         if (!string.IsNullOrWhiteSpace(options.Search))
         {
@@ -89,7 +99,7 @@ public class RecipeRepository : IRecipeRepository
                 options.MaxTotalTimeMinutes.Value);
         }
 
-        return GetPublishedPageAsync(
+        return GetRecipePageAsync(
             query,
             page,
             pageSize,
@@ -195,7 +205,7 @@ public class RecipeRepository : IRecipeRepository
             return null;
         }
 
-        var recipes = await GetPublishedPageAsync(
+        var recipes = await GetRecipePageAsync(
             _db.Recipes
                 .AsNoTracking()
                 .Where(recipe =>
@@ -212,7 +222,7 @@ public class RecipeRepository : IRecipeRepository
         return new CategoryRecipesResponseDto(category, recipes);
     }
 
-    private static async Task<PagedResultDto<RecipeListItemDto>> GetPublishedPageAsync(
+    private static async Task<PagedResultDto<RecipeListItemDto>> GetRecipePageAsync(
         IQueryable<Recipe> query,
         int page,
         int pageSize,

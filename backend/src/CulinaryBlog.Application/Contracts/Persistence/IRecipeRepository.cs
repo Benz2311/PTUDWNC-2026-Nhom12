@@ -4,7 +4,7 @@ namespace CulinaryBlog.Application.Contracts.Persistence;
 
 public interface IRecipeRepository
 {
-    Task<PagedResultDto<RecipeListItemDto>> GetPublishedAsync(
+    Task<PagedResultDto<RecipeListItemDto>> GetListAsync(
         int page,
         int pageSize,
         RecipeListOptions options,

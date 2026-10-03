@@ -137,4 +137,6 @@ public record RecipeListOptions(
     RecipeSortField SortBy = RecipeSortField.PublishedAt,
     bool SortDescending = true,
     Guid? CategoryId = null,
-    int? MaxCookTimeMinutes = null);
+    int? MaxCookTimeMinutes = null,
+    Guid? AuthorId = null,
+    RecipeStatus? Status = null);

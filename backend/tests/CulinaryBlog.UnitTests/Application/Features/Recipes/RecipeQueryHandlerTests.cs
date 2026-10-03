@@ -31,7 +31,7 @@ public class RecipeQueryHandlerTests
             0);
         var cancellationToken = new CancellationTokenSource().Token;
         repository
-            .Setup(item => item.GetPublishedAsync(2, 8, options, cancellationToken))
+            .Setup(item => item.GetListAsync(2, 8, options, cancellationToken))
             .ReturnsAsync(expected);
         var handler = new GetRecipesQueryHandler(repository.Object);
 

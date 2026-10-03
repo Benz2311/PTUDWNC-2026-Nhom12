@@ -71,7 +71,12 @@ public static class RecipeEndpoints
         string? sortBy,
         string? sortDirection,
         string? sort,
+        bool? mine,
+        Guid? authorId,
+        string? status,
+        ClaimsPrincipal user,
         ISender sender,
+        ICacheService cache,
         CancellationToken cancellationToken)
     {
         var validationResult = ValidateListOptions(
@@ -89,17 +94,130 @@ public static class RecipeEndpoints
             return validationResult;
         }
 
-        var result = await sender.Send(
-            new GetRecipesQuery(page ?? 1, pageSize ?? 12, options with
+        var isMine = mine == true;
+        var isAdmin = user.IsInRole("Admin");
+        if (isMine && authorId.HasValue)
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["authorId"] = ["Không thể kết hợp mine=true với authorId."]
+                });
+        }
+
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+
+        if (isMine && (!user.IsInRole("Author") || !currentUserId.HasValue))
+        {
+            return Results.Forbid();
+        }
+
+        if (authorId.HasValue && !isAdmin)
+        {
+            return Results.Forbid();
+        }
+
+        RecipeStatus? parsedStatus = null;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            var statusName = Enum.GetNames<RecipeStatus>()
+                .FirstOrDefault(name => string.Equals(
+                    name,
+                    status.Trim(),
+                    StringComparison.OrdinalIgnoreCase));
+            if (statusName is null ||
+                !Enum.TryParse<RecipeStatus>(statusName, true, out var matchedStatus))
             {
-                CategorySlug = string.IsNullOrWhiteSpace(categorySlug)
-                    ? null
-                    : categorySlug.Trim(),
-                CategoryId = categoryId
-            }),
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]>
+                    {
+                        ["status"] = ["Status phải là Draft, Published hoặc Archived."]
+                    },
+                    statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+
+            parsedStatus = matchedStatus;
+            if (!isMine && !authorId.HasValue)
+            {
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]>
+                    {
+                        ["status"] = ["Status chỉ được dùng cùng mine=true hoặc authorId của Admin."]
+                    },
+                    statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+        }
+
+        var effectivePage = page is > 0 ? page.Value : 1;
+        var effectivePageSize = pageSize is > 0
+            ? Math.Min(pageSize.Value, 100)
+            : 12;
+        var listOptions = options with
+        {
+            CategorySlug = string.IsNullOrWhiteSpace(categorySlug)
+                ? null
+                : categorySlug.Trim(),
+            CategoryId = categoryId,
+            AuthorId = isMine ? currentUserId : authorId,
+            Status = parsedStatus
+        };
+
+        if (isMine || authorId.HasValue)
+        {
+            var privateResult = await sender.Send(
+                new GetRecipesQuery(effectivePage, effectivePageSize, listOptions),
+                cancellationToken);
+            return Results.Ok(privateResult);
+        }
+
+        var cacheKey = CreatePublicRecipeListCacheKey(
+            effectivePage,
+            effectivePageSize,
+            listOptions);
+        var cachedResult = await cache.GetAsync<PagedResultDto<RecipeListItemDto>>(
+            cacheKey,
+            cancellationToken);
+        if (cachedResult is not null)
+        {
+            return Results.Ok(cachedResult);
+        }
+
+        var result = await sender.Send(
+            new GetRecipesQuery(effectivePage, effectivePageSize, listOptions),
+            cancellationToken);
+        await cache.SetAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(1),
             cancellationToken);
 
         return Results.Ok(result);
+    }
+
+    private static string CreatePublicRecipeListCacheKey(
+        int page,
+        int pageSize,
+        RecipeListOptions options)
+    {
+        return string.Join(
+            ':',
+            "recipes:list",
+            page,
+            pageSize,
+            Uri.EscapeDataString(options.Search ?? string.Empty),
+            Uri.EscapeDataString(options.CategorySlug ?? string.Empty),
+            options.CategoryId?.ToString("N") ?? string.Empty,
+            options.Difficulty?.ToString() ?? string.Empty,
+            options.MaxCookTimeMinutes?.ToString() ?? string.Empty,
+            options.MaxTotalTimeMinutes?.ToString() ?? string.Empty,
+            options.SortBy,
+            options.SortDescending);
     }
 
     private static async Task<IResult> GetRecipesByCategory(
