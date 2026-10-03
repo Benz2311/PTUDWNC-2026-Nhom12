@@ -173,10 +173,11 @@ public class RecipeRepository : IRecipeRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<CategoryRecipesResponseDto?> GetPublishedByCategorySlugAsync(
+    public async Task<CategoryRecipesResponseDto?> GetByCategorySlugAsync(
         string categorySlug,
         int page,
         int pageSize,
+        Guid? authorId = null,
         CancellationToken cancellationToken = default)
     {
         var category = await _db.Categories
@@ -199,7 +200,10 @@ public class RecipeRepository : IRecipeRepository
                 .AsNoTracking()
                 .Where(recipe =>
                     recipe.CategoryId == category.Id &&
-                    recipe.Status == RecipeStatus.Published),
+                    (recipe.Status == RecipeStatus.Published ||
+                     (authorId.HasValue &&
+                      recipe.AuthorId == authorId.Value &&
+                      recipe.Status == RecipeStatus.Draft))),
             page,
             pageSize,
             new RecipeListOptions(),

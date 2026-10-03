@@ -305,8 +305,8 @@ public class RecipeQueryHandlerTests
         var response = new CategoryRecipesResponseDto(categoryDto, paged);
 
         _recipeRepoMock
-            .Setup(r => r.GetPublishedByCategorySlugAsync(
-                "mon-chinh", 1, 12, It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByCategorySlugAsync(
+                "mon-chinh", 1, 12, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(response);
 
         var handler = new GetRecipesByCategoryQueryHandler(_recipeRepoMock.Object);
@@ -331,8 +331,9 @@ public class RecipeQueryHandlerTests
     {
         // Arrange
         _recipeRepoMock
-            .Setup(r => r.GetPublishedByCategorySlugAsync(
+            .Setup(r => r.GetByCategorySlugAsync(
                 "category-khong-ton-tai", It.IsAny<int>(), It.IsAny<int>(),
+                It.IsAny<Guid?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((CategoryRecipesResponseDto?)null);
 
@@ -357,11 +358,12 @@ public class RecipeQueryHandlerTests
 
         int capturedPage = 0, capturedPageSize = 0;
         _recipeRepoMock
-            .Setup(r => r.GetPublishedByCategorySlugAsync(
+            .Setup(r => r.GetByCategorySlugAsync(
                 It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(),
+                It.IsAny<Guid?>(),
                 It.IsAny<CancellationToken>()))
-            .Callback<string, int, int, CancellationToken>(
-                (_, p, ps, _) => { capturedPage = p; capturedPageSize = ps; })
+            .Callback<string, int, int, Guid?, CancellationToken>(
+                (_, p, ps, _, _) => { capturedPage = p; capturedPageSize = ps; })
             .ReturnsAsync(response);
 
         var handler = new GetRecipesByCategoryQueryHandler(_recipeRepoMock.Object);

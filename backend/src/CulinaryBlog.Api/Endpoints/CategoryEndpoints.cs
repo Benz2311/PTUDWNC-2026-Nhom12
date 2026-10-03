@@ -1,4 +1,5 @@
-﻿using CulinaryBlog.Application.Common.Interfaces;
+﻿using System.Security.Claims;
+using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Features.Categories.Queries.GetCategories;
 using CulinaryBlog.Application.Features.Categories.Queries.GetCategoryStatistics;
@@ -50,64 +51,19 @@ public static class CategoryEndpoints
         // GET /api/v1/categories/{slug} (SRS FR-CAT-002 & Table 8.2)
         group.MapGet(
             "/{slug}",
-            async (
-                string slug,
-                int? page,
-                int? pageSize,
-                ISender sender,
-                CancellationToken cancellationToken) =>
-            {
-                var result =
-                    await sender.Send(
-                        new GetRecipesByCategoryQuery(slug, page ?? 1, pageSize ?? 12),
-                        cancellationToken);
-
-                return result is null
-                    ? Results.NotFound()
-                    : Results.Ok(result);
-            })
+            GetRecipesByCategory)
             .WithName("GetCategoryBySlug")
             .WithSummary("Lấy chi tiết danh mục và danh sách công thức thuộc danh mục");
 
         app.MapGet(
             "/api/categories/{slug}",
-            async (
-                string slug,
-                int? page,
-                int? pageSize,
-                ISender sender,
-                CancellationToken cancellationToken) =>
-            {
-                var result =
-                    await sender.Send(
-                        new GetRecipesByCategoryQuery(slug, page ?? 1, pageSize ?? 12),
-                        cancellationToken);
-
-                return result is null
-                    ? Results.NotFound()
-                    : Results.Ok(result);
-            })
+            GetRecipesByCategory)
             .ExcludeFromDescription();
 
         // GET /api/v1/categories/{slug}/recipes (Backward compatibility)
         group.MapGet(
             "/{slug}/recipes",
-            async (
-                string slug,
-                int? page,
-                int? pageSize,
-                ISender sender,
-                CancellationToken cancellationToken) =>
-            {
-                var result =
-                    await sender.Send(
-                        new GetRecipesByCategoryQuery(slug, page ?? 1, pageSize ?? 12),
-                        cancellationToken);
-
-                return result is null
-                    ? Results.NotFound()
-                    : Results.Ok(result);
-            })
+            GetRecipesByCategory)
             .WithName("GetCategoryRecipes")
             .WithSummary("Lấy danh sách công thức thuộc danh mục theo slug");
     }
@@ -135,5 +91,37 @@ public static class CategoryEndpoints
             cancellationToken);
 
         return Results.Ok(categories);
+    }
+
+    private static async Task<IResult> GetRecipesByCategory(
+        string slug,
+        int? page,
+        int? pageSize,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        Guid? authorId = null;
+        if (user.IsInRole("Author"))
+        {
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? user.FindFirst("sub")?.Value;
+            if (Guid.TryParse(userIdClaim, out var parsedUserId))
+            {
+                authorId = parsedUserId;
+            }
+        }
+
+        var result = await sender.Send(
+            new GetRecipesByCategoryQuery(
+                slug,
+                page ?? 1,
+                pageSize ?? 12,
+                authorId),
+            cancellationToken);
+
+        return result is null
+            ? Results.NotFound()
+            : Results.Ok(result);
     }
 }

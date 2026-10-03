@@ -14,9 +14,10 @@ public interface IRecipeRepository
         string slug,
         CancellationToken cancellationToken = default);
 
-    Task<CategoryRecipesResponseDto?> GetPublishedByCategorySlugAsync(
+    Task<CategoryRecipesResponseDto?> GetByCategorySlugAsync(
         string categorySlug,
         int page,
         int pageSize,
+        Guid? authorId = null,
         CancellationToken cancellationToken = default);
 }

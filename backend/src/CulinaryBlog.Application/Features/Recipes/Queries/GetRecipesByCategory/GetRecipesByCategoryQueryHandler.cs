@@ -18,10 +18,11 @@ public class GetRecipesByCategoryQueryHandler
         GetRecipesByCategoryQuery request,
         CancellationToken cancellationToken)
     {
-        return _recipeRepository.GetPublishedByCategorySlugAsync(
+        return _recipeRepository.GetByCategorySlugAsync(
             request.CategorySlug,
             request.Page,
             request.PageSize,
+            request.AuthorId,
             cancellationToken);
     }
 }
