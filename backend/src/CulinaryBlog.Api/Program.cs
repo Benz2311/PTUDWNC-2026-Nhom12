@@ -7,6 +7,8 @@ using CulinaryBlog.Api.Endpoints.Dashboard;
 using CulinaryBlog.Api.Endpoints.Files;
 using CulinaryBlog.Api.Endpoints.Health;
 using CulinaryBlog.Api.Endpoints.Recipes;
+using CulinaryBlog.Api.Endpoints.Sitemap;
+using CulinaryBlog.Api.Jobs;
 using CulinaryBlog.Api.Contracts;
 using CulinaryBlog.Infrastructure;
 using CulinaryBlog.Infrastructure.Persistence;
@@ -75,9 +77,15 @@ var corsOrigins = (builder.Configuration["Cors:Origins"] ?? "http://localhost:30
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
     policy.WithOrigins(corsOrigins)
+        .WithExposedHeaders("ETag")
         .AllowAnyHeader()
         .AllowAnyMethod()));
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<SitemapGenerationHostedService>();
+if (builder.Configuration.GetValue<bool>("Recipes:PurgeJobEnabled"))
+{
+    builder.Services.AddHostedService<RecipePurgeHostedService>();
+}
 
 var app = builder.Build();
 
@@ -118,6 +126,7 @@ app.MapAuthEndpoints();
 app.MapHealthEndpoints();
 app.MapCategoryEndpoints();
 app.MapRecipeEndpoints();
+app.MapSitemapEndpoints();
 app.MapDashboardEndpoints();
 app.MapFileEndpoints();
 

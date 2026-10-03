@@ -16,6 +16,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<RecipeStep> RecipeSteps => Set<RecipeStep>();
     public DbSet<RecipeImage> RecipeImages => Set<RecipeImage>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<RecipeSlugHistory> RecipeSlugHistories => Set<RecipeSlugHistory>();
+    public DbSet<RecipeAuditLog> RecipeAuditLogs => Set<RecipeAuditLog>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -121,6 +123,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(x => x.CookTimeMinutes).HasColumnName("CookTimeMinutes").IsRequired();
             entity.Property(x => x.Servings).IsRequired();
             entity.Property(x => x.RowVersion).HasColumnName("RowVersion").IsConcurrencyToken().ValueGeneratedNever();
+            entity.Property(x => x.xmin).IsRowVersion();
 
             entity.HasIndex(x => x.Slug).IsUnique();
             entity.HasIndex(x => x.AuthorId);
@@ -163,6 +166,7 @@ public class ApplicationDbContext : DbContext
 
             entity.OwnsOne(x => x.Nutrition, nutrition =>
             {
+                nutrition.Property(x => x.Source).HasColumnName("Nutrition_Source").HasConversion<string>().HasMaxLength(40).IsRequired();
                 nutrition.Property(x => x.Calories).HasColumnName("Nutrition_Calories").HasPrecision(8, 2);
                 nutrition.Property(x => x.Protein).HasColumnName("Nutrition_Protein").HasPrecision(8, 2);
                 nutrition.Property(x => x.Carbohydrates).HasColumnName("Nutrition_Carbohydrates").HasPrecision(8, 2);
@@ -170,6 +174,22 @@ public class ApplicationDbContext : DbContext
                 nutrition.Property(x => x.Fiber).HasColumnName("Nutrition_Fiber").HasPrecision(8, 2);
                 nutrition.Property(x => x.Sodium).HasColumnName("Nutrition_Sodium").HasPrecision(8, 2);
             });
+        });
+
+        modelBuilder.Entity<RecipeSlugHistory>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Slug).HasMaxLength(220).IsRequired();
+            entity.HasIndex(x => x.Slug);
+            entity.HasIndex(x => new { x.RecipeId, x.Slug }).IsUnique();
+            entity.HasOne<Recipe>().WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RecipeAuditLog>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Action).HasMaxLength(40).IsRequired();
+            entity.HasIndex(x => new { x.RecipeId, x.CreatedAt });
         });
 
         modelBuilder.Entity<RecipeIngredient>(entity =>

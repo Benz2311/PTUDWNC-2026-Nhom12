@@ -8,51 +8,48 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
 {
     public void Configure(EntityTypeBuilder<ApplicationUser> builder)
     {
-        builder.ToTable("Users");
+        builder.ToTable("AspNetUsers");
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Id)
-            .ValueGeneratedOnAdd();
+        builder.Property(x => x.FullName)
+            .HasColumnName("DisplayName")
+            .HasMaxLength(100)
+            .IsRequired();
 
         builder.Property(x => x.UserName)
-            .IsRequired()
-            .HasMaxLength(100);
+            .HasMaxLength(256);
+
+        builder.Property(x => x.Email)
+            .HasMaxLength(256);
+
+        builder.Property(x => x.EmailConfirmed)
+            .IsRequired();
+
+        builder.Property(x => x.Roles)
+            .HasColumnType("text[]")
+            .IsRequired();
+
+        builder.Property(x => x.AvatarUrl)
+            .HasMaxLength(500);
+
+        builder.Property(x => x.PasswordHash)
+            .HasColumnType("text");
 
         builder.HasIndex(x => x.UserName)
             .IsUnique();
 
-        builder.Property(x => x.Email)
-            .IsRequired()
-            .HasMaxLength(255);
-
         builder.HasIndex(x => x.Email)
             .IsUnique();
-
-        builder.Property(x => x.PasswordHash)
-            .IsRequired()
-            .HasMaxLength(500);
-
-        builder.Property(x => x.DisplayName)
-            .IsRequired()
-            .HasMaxLength(150);
-
-        builder.Property(x => x.AvatarUrl)
-            .HasMaxLength(1000);
-
-        builder.Property(x => x.Bio)
-            .HasMaxLength(1000);
-
-        builder.Property(x => x.IsActive)
-            .IsRequired()
-            .HasDefaultValue(true);
-
-        builder.Property(x => x.CreatedAt)
-            .IsRequired();
 
         builder.HasMany(x => x.RefreshTokens)
             .WithOne(x => x.User)
             .HasForeignKey(x => x.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(x => x.Recipes)
+            .WithOne(x => x.Author)
+            .HasForeignKey(x => x.AuthorId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

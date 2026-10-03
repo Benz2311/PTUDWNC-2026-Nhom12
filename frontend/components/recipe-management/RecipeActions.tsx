@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiFetch } from '@/lib/api';
+import { apiFetchWithResponse } from '@/lib/api';
 
-type RecipeState = { id: string; slug: string; status: string };
+type RecipeState = { id: string; slug: string; status: string; etag: string };
 
 export default function RecipeActions({ slug }: { slug: string }) {
   const [recipe, setRecipe] = useState<RecipeState | null>(null);
@@ -11,8 +11,8 @@ export default function RecipeActions({ slug }: { slug: string }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    apiFetch<RecipeState>(`/api/v1/recipes/${slug}`)
-      .then(setRecipe)
+    apiFetchWithResponse<Omit<RecipeState, 'etag'>>(`/api/v1/recipes/${slug}`)
+      .then(({ data, headers }) => setRecipe({ ...data, etag: headers.get('ETag') ?? '' }))
       .catch((reason: Error) => setMessage(reason.message));
   }, [slug]);
 
@@ -21,8 +21,15 @@ export default function RecipeActions({ slug }: { slug: string }) {
     setSaving(true);
     setMessage('');
     try {
-      await apiFetch(`/api/v1/recipes/${recipe.id}/${action}`, { method: 'PATCH' });
-      setRecipe((current) => (current ? { ...current, status: action === 'publish' ? 'Published' : 'Draft' } : current));
+      const response = await apiFetchWithResponse<{ id: string; status: string }>(`/api/v1/recipes/${recipe.id}/${action}`, {
+        method: 'PATCH',
+        headers: { 'If-Match': recipe.etag },
+      });
+      setRecipe((current) => (current ? {
+        ...current,
+        status: response.data.status,
+        etag: response.headers.get('ETag') ?? current.etag,
+      } : current));
     } catch (err: unknown) {
       setMessage(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái.');
     } finally {

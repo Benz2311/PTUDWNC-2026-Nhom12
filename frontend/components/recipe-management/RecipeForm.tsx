@@ -32,7 +32,7 @@ export type InitialRecipe = {
   images: { url: string; altText: string | null }[];
 };
 
-export default function RecipeForm({ recipeId, initialRecipe }: { recipeId?: string; initialRecipe?: InitialRecipe }) {
+export default function RecipeForm({ recipeId, initialRecipe, etag }: { recipeId?: string; initialRecipe?: InitialRecipe; etag?: string }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -119,6 +119,12 @@ export default function RecipeForm({ recipeId, initialRecipe }: { recipeId?: str
     setSaving(true);
     setMessage('');
 
+    if (recipeId && !etag) {
+      setMessage('Không nhận được phiên bản công thức. Hãy tải lại trang trước khi lưu.');
+      setSaving(false);
+      return;
+    }
+
     if (imageFiles.some((file) => file.size > 5 * 1024 * 1024)) {
       setMessage('Mỗi ảnh không được vượt quá 5 MB.');
       setSaving(false);
@@ -141,7 +147,10 @@ export default function RecipeForm({ recipeId, initialRecipe }: { recipeId?: str
         recipeId ? `/api/v1/recipes/${recipeId}` : '/api/v1/recipes',
         {
           method: recipeId ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(recipeId && etag ? { 'If-Match': etag } : {}),
+          },
           body: JSON.stringify({
             categoryId,
             title,

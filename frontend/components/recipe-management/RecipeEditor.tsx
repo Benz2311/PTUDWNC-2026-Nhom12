@@ -1,16 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiFetch } from '@/lib/api';
+import { apiFetchWithResponse } from '@/lib/api';
 import RecipeForm, { InitialRecipe } from './RecipeForm';
 
 export default function RecipeEditor({ slug }: { slug: string }) {
   const [recipe, setRecipe] = useState<InitialRecipe | null>(null);
+  const [etag, setEtag] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    apiFetch<InitialRecipe>(`/api/v1/recipes/${slug}`)
-      .then(setRecipe)
+    apiFetchWithResponse<InitialRecipe>(`/api/v1/recipes/${slug}`)
+      .then(({ data, headers }) => {
+        setRecipe(data);
+        setEtag(headers.get('ETag') ?? '');
+      })
       .catch((reason: Error) => setError(reason.message));
   }, [slug]);
 
@@ -29,5 +33,5 @@ export default function RecipeEditor({ slug }: { slug: string }) {
     return <div className="loading-state">Đang tải công thức...</div>;
   }
 
-  return <RecipeForm recipeId={recipe.id} initialRecipe={recipe} />;
+  return <RecipeForm recipeId={recipe.id} initialRecipe={recipe} etag={etag} />;
 }

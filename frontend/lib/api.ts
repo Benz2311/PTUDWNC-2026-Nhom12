@@ -36,7 +36,7 @@ export function clearAuth() {
   localStorage.removeItem(AUTH_STORAGE_KEYS.refreshToken);
 }
 
-export async function apiFetch<T = unknown>(url: string, options: RequestInit = {}, withAuth = true): Promise<T> {
+export async function apiFetchWithResponse<T = unknown>(url: string, options: RequestInit = {}, withAuth = true): Promise<{ data: T; headers: Headers }> {
   const headers = new Headers(options.headers ?? {});
 
   if (withAuth) {
@@ -67,11 +67,13 @@ export async function apiFetch<T = unknown>(url: string, options: RequestInit = 
     throw error;
   }
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
+  const data = response.status === 204 ? undefined as T : await response.json() as T;
+  return { data, headers: response.headers };
+}
 
-  return (await response.json()) as T;
+export async function apiFetch<T = unknown>(url: string, options: RequestInit = {}, withAuth = true): Promise<T> {
+  const response = await apiFetchWithResponse<T>(url, options, withAuth);
+  return response.data;
 }
 
 export async function apiJson<T = unknown>(url: string, options: RequestInit = {}, withAuth = true): Promise<T> {

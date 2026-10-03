@@ -262,12 +262,10 @@ await db.SaveChangesAsync(cancellationToken);
         string slug,
         string name,
         string description) =>
-        new()
-        {
-            Slug = slug,
-            Name = name,
-            Description = description
-        };
+        Category.Create(
+            name: name,
+            slug: slug,
+            description: description);
 
     private static bool NeedsPasswordReset(ApplicationUser user, PasswordHasher<ApplicationUser> passwordHasher, string demoPassword)
     {

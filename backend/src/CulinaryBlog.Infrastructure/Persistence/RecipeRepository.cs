@@ -69,7 +69,7 @@ public class RecipeRepository : IRecipeRepository
     {
         var normalizedSlug = slug.Trim();
         return _dbContext.Recipes
-            .AnyAsync(recipe => recipe.Slug == normalizedSlug && (!excludeId.HasValue || recipe.Id != excludeId.Value) && !recipe.IsDeleted, cancellationToken);
+            .AnyAsync(recipe => recipe.Slug == normalizedSlug && (!excludeId.HasValue || recipe.Id != excludeId.Value), cancellationToken);
     }
 
     public Task AddAsync(Recipe recipe, CancellationToken cancellationToken = default)
@@ -104,12 +104,14 @@ public class RecipeRepository : IRecipeRepository
     public Task DeleteAsync(Recipe recipe, CancellationToken cancellationToken = default)
     {
         recipe.IsDeleted = true;
+        recipe.DeletedAt = DateTime.UtcNow;
         recipe.UpdatedAt = DateTime.UtcNow;
         var entry = _dbContext.Entry(recipe);
         if (entry.State == EntityState.Detached)
         {
             _dbContext.Recipes.Attach(recipe);
             entry.Property(item => item.IsDeleted).IsModified = true;
+            entry.Property(item => item.DeletedAt).IsModified = true;
             entry.Property(item => item.UpdatedAt).IsModified = true;
         }
 

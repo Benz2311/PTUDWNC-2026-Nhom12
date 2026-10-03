@@ -19,7 +19,9 @@ public static class CategoryEndpoints
     {
         group.MapGet("", async (ApplicationDbContext db, IDistributedCache cache, CancellationToken cancellationToken) =>
         {
-            var cached = await cache.GetStringAsync("categories:all", cancellationToken);
+            var generation = await GetCacheGenerationAsync(cache, cancellationToken);
+            var cacheKey = $"categories:{generation}:all";
+            var cached = await cache.GetStringAsync(cacheKey, cancellationToken);
             if (cached is not null)
             {
                 return Results.Content(cached, "application/json");
@@ -38,7 +40,7 @@ public static class CategoryEndpoints
                 .ToListAsync(cancellationToken);
 
             await cache.SetStringAsync(
-                "categories:all",
+                cacheKey,
                 JsonSerializer.Serialize(categories),
                 new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(60) },
                 cancellationToken);
@@ -47,7 +49,8 @@ public static class CategoryEndpoints
 
         group.MapGet("/{slug}", async (string slug, ApplicationDbContext db, IDistributedCache cache, CancellationToken cancellationToken) =>
         {
-            var cacheKey = $"categories:{slug}";
+            var generation = await GetCacheGenerationAsync(cache, cancellationToken);
+            var cacheKey = $"categories:{generation}:{slug}";
             var cached = await cache.GetStringAsync(cacheKey, cancellationToken);
             if (cached is not null)
             {
@@ -92,12 +95,10 @@ public static class CategoryEndpoints
                 return Results.Conflict(new { error = "Category slug already exists." });
             }
 
-            var category = new Category
-            {
-                Name = request.Name.Trim(),
-                Slug = slug,
-                Description = request.Description?.Trim()
-            };
+            var category = Category.Create(
+                request.Name.Trim(),
+                slug,
+                request.Description?.Trim());
             db.Categories.Add(category);
             await db.SaveChangesAsync(cancellationToken);
             await InvalidateCacheAsync(cache, category.Slug, cancellationToken);
@@ -119,19 +120,26 @@ public static class CategoryEndpoints
                 return Results.NotFound();
             }
 
-            var previousSlug = category.Slug;
             var slug = Slugify(request.Slug ?? request.Name);
-            if (await db.Categories.AnyAsync(item => item.Id != id && item.Slug == slug, cancellationToken))
+            if (!string.Equals(slug, category.Slug, StringComparison.Ordinal) &&
+                await db.Categories.AnyAsync(item => item.Id != id && item.Slug == slug, cancellationToken))
             {
                 return Results.Conflict(new { error = "Category slug already exists." });
             }
 
-            category.Name = request.Name.Trim();
-            category.Slug = slug;
-            category.Description = request.Description?.Trim();
+            if (!string.Equals(slug, category.Slug, StringComparison.Ordinal))
+            {
+                return Results.BadRequest(new { error = "Updating category slug is not supported. Use the existing slug." });
+            }
+
+            category.Update(
+                request.Name.Trim(),
+                request.Description?.Trim(),
+                category.ImageUrl,
+                category.OrderIndex);
             category.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
-            await InvalidateCacheAsync(cache, category.Slug, cancellationToken, previousSlug);
+            await InvalidateCacheAsync(cache, category.Slug, cancellationToken);
 
             return Results.Ok(ToResponse(category));
         }).RequireAuthorization(policy => policy.RequireRole("Admin"));
@@ -176,6 +184,7 @@ public static class CategoryEndpoints
 
     private static async Task InvalidateCacheAsync(IDistributedCache cache, string slug, CancellationToken cancellationToken, string? previousSlug = null)
     {
+        await cache.SetStringAsync("categories:cache:generation", Guid.NewGuid().ToString("N"), cancellationToken);
         await cache.RemoveAsync("categories:all", cancellationToken);
         await cache.RemoveAsync($"categories:{slug}", cancellationToken);
         if (!string.IsNullOrWhiteSpace(previousSlug) && previousSlug != slug)
@@ -183,6 +192,9 @@ public static class CategoryEndpoints
             await cache.RemoveAsync($"categories:{previousSlug}", cancellationToken);
         }
     }
+
+    private static async Task<string> GetCacheGenerationAsync(IDistributedCache cache, CancellationToken cancellationToken) =>
+        await cache.GetStringAsync("categories:cache:generation", cancellationToken) ?? "initial";
 }
 
 public sealed record CategoryRequest(string Name, string? Slug, string? Description);

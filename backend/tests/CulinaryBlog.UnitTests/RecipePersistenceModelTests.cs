@@ -1,7 +1,12 @@
 using CulinaryBlog.Domain.Entities;
+using CulinaryBlog.Domain.Enums;
+using CulinaryBlog.Api.Endpoints.Recipes;
 using CulinaryBlog.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.AspNetCore.Http;
+using System.Text.Json;
+using System.Reflection;
 
 namespace CulinaryBlog.UnitTests;
 
@@ -41,6 +46,115 @@ public sealed class RecipePersistenceModelTests
 
         Assert.True(stepIndex.IsUnique);
         Assert.False(imageIndex.IsUnique);
+    }
+
+    [Fact]
+    public void PublishGuard_RejectsUnconfirmedAuthorWithoutAdminOverride()
+    {
+        var method = typeof(RecipeEndpoints).GetMethod("CanPublishRecipe", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var recipe = new Recipe
+        {
+            Status = RecipeStatus.Draft,
+            Ingredients = [new RecipeIngredient { Name = "Salt", Quantity = 1m, SortOrder = 0 }],
+            Steps = [new RecipeStep { StepNumber = 1, Title = "Mix", Description = "Mix ingredients" }],
+            Category = Category.Create("Dinner", "dinner")
+        };
+        var author = new ApplicationUser { EmailConfirmed = false };
+
+        var result = (bool)method.Invoke(null, [recipe, author, false])!;
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IfMatchGuard_RejectsStaleVersion()
+    {
+        var method = typeof(RecipeEndpoints).GetMethod("MatchesIfMatchHeader", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var recipe = new Recipe { xmin = 42 };
+        var result = (bool)method.Invoke(null, [recipe, "\"41\""])!;
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void RecipeEtag_IsEmittedAsStrongXminTag()
+    {
+        var method = typeof(RecipeEndpoints).GetMethod("SetRecipeEtag", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        var context = new DefaultHttpContext();
+
+        method.Invoke(null, [context, new Recipe { xmin = 42 }]);
+
+        Assert.Equal("\"42\"", context.Response.Headers.ETag.ToString());
+    }
+
+    [Fact]
+    public void PublishGuard_AllowsConfirmedAuthorAndAdminWhenRecipeIsComplete()
+    {
+        var method = typeof(RecipeEndpoints).GetMethod("CanPublishRecipe", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        var recipe = new Recipe
+        {
+            Title = "A complete recipe",
+            Content = "Mix, cook, and serve.",
+            PrepTimeMinutes = 10,
+            CookTimeMinutes = 15,
+            Servings = 2,
+            Difficulty = DifficultyLevel.Easy,
+            Category = Category.Create("Dinner", "dinner"),
+            Ingredients = [new RecipeIngredient { Name = "Salt", Quantity = 1m }],
+            Steps = [new RecipeStep { StepNumber = 1, Description = "Mix and cook." }]
+        };
+
+        var result = (bool)method.Invoke(null, [recipe, new ApplicationUser { EmailConfirmed = true }, false])!;
+        var adminResult = (bool)method.Invoke(null, [recipe, new ApplicationUser { EmailConfirmed = false }, true])!;
+
+        Assert.True(result);
+        Assert.True(adminResult);
+    }
+
+    [Fact]
+    public void IngredientQuantity_RejectsFractionStringsButAcceptsJsonNumbersAndNull()
+    {
+        var method = typeof(RecipeEndpoints).GetMethod("ValidateIngredient", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        using var fractionDocument = JsonDocument.Parse("\"1/2\"");
+        using var decimalDocument = JsonDocument.Parse("0.5");
+        using var nullDocument = JsonDocument.Parse("null");
+
+        var fractionError = (string?)method.Invoke(null, [new IngredientRequest("Salt", fractionDocument.RootElement, null)]);
+        var decimalError = (string?)method.Invoke(null, [new IngredientRequest("Salt", decimalDocument.RootElement, null)]);
+        var nullError = (string?)method.Invoke(null, [new IngredientRequest("Salt", nullDocument.RootElement, null)]);
+
+        Assert.NotNull(fractionError);
+        Assert.Null(decimalError);
+        Assert.Null(nullError);
+    }
+
+    [Fact]
+    public void LifecycleEntitiesAndDeletedAt_AreMappedInEfModel()
+    {
+        using var context = CreateContext();
+        var recipe = context.Model.FindEntityType(typeof(Recipe))!;
+        var history = context.Model.FindEntityType(typeof(RecipeSlugHistory))!;
+        var audit = context.Model.FindEntityType(typeof(RecipeAuditLog))!;
+        var historyIndex = FindIndex(history, nameof(RecipeSlugHistory.RecipeId), nameof(RecipeSlugHistory.Slug));
+
+        Assert.NotNull(recipe.FindProperty(nameof(Recipe.DeletedAt)));
+        Assert.True(historyIndex.IsUnique);
+        Assert.NotNull(audit.FindProperty(nameof(RecipeAuditLog.ActorId)));
+    }
+
+    [Fact]
+    public void LifecycleMigration_IsDiscoverableByEfCore()
+    {
+        using var context = CreateContext();
+
+        Assert.Contains("20261003090000_AddRecipeLifecycleSupport", context.Database.GetMigrations());
     }
 
     private static ApplicationDbContext CreateContext()

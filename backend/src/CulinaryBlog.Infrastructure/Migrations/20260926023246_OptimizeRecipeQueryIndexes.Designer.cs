@@ -3,24 +3,26 @@ using System;
 using CulinaryBlog.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace CulinaryBlog.Infrastructure.Persistence.Migrations
+namespace CulinaryBlog.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260926023246_OptimizeRecipeQueryIndexes")]
+    partial class OptimizeRecipeQueryIndexes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.ApplicationUser", b =>
@@ -196,9 +198,6 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -232,89 +231,16 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("Description");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Description"), "gin");
-                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Description"), new[] { "gin_trgm_ops" });
-
                     b.HasIndex("Slug")
                         .IsUnique();
 
                     b.HasIndex("Status");
-
-                    b.HasIndex("Title");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Title"), "gin");
-                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Title"), new[] { "gin_trgm_ops" });
 
                     b.HasIndex("IsDeleted", "Status", "CreatedAt");
 
                     b.HasIndex("CategoryId", "IsDeleted", "Status", "CreatedAt");
 
                     b.ToTable("Recipes");
-                });
-
-            modelBuilder.Entity("CulinaryBlog.Domain.Entities.RecipeAuditLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ActorId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("RecipeId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RecipeId", "CreatedAt");
-
-                    b.ToTable("RecipeAuditLogs");
-                });
-
-            modelBuilder.Entity("CulinaryBlog.Domain.Entities.RecipeSlugHistory", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("RecipeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasMaxLength(220)
-                        .HasColumnType("character varying(220)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RecipeId", "Slug")
-                        .IsUnique();
-
-                    b.HasIndex("Slug");
-
-                    b.ToTable("RecipeSlugHistories");
-                });
-
-            modelBuilder.Entity("CulinaryBlog.Domain.Entities.RecipeSlugHistory", b =>
-                {
-                    b.HasOne("CulinaryBlog.Domain.Entities.Recipe", null)
-                        .WithMany()
-                        .HasForeignKey("RecipeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.RecipeImage", b =>

@@ -21,6 +21,8 @@ public class Recipe : BaseEntity
     public string? SearchVector { get; set; }
     public string? CoverImageUrl { get; set; }
     public DateTime? PublishedAt { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public uint xmin { get; set; }
     public DifficultyLevel Difficulty { get; set; }
     public RecipeStatus Status { get; set; } = RecipeStatus.Draft;
     public ICollection<RecipeIngredient> Ingredients { get; set; } = new List<RecipeIngredient>();
