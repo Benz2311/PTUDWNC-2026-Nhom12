@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Application.DTOs;
+using CulinaryBlog.Application.Features.Categories.Commands.CreateCategory;
 using CulinaryBlog.Application.Features.Categories.Queries.GetCategories;
 using CulinaryBlog.Application.Features.Categories.Queries.GetCategoryStatistics;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipesByCategory;
@@ -30,6 +31,16 @@ public static class CategoryEndpoints
             "/api/categories",
             GetCategories)
             .ExcludeFromDescription();
+
+        group.MapPost(
+            "/",
+            CreateCategory)
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithName("CreateCategory")
+            .WithSummary("Tạo danh mục mới")
+            .Produces<CategoryDto>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         // GET /api/v1/categories/statistics
         group.MapGet(
@@ -123,5 +134,34 @@ public static class CategoryEndpoints
         return result is null
             ? Results.NotFound()
             : Results.Ok(result);
+    }
+
+    private static async Task<IResult> CreateCategory(
+        CreateCategoryCommand command,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var category = await sender.Send(command, cancellationToken);
+            if (category is null)
+            {
+                return Results.Problem(
+                    title: "Category name already exists",
+                    statusCode: StatusCodes.Status409Conflict);
+            }
+
+            return Results.Created($"/api/v1/categories/{category.Slug}", category);
+        }
+        catch (FluentValidation.ValidationException exception)
+        {
+            var errors = exception.Errors
+                .GroupBy(error => error.PropertyName)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(error => error.ErrorMessage).ToArray());
+
+            return Results.ValidationProblem(errors);
+        }
     }
 }

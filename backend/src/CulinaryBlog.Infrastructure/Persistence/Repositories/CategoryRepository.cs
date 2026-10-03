@@ -62,12 +62,22 @@ public class CategoryRepository : ICategoryRepository
         CancellationToken cancellationToken = default)
     {
         return await _db.Categories
+            .IgnoreQueryFilters()
             .AnyAsync(
                 c =>
                     c.Name == name &&
                     (!excludeId.HasValue ||
                      c.Id != excludeId.Value),
                 cancellationToken);
+    }
+
+    public Task<bool> SlugExistsAsync(
+        string slug,
+        CancellationToken cancellationToken = default)
+    {
+        return _db.Categories
+            .IgnoreQueryFilters()
+            .AnyAsync(category => category.Slug == slug, cancellationToken);
     }
 
     public async Task<int> CountRecipesAsync(
