@@ -10,9 +10,9 @@
     "lint:fix": "eslint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "jest --passWithNoTests",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
+    "test": "jest --config jest.config.mjs --passWithNoTests",
+    "test:watch": "jest --config jest.config.mjs --watch",
+    "test:coverage": "jest --config jest.config.mjs --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
