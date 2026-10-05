@@ -122,23 +122,49 @@ public static class RecipeEndpoints
         [FromQuery] string? q,
         [FromQuery] int page,
         [FromQuery] int pageSize,
+        [FromQuery] Guid? categoryId,
+        [FromQuery] string? categorySlug,
+        [FromQuery] string? difficulty,
+        [FromQuery] int? maxCookTimeMinutes,
+        [FromQuery] string? sortBy,
         ISender sender,
         ICacheService cache,
         CancellationToken ct)
     {
         var effectivePage = page > 0 ? page : 1;
         var effectivePageSize = pageSize is > 0 and <= 100 ? pageSize : 10;
-        var normalizedQ = q?.Trim().ToLowerInvariant() ?? string.Empty;
+        var rawQuery = q?.Trim() ?? string.Empty;
+        var normalizedQ = rawQuery.ToLowerInvariant();
 
-        // SRS FR-SRCH-001: Cache Redis 1 phút vary theo query/page/pageSize
-        var cacheKey = $"search:{normalizedQ}:{effectivePage}:{effectivePageSize}";
+        DifficultyLevel? parsedDifficulty = null;
+        if (!string.IsNullOrWhiteSpace(difficulty) && Enum.TryParse<DifficultyLevel>(difficulty, true, out var diff))
+        {
+            parsedDifficulty = diff;
+        }
+
+        // SRS FR-SRCH-001: Cache Redis 1 phút vary theo query, filter, page, pageSize, sort để tránh cache collision
+        var catKey = categoryId?.ToString() ?? (!string.IsNullOrWhiteSpace(categorySlug) ? categorySlug.Trim().ToLowerInvariant() : "all");
+        var diffKey = parsedDifficulty?.ToString() ?? "all";
+        var cookKey = maxCookTimeMinutes?.ToString() ?? "any";
+        var sortKey = string.IsNullOrWhiteSpace(sortBy) ? "relevance" : sortBy.Trim().ToLowerInvariant();
+
+        var cacheKey = $"search:{normalizedQ}:cat={catKey}:diff={diffKey}:cook={cookKey}:sort={sortKey}:p={effectivePage}:sz={effectivePageSize}";
         var cachedResult = await cache.GetAsync<PagedResult<RecipeSearchResultDto>>(cacheKey, ct);
         if (cachedResult != null)
         {
             return Results.Ok(cachedResult);
         }
 
-        var query = new SearchRecipesQuery(q, effectivePage, effectivePageSize);
+        var query = new SearchRecipesQuery(
+            rawQuery,
+            effectivePage,
+            effectivePageSize,
+            categoryId,
+            categorySlug,
+            parsedDifficulty,
+            maxCookTimeMinutes,
+            sortKey);
+
         var result = await sender.Send(query, ct);
 
         // Lưu cache 1 phút (tự động fail-safe nếu Redis offline)
