@@ -36,25 +36,38 @@ public class RefreshTokenRepository : IRefreshTokenRepository
 
     public async Task RevokeAsync(string tokenHash, DateTimeOffset revokedAt, string? replacedByTokenHash = null, CancellationToken cancellationToken = default)
     {
+        var revokedUtc = revokedAt.UtcDateTime;
         await _db.RefreshTokens
             .Where(x => x.TokenHash == tokenHash)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(x => x.RevokedAt, revokedAt)
+                .SetProperty(x => x.RevokedAt, revokedUtc)
                 .SetProperty(x => x.ReplacedByTokenHash, replacedByTokenHash), cancellationToken);
     }
 
-    public async Task RevokeAllForUserAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
+        var nowUtc = DateTime.UtcNow;
         await _db.RefreshTokens
             .Where(x => x.UserId == userId && x.RevokedAt == null)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(x => x.RevokedAt, DateTimeOffset.UtcNow), cancellationToken);
+                .SetProperty(x => x.RevokedAt, nowUtc), cancellationToken);
+    }
+
+    public Task RevokeAllForUserAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        if (Guid.TryParse(userId, out var guid))
+        {
+            return RevokeAllForUserAsync(guid, cancellationToken);
+        }
+
+        return Task.CompletedTask;
     }
 
     public async Task<int> DeleteExpiredAsync(CancellationToken cancellationToken = default)
     {
+        var nowUtc = DateTime.UtcNow;
         return await _db.RefreshTokens
-            .Where(x => x.ExpiresAt <= DateTimeOffset.UtcNow)
+            .Where(x => x.ExpiresAt <= nowUtc)
             .ExecuteDeleteAsync(cancellationToken);
     }
 }

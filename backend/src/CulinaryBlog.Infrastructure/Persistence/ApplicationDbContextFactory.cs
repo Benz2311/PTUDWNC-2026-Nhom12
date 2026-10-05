@@ -10,7 +10,7 @@ public class ApplicationDbContextFactory
     {
         var host =
             Environment.GetEnvironmentVariable("POSTGRES_HOST")
-            ?? "127.0.0.1";
+            ?? "localhost";
 
         var port =
             Environment.GetEnvironmentVariable("POSTGRES_PORT")
@@ -18,7 +18,7 @@ public class ApplicationDbContextFactory
 
         var database =
             Environment.GetEnvironmentVariable("POSTGRES_DB")
-            ?? "culinaryblog_db";
+            ?? "culinary_blog";
 
         var username =
             Environment.GetEnvironmentVariable("POSTGRES_USER")
@@ -26,21 +26,22 @@ public class ApplicationDbContextFactory
 
         var password =
             Environment.GetEnvironmentVariable("POSTGRES_PASSWORD")
-            ?? "YourStrongPassword123";
+            ?? "Manh80891234567";
 
         var connectionString =
             $"Host={host};" +
             $"Port={port};" +
             $"Database={database};" +
             $"Username={username};" +
-            $"Password={password}";
-
-        Console.WriteLine($"[DEBUG] Connection string: {connectionString}");
+            $"Password={password};" +
+            "Include Error Detail=true";
 
         var optionsBuilder =
             new DbContextOptionsBuilder<ApplicationDbContext>();
 
         optionsBuilder.UseNpgsql(connectionString);
+        optionsBuilder.ConfigureWarnings(warnings =>
+            warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
 
         return new ApplicationDbContext(
             optionsBuilder.Options);

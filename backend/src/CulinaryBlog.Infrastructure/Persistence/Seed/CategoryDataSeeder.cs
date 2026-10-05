@@ -13,8 +13,8 @@ public static class CategoryDataSeeder
     private const int SEED = 42;
 
     // User mẫu dùng làm Author nếu database chưa có user.
-    private static readonly string DemoUserId =
-        "11111111-1111-1111-1111-111111111111";
+    private static readonly Guid DemoUserId =
+        Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     // ============================================================
     // DANH SÁCH CATEGORY
@@ -377,10 +377,6 @@ public static class CategoryDataSeeder
                     imageUrl: imageUrl,
                     orderIndex: orderIndex++);
 
-                category.RowVersion = new byte[8];
-                category.IsDeleted = false;
-                category.CreatedAt = DateTime.UtcNow;
-
                 categoriesToAdd.Add(category);
 
                 existingCategoryNames.Add(nameLower);
@@ -426,10 +422,6 @@ public static class CategoryDataSeeder
                     description: description,
                     imageUrl: imageUrl,
                     orderIndex: orderIndex++);
-
-                category.RowVersion = new byte[8];
-                category.IsDeleted = false;
-                category.CreatedAt = DateTime.UtcNow;
 
                 categoriesToAdd.Add(category);
 
@@ -602,11 +594,7 @@ public static class CategoryDataSeeder
                                 .ToUniversalTime()
                             : null,
 
-                    Nutrition = new RecipeNutrition(),
-
-                    IsDeleted = false,
-
-                    RowVersion = new byte[8]
+                    Nutrition = new RecipeNutrition()
                 };
 
                 recipesToAdd.Add(recipe);

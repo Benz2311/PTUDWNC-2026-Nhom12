@@ -1,76 +1,108 @@
-using System.Text;
-using CulinaryBlog.Application.Repositories;
-using CulinaryBlog.Application.Services;
+using CulinaryBlog.API.Endpoints;
+using CulinaryBlog.Application;
+using CulinaryBlog.Infrastructure;
 using CulinaryBlog.Infrastructure.Persistence;
-using CulinaryBlog.Infrastructure.Repositories;
-using CulinaryBlog.Infrastructure.Services;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity;
+using CulinaryBlog.Infrastructure.Persistence.Seed;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
+using Scalar.AspNetCore;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+// ── Serilog — cấu hình trước khi build host ──────────────────────────────────
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(new ConfigurationBuilder()
+        .SetBasePath(AppContext.BaseDirectory)
+        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+        .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true)
+        .AddEnvironmentVariables()
+        .Build())
+    .Enrich.FromLogContext()
+    .CreateLogger();
 
-builder.Services.AddControllers();
+try
+{
+    Log.Information("Starting CulinaryBlog API");
 
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+    var builder = WebApplication.CreateBuilder(args);
 
-var connectionString =
-    builder.Configuration.GetConnectionString("DefaultConnection");
+    // Dùng Serilog thay thế logging mặc định
+    builder.Host.UseSerilog();
 
-Console.WriteLine("========================================");
-Console.WriteLine($"DB CONNECTION: {connectionString}");
-Console.WriteLine("========================================");
+    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(builder.Configuration);
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
-builder.Services.AddScoped<
-    IPasswordHasher<CulinaryBlog.Domain.Entities.ApplicationUser>,
-    PasswordHasher<CulinaryBlog.Domain.Entities.ApplicationUser>>();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
-builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-builder.Services.AddScoped<IAuthService, AuthService>();
+    builder.Services.AddControllers();
+    builder.Services.AddOpenApi();
 
-builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+    builder.Services.AddCors(options =>
     {
-        var key = builder.Configuration["Jwt:Key"]
-            ?? throw new InvalidOperationException(
-                "JWT key is missing.");
-
-        options.TokenValidationParameters = new TokenValidationParameters
+        options.AddPolicy("Frontend", policy =>
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(key))
-        };
+            policy
+                .WithOrigins("http://localhost:5000", "http://localhost:3000")
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
     });
 
-builder.Services.AddAuthorization();
+    var app = builder.Build();
 
-var app = builder.Build();
+    // ── Migrate + Seed ────────────────────────────────────────────────────────
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        try
+        {
+            await dbContext.Database.MigrateAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Database migration skipped or tables already exist.");
+        }
 
-if (app.Environment.IsDevelopment())
+        try
+        {
+            await CategoryDataSeeder.SeedAsync(dbContext, targetCount: 20);
+        }
+        catch (Exception seedEx)
+        {
+            Log.Warning(seedEx, "Seeding skipped: {Message}", seedEx.Message);
+        }
+    }
+
+    // ── Middleware pipeline ───────────────────────────────────────────────────
+    app.MapOpenApi();
+    app.MapScalarApiReference();
+
+    app.UseCors("Frontend");
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    // Hangfire Dashboard (chỉ môi trường dev)
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseHangfireDashboard("/hangfire");
+    }
+
+    // Serilog request logging
+    app.UseSerilogRequestLogging();
+
+    app.MapCategoryEndpoints();
+    app.MapRecipeEndpoints();
+    app.MapControllers();
+
+    app.Run();
+}
+catch (Exception ex)
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
 }
 
-app.UseHttpsRedirection();
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
+public partial class Program
+{
+}

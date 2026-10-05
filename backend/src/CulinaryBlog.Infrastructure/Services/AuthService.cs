@@ -3,11 +3,12 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using CulinaryBlog.Application.DTOs.Auth;
+using CulinaryBlog.Application.Interfaces;
 using CulinaryBlog.Application.Repositories;
 using CulinaryBlog.Application.Services;
 using CulinaryBlog.Domain.Entities;
-using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CulinaryBlog.Infrastructure.Services;
@@ -42,23 +43,26 @@ public class AuthService : IAuthService
         var email = request.Email.Trim().ToLowerInvariant();
 
         if (await _userRepository.ExistsByUserNameAsync(userName))
+        {
             throw new InvalidOperationException("Username already exists.");
+        }
 
         if (await _userRepository.ExistsByEmailAsync(email))
+        {
             throw new InvalidOperationException("Email already exists.");
+        }
 
         var user = new ApplicationUser
         {
-            Id = Guid.NewGuid().ToString(),
+            Id = Guid.NewGuid(),
             UserName = userName,
-            NormalizedUserName = userName.ToUpperInvariant(),
             Email = email,
-            NormalizedEmail = email.ToUpperInvariant(),
             DisplayName = string.IsNullOrWhiteSpace(request.DisplayName)
                 ? userName
                 : request.DisplayName.Trim(),
             IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            Roles = ["Author"]
         };
 
         user.PasswordHash = _passwordHasher.HashPassword(
@@ -80,38 +84,26 @@ public class AuthService : IAuthService
         var user = await _userRepository.GetByEmailOrUserNameAsync(login);
 
         if (user is null)
+        {
             throw new UnauthorizedAccessException("Invalid username/email or password.");
+        }
 
         if (!user.IsActive)
+        {
             throw new UnauthorizedAccessException("Account is inactive.");
+        }
 
-        var userForVerification = new ApplicationUser
+        var verifyResult = _passwordHasher.VerifyHashedPassword(
+            user,
+            user.PasswordHash,
+            request.Password);
+
+        if (verifyResult == PasswordVerificationResult.Failed)
         {
-            Id = user.Id,
-            UserName = user.UserName,
-            Email = user.Email,
-            PasswordHash = user.PasswordHash
-        };
-
-        if (_passwordHasher.VerifyHashedPassword(
-                userForVerification,
-                user.PasswordHash!,
-                request.Password) == PasswordVerificationResult.Failed)
             throw new UnauthorizedAccessException("Invalid username/email or password.");
+        }
 
-        var fullUser = new ApplicationUser
-        {
-            Id = user.Id,
-            UserName = user.UserName,
-            Email = user.Email,
-            PasswordHash = user.PasswordHash,
-            IsActive = user.IsActive,
-            DisplayName = user.DisplayName,
-            AvatarUrl = user.AvatarUrl,
-            Bio = user.Bio
-        };
-
-        return await CreateAuthResponseAsync(fullUser, ipAddress);
+        return await CreateAuthResponseAsync(user, ipAddress);
     }
 
     public async Task<AuthResponse> RefreshAsync(
@@ -123,13 +115,19 @@ public class AuthService : IAuthService
         var storedToken = await _refreshTokenRepository.GetByTokenHashWithUserAsync(tokenHash);
 
         if (storedToken is null)
+        {
             throw new UnauthorizedAccessException("Invalid refresh token.");
+        }
 
         if (storedToken.RevokedAt.HasValue)
+        {
             throw new UnauthorizedAccessException("Refresh token has been revoked.");
+        }
 
-        if (storedToken.ExpiresAt <= DateTimeOffset.UtcNow)
+        if (storedToken.ExpiresAt <= DateTime.UtcNow)
+        {
             throw new UnauthorizedAccessException("Refresh token has expired.");
+        }
 
         var response = await CreateAuthResponseAsync(storedToken.User, ipAddress);
 
@@ -156,7 +154,9 @@ public class AuthService : IAuthService
         var profile = await _userRepository.GetProfileAsync(userId);
 
         if (profile is null)
+        {
             return null;
+        }
 
         return new UserResponse
         {
@@ -174,29 +174,33 @@ public class AuthService : IAuthService
         string? ipAddress)
     {
         var accessToken = GenerateAccessToken(user);
-        var refreshToken = GenerateRefreshToken();
+        var rawRefreshToken = GenerateRefreshToken();
+        var hashedRefreshToken = HashToken(rawRefreshToken);
 
+        var refreshTokenDays = _configuration.GetValue<int>("Jwt:RefreshTokenDays", 7);
         var refreshTokenEntity = new RefreshToken
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
-            TokenHash = HashToken(refreshToken),
-            ExpiresAt = DateTimeOffset.UtcNow.AddDays(
-                _configuration.GetValue<int>("Jwt:RefreshTokenDays", 7)),
-            CreatedAt = DateTimeOffset.UtcNow,
+            TokenHash = hashedRefreshToken,
+            ExpiresAt = DateTime.UtcNow.AddDays(refreshTokenDays),
+            CreatedAt = DateTime.UtcNow,
             CreatedByIp = ipAddress
         };
 
         await _refreshTokenRepository.AddAsync(refreshTokenEntity);
         await _unitOfWork.SaveChangesAsync();
 
-        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(
-            _configuration.GetValue<int>("Jwt:AccessTokenMinutes", 60));
+        var accessTokenMinutes = _configuration.GetValue<int>(
+            "Jwt:AccessTokenMinutes",
+            _configuration.GetValue<int>("Jwt:ExpiryMinutes", 60));
+
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(accessTokenMinutes);
 
         return new AuthResponse
         {
             AccessToken = accessToken,
-            RefreshToken = refreshToken,
+            RefreshToken = rawRefreshToken,
             ExpiresAt = expiresAt,
             User = ToUserResponse(user)
         };
@@ -205,6 +209,7 @@ public class AuthService : IAuthService
     private string GenerateAccessToken(ApplicationUser user)
     {
         var key = _configuration["Jwt:Key"]
+            ?? _configuration["Jwt:SecretKey"]
             ?? throw new InvalidOperationException("JWT key is missing.");
 
         var issuer = _configuration["Jwt:Issuer"];
@@ -212,17 +217,30 @@ public class AuthService : IAuthService
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, user.Id),
-            new(JwtRegisteredClaimNames.UniqueName, user.UserName ?? string.Empty),
-            new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(JwtRegisteredClaimNames.UniqueName, user.UserName),
+            new(JwtRegisteredClaimNames.Email, user.Email),
             new("displayName", user.DisplayName)
         };
+
+        if (user.Roles != null && user.Roles.Length > 0)
+        {
+            foreach (var role in user.Roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+                claims.Add(new Claim("role", role));
+            }
+        }
 
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        var expires = DateTime.UtcNow.AddMinutes(
-            _configuration.GetValue<int>("Jwt:AccessTokenMinutes", 60));
+        var accessTokenMinutes = _configuration.GetValue<int>(
+            "Jwt:AccessTokenMinutes",
+            _configuration.GetValue<int>("Jwt:ExpiryMinutes", 60));
+
+        var expires = DateTime.UtcNow.AddMinutes(accessTokenMinutes);
 
         var token = new JwtSecurityToken(
             issuer: issuer,
@@ -250,9 +268,9 @@ public class AuthService : IAuthService
     {
         return new UserResponse
         {
-            Id = user.Id,
-            UserName = user.UserName ?? string.Empty,
-            Email = user.Email ?? string.Empty,
+            Id = user.Id.ToString(),
+            UserName = user.UserName,
+            Email = user.Email,
             DisplayName = user.DisplayName,
             AvatarUrl = user.AvatarUrl,
             Bio = user.Bio
