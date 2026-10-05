@@ -451,6 +451,52 @@ public class Program
                     CurrentUserId: Guid.NewGuid(),
                     IsAdmin: true));
                 Assert(adminDeleteSuccess, "Phase 13: Admin user can Delete image regardless of author ownership");
+
+                // Task 4: UpdateRecipeImageCommand (AltText, OrderIndex, IsPrimary)
+                var patchImg = await mediator.Send(new UpdateRecipeImageCommand(
+                    imgTestRecipeId,
+                    finalImg1.Id,
+                    AltText: "Mô tả ảnh cập nhật",
+                    OrderIndex: 10,
+                    CurrentUserId: author.Id,
+                    IsAdmin: false));
+                Assert(patchImg.AltText == "Mô tả ảnh cập nhật", "PATCH: Image AltText successfully updated");
+                Assert(patchImg.OrderIndex == 10, "PATCH: Image OrderIndex successfully updated");
+
+                // Task 4: UploadRecipeImageCommand với stream JPEG hợp lệ
+                byte[] sampleJpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43];
+                using var uploadStream = new MemoryStream(sampleJpeg);
+                var uploadedImg = await mediator.Send(new UploadRecipeImageCommand(
+                    imgTestRecipeId,
+                    uploadStream,
+                    "uploaded_pho.jpg",
+                    "image/jpeg",
+                    sampleJpeg.Length,
+                    AltText: "Ảnh phở mới tải lên",
+                    CurrentUserId: author.Id,
+                    IsAdmin: false));
+                Assert(uploadedImg != null && uploadedImg.Id != Guid.Empty, "UploadRecipeImageCommand: Valid JPEG stream uploaded successfully");
+
+                // Task 4: Upload file giả mạo đuôi (.jpg nhưng nội dung MZ PE header) -> ValidationException
+                byte[] fakeExeHeader = [0x4D, 0x5A, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00];
+                using var fakeStream = new MemoryStream(fakeExeHeader);
+                bool fakeRejected = false;
+                try
+                {
+                    await mediator.Send(new UploadRecipeImageCommand(
+                        imgTestRecipeId,
+                        fakeStream,
+                        "virus_as_image.jpg",
+                        "image/jpeg",
+                        fakeExeHeader.Length,
+                        CurrentUserId: author.Id,
+                        IsAdmin: false));
+                }
+                catch (ValidationException)
+                {
+                    fakeRejected = true;
+                }
+                Assert(fakeRejected, "Security: Uploading disguised executable with .jpg extension throws ValidationException");
             }
             finally
             {

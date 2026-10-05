@@ -5,6 +5,7 @@ using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Exceptions;
 using CulinaryBlog.Application.Features.Recipes.Commands.RecipeImages;
 using CulinaryBlog.Application.Features.Recipes.Dtos;
+using RecipeImageDto = CulinaryBlog.Application.Features.Recipes.Dtos.RecipeImageDto;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipeBySlug;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipes;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipesByCategory;
@@ -43,10 +44,25 @@ public static class RecipeEndpoints
             .WithName("GetRecipeBySlug")
             .WithSummary("Lấy chi tiết công thức");
 
-        // TV4: Thêm ảnh cho công thức (Ảnh đầu tiên mặc định Primary)
+        // TV4: Thêm ảnh cho công thức (Multipart Form Upload / JSON URL)
         group.MapPost("/{recipeId:guid}/images", AddRecipeImage)
             .WithName("AddRecipeImage")
-            .WithSummary("Thêm ảnh cho công thức");
+            .WithSummary("Tải lên ảnh cho công thức (Multipart Form hoặc JSON)")
+            .Accepts<IFormFile>("multipart/form-data")
+            .Produces<RecipeImageDto>(StatusCodes.Status201Created)
+            .ProducesValidationProblem()
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .DisableAntiforgery();
+
+        // TV4: Cập nhật thông tin ảnh công thức (AltText, OrderIndex, IsPrimary)
+        group.MapPatch("/{recipeId:guid}/images/{imageId:guid}", UpdateRecipeImage)
+            .WithName("UpdateRecipeImage")
+            .WithSummary("Cập nhật thông tin ảnh công thức")
+            .Produces<RecipeImageDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem()
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
         // TV4: Đặt ảnh đại diện (Set Primary trong cùng transaction)
         group.MapPatch("/{recipeId:guid}/images/{imageId:guid}/primary", SetPrimaryRecipeImage)
@@ -56,7 +72,10 @@ public static class RecipeEndpoints
         // TV4: Xóa mềm ảnh và tự động chuyển Primary cho ảnh OrderIndex nhỏ nhất
         group.MapDelete("/{recipeId:guid}/images/{imageId:guid}", DeleteRecipeImage)
             .WithName("DeleteRecipeImage")
-            .WithSummary("Xóa mềm ảnh công thức");
+            .WithSummary("Xóa mềm ảnh công thức")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
     }
 
     private static async Task<IResult> GetRecipes(
@@ -202,7 +221,7 @@ public static class RecipeEndpoints
 
     private static async Task<IResult> AddRecipeImage(
         Guid recipeId,
-        [FromBody] AddRecipeImageRequest request,
+        HttpRequest httpRequest,
         ClaimsPrincipal user,
         ISender sender,
         CancellationToken ct)
@@ -218,20 +237,60 @@ public static class RecipeEndpoints
 
         try
         {
-            var command = new AddRecipeImageCommand(
-                recipeId,
-                request.OriginalUrl,
-                request.MediumUrl,
-                request.ThumbnailUrl,
-                request.AltText,
-                request.IsPrimary,
-                request.OrderIndex,
-                currentUserId,
-                isAdmin);
+            if (httpRequest.HasFormContentType)
+            {
+                var form = await httpRequest.ReadFormAsync(ct);
+                var file = form.Files.GetFile("file") ?? (form.Files.Count > 0 ? form.Files[0] : null);
+                if (file == null || file.Length == 0)
+                {
+                    return Results.ValidationProblem(
+                        new Dictionary<string, string[]> { ["File"] = ["Vui lòng chọn tệp ảnh để tải lên (File is required)."] },
+                        statusCode: StatusCodes.Status400BadRequest);
+                }
 
-            var image = await sender.Send(command, ct);
+                var altText = form["altText"].FirstOrDefault();
+                var isPrimaryStr = form["isPrimary"].FirstOrDefault();
+                bool? isPrimary = bool.TryParse(isPrimaryStr, out var p) ? p : null;
 
-            return Results.Created($"/api/v1/recipes/{recipeId}/images/{image.Id}", image);
+                await using var stream = file.OpenReadStream();
+                var command = new UploadRecipeImageCommand(
+                    recipeId,
+                    stream,
+                    file.FileName,
+                    file.ContentType,
+                    file.Length,
+                    altText,
+                    isPrimary,
+                    currentUserId,
+                    isAdmin);
+
+                var image = await sender.Send(command, ct);
+                return Results.Created($"/api/v1/recipes/{recipeId}/images/{image.Id}", image);
+            }
+            else
+            {
+                var jsonRequest = await httpRequest.ReadFromJsonAsync<AddRecipeImageRequest>(ct);
+                if (jsonRequest == null || string.IsNullOrWhiteSpace(jsonRequest.OriginalUrl))
+                {
+                    return Results.ValidationProblem(
+                        new Dictionary<string, string[]> { ["File"] = ["Yêu cầu tải lên form multipart hoặc JSON chứa OriginalUrl."] },
+                        statusCode: StatusCodes.Status400BadRequest);
+                }
+
+                var command = new AddRecipeImageCommand(
+                    recipeId,
+                    jsonRequest.OriginalUrl,
+                    jsonRequest.MediumUrl,
+                    jsonRequest.ThumbnailUrl,
+                    jsonRequest.AltText,
+                    jsonRequest.IsPrimary,
+                    jsonRequest.OrderIndex,
+                    currentUserId,
+                    isAdmin);
+
+                var image = await sender.Send(command, ct);
+                return Results.Created($"/api/v1/recipes/{recipeId}/images/{image.Id}", image);
+            }
         }
         catch (NotFoundException ex)
         {
@@ -240,6 +299,66 @@ public static class RecipeEndpoints
         catch (ForbiddenException ex)
         {
             return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+        catch (ValidationException ex)
+        {
+            return Results.ValidationProblem(
+                ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "Dịch vụ lưu trữ không khả dụng");
+        }
+    }
+
+    private static async Task<IResult> UpdateRecipeImage(
+        Guid recipeId,
+        Guid imageId,
+        [FromBody] UpdateRecipeImageRequest request,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            var command = new UpdateRecipeImageCommand(
+                recipeId,
+                imageId,
+                request.AltText,
+                request.OrderIndex,
+                request.IsPrimary,
+                currentUserId,
+                isAdmin);
+
+            var updated = await sender.Send(command, ct);
+            return Results.Ok(updated);
+        }
+        catch (NotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+        catch (ValidationException ex)
+        {
+            return Results.ValidationProblem(
+                ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
+                statusCode: StatusCodes.Status400BadRequest);
         }
     }
 
@@ -456,4 +575,10 @@ public record AddRecipeImageRequest(
     string? AltText = null,
     bool? IsPrimary = null,
     int? OrderIndex = null
+);
+
+public record UpdateRecipeImageRequest(
+    string? AltText = null,
+    int? OrderIndex = null,
+    bool? IsPrimary = null
 );
