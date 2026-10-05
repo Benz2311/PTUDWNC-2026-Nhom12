@@ -92,6 +92,27 @@ try
     app.MapRecipeEndpoints();
     app.MapControllers();
 
+    // ── Health Check Endpoints (Task 4 - Võ Hùng Mạnh) ─────────────────────────
+    // 1. /health - Tổng quan toàn bộ dependency (PostgreSQL, Redis, MinIO)
+    app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        ResponseWriter = CulinaryBlog.Infrastructure.HealthChecks.HealthCheckResponseWriter.WriteResponse
+    });
+
+    // 2. /health/live - Liveness: Chỉ xác nhận process/app đang sống, không phụ thuộc external dependencies
+    app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("live"),
+        ResponseWriter = CulinaryBlog.Infrastructure.HealthChecks.HealthCheckResponseWriter.WriteResponse
+    });
+
+    // 3. /health/ready - Readiness: Kiểm tra dependency bắt buộc tiếp nhận traffic (PostgreSQL + Redis)
+    app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready"),
+        ResponseWriter = CulinaryBlog.Infrastructure.HealthChecks.HealthCheckResponseWriter.WriteResponse
+    });
+
     app.Run();
 }
 catch (Exception ex)

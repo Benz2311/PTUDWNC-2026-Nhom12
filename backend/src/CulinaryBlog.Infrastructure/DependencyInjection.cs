@@ -4,7 +4,9 @@ using CulinaryBlog.Infrastructure.Authentication;
 using CulinaryBlog.Infrastructure.BackgroundJobs;
 using CulinaryBlog.Infrastructure.Caching;
 using CulinaryBlog.Infrastructure.Email;
+using CulinaryBlog.Infrastructure.HealthChecks;
 using CulinaryBlog.Infrastructure.Observability;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using CulinaryBlog.Infrastructure.Persistence;
 using CulinaryBlog.Infrastructure.Persistence.Repositories;
 using CulinaryBlog.Infrastructure.Storage;
@@ -123,6 +125,13 @@ public static class DependencyInjection
 
         // ── Observability — OpenTelemetry ─────────────────────────────────────
         services.AddObservability(configuration);
+
+        // ── Health Checks — ASP.NET Core Health Checks ────────────────────────
+        services.AddHealthChecks()
+            .AddCheck("self", () => HealthCheckResult.Healthy("Application is running."), tags: new[] { "live" })
+            .AddCheck<PostgresHealthCheck>("postgresql", tags: new[] { "ready", "db" })
+            .AddCheck<RedisHealthCheck>("redis", tags: new[] { "ready", "redis" })
+            .AddCheck<MinioHealthCheck>("minio", tags: new[] { "storage", "minio" });
 
         return services;
     }
