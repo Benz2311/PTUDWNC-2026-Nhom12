@@ -117,6 +117,8 @@ public static class DependencyInjection
 
         services.AddHangfireServer();
         services.AddScoped<IBackgroundJobService, HangfireJobService>();
+        services.AddHttpClient();
+        services.AddScoped<IImageResizeJob, ImageResizeJob>();
 
         // ── Email — MailKit ───────────────────────────────────────────────────
         services.AddSingleton<IEmailService, MailKitEmailService>();

@@ -20,4 +20,10 @@ public interface IStorageService
         string objectKey,
         TimeSpan expiry,
         CancellationToken ct = default);
+
+    /// <summary>Tải luồng dữ liệu file từ Object Storage.</summary>
+    Task<Stream> DownloadAsync(
+        string bucketName,
+        string objectKey,
+        CancellationToken ct = default);
 }

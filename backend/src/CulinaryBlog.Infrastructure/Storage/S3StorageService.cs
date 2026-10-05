@@ -72,6 +72,12 @@ public sealed class S3StorageService : IStorageService
         await _s3Client.DeleteObjectAsync(request, ct);
     }
 
+    public S3StorageService(IAmazonS3 s3Client, StorageSettings settings)
+    {
+        _s3Client = s3Client ?? throw new ArgumentNullException(nameof(s3Client));
+        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+    }
+
     public async Task<string> GetPresignedUrlAsync(
         string bucketName,
         string objectKey,
@@ -87,6 +93,24 @@ public sealed class S3StorageService : IStorageService
         };
 
         return await _s3Client.GetPreSignedURLAsync(request);
+    }
+
+    public async Task<Stream> DownloadAsync(
+        string bucketName,
+        string objectKey,
+        CancellationToken ct = default)
+    {
+        var request = new GetObjectRequest
+        {
+            BucketName = bucketName,
+            Key = objectKey
+        };
+
+        var response = await _s3Client.GetObjectAsync(request, ct);
+        var memoryStream = new MemoryStream();
+        await response.ResponseStream.CopyToAsync(memoryStream, ct);
+        memoryStream.Position = 0;
+        return memoryStream;
     }
 }
 
