@@ -1,0 +1,140 @@
+using CulinaryBlog.Domain.Enums;
+
+namespace CulinaryBlog.Application.DTOs;
+
+public enum RecipeSortField
+{
+    PublishedAt,
+    Title,
+    PrepTime,
+    CookTime,
+    TotalTime
+}
+
+public record PaginationMetaDto(
+    int Page,
+    int PageSize,
+    int Total,
+    int TotalPages,
+    bool HasNextPage,
+    bool HasPreviousPage);
+
+public record PaginatedDataDto<T>(
+    IReadOnlyList<T> Items);
+
+public record PaginatedResponseDto<T>(
+    PaginatedDataDto<T> Data,
+    PaginationMetaDto Meta);
+
+public record PagedResultDto<T>(
+    IReadOnlyList<T> Items,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    int TotalPages)
+{
+    public int Total => TotalCount;
+    public bool HasNextPage => Page < TotalPages;
+    public bool HasPreviousPage => Page > 1;
+
+    public PaginatedDataDto<T> Data => new(Items);
+    public PaginationMetaDto Meta => new(Page, PageSize, TotalCount, TotalPages, HasNextPage, HasPreviousPage);
+
+    public PaginatedResponseDto<T> ToPaginatedResponse() => new(Data, Meta);
+}
+
+public record RecipeCategoryDto(
+    Guid Id,
+    string Name,
+    string Slug,
+    string? Description);
+
+public record RecipeListItemDto(
+    Guid Id,
+    string Title,
+    string Slug,
+    string Description,
+    int PrepTimeMinutes,
+    int CookTimeMinutes,
+    int Servings,
+    string Difficulty,
+    string? ImageUrl,
+    RecipeCategoryDto Category,
+    DateTime? PublishedAt);
+
+public record RecipeIngredientDto(
+    Guid Id,
+    string Name,
+    decimal? Quantity,
+    string? Unit,
+    string? Notes,
+    int SortOrder);
+
+public record RecipeStepDto(
+    Guid Id,
+    int StepNumber,
+    string Title,
+    string Description);
+
+public record RecipeImageDto(
+    Guid Id,
+    string Url,
+    string? AltText,
+    bool IsPrimary,
+    int SortOrder);
+
+public record RecipeNutritionDto(
+    decimal? Calories,
+    decimal? Protein,
+    decimal? Carbs,
+    decimal? Fat,
+    decimal? Fiber = null,
+    decimal? Sodium = null)
+{
+    public decimal? Carbohydrates => Carbs;
+}
+
+public record RecipeAuthorDto(
+    Guid Id,
+    string DisplayName,
+    string? AvatarUrl);
+
+public record RecipeDetailDto(
+    Guid Id,
+    string Title,
+    string Slug,
+    string Description,
+    string Content,
+    int PrepTimeMinutes,
+    int CookTimeMinutes,
+    int Servings,
+    string Difficulty,
+    DateTime? PublishedAt,
+    RecipeCategoryDto Category,
+    IReadOnlyList<RecipeIngredientDto> Ingredients,
+    IReadOnlyList<RecipeStepDto> Steps,
+    IReadOnlyList<RecipeImageDto> Images,
+    RecipeNutritionDto Nutrition,
+    RecipeAuthorDto? Author = null);
+
+public record CategoryRecipesDataDto(
+    RecipeCategoryDto Category,
+    IReadOnlyList<RecipeListItemDto> Items);
+
+public record CategoryRecipesResponseDto(
+    RecipeCategoryDto Category,
+    PagedResultDto<RecipeListItemDto> Recipes)
+{
+    public CategoryRecipesDataDto Data => new(Category, Recipes.Items);
+    public PaginationMetaDto Meta => Recipes.Meta;
+}
+
+public record RecipeListOptions(
+    string? Search = null,
+    string? CategorySlug = null,
+    DifficultyLevel? Difficulty = null,
+    int? MaxTotalTimeMinutes = null,
+    RecipeSortField SortBy = RecipeSortField.PublishedAt,
+    bool SortDescending = true,
+    Guid? CategoryId = null,
+    int? MaxCookTimeMinutes = null);

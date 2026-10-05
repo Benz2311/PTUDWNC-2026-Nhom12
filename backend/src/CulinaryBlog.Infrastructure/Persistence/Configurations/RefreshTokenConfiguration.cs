@@ -23,17 +23,11 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
             .HasMaxLength(64);
 
         builder.HasIndex(x => x.TokenHash)
-            .IsUnique()
-            .HasDatabaseName("IX_RefreshTokens_TokenHash");
+            .IsUnique();
 
-        builder.HasIndex(x => x.UserId)
-            .HasDatabaseName("IX_RefreshTokens_UserId");
-
-        builder.HasIndex(x => x.ExpiresAt)
-            .HasDatabaseName("IX_RefreshTokens_ExpiresAt");
-
-        builder.HasIndex(x => x.RevokedAt)
-            .HasDatabaseName("IX_RefreshTokens_RevokedAt");
+        builder.HasIndex(x => x.UserId);
+        builder.HasIndex(x => x.ExpiresAt);
+        builder.HasIndex(x => x.RevokedAt);
 
         builder.Property(x => x.ExpiresAt)
             .IsRequired();
@@ -44,8 +38,7 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
             .HasMaxLength(64);
 
         builder.Property(x => x.CreatedAt)
-            .IsRequired()
-            .HasDefaultValueSql("NOW()");
+            .IsRequired();
 
         builder.Property(x => x.CreatedByIp)
             .HasMaxLength(45);

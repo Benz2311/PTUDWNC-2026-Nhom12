@@ -4,7 +4,7 @@ using CulinaryBlog.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace CulinaryBlog.Api.Controllers;
+namespace CulinaryBlog.API.Controllers;
 
 [ApiController]
 [Route("api/v1/auth")]
@@ -35,7 +35,7 @@ public class AuthController : ControllerBase
         {
             return Conflict(new
             {
-                message = ex.Message
+                message = ex.Message,
             });
         }
     }
@@ -58,7 +58,7 @@ public class AuthController : ControllerBase
         {
             return Unauthorized(new
             {
-                message = ex.Message
+                message = ex.Message,
             });
         }
     }
@@ -81,7 +81,7 @@ public class AuthController : ControllerBase
         {
             return Unauthorized(new
             {
-                message = ex.Message
+                message = ex.Message,
             });
         }
     }
@@ -105,12 +105,16 @@ public class AuthController : ControllerBase
             ?? User.FindFirstValue("sub");
 
         if (string.IsNullOrWhiteSpace(userIdClaim))
+        {
             return Unauthorized();
+        }
 
         var user = await _authService.GetMeAsync(userIdClaim);
 
         if (user is null)
+        {
             return NotFound();
+        }
 
         return Ok(user);
     }

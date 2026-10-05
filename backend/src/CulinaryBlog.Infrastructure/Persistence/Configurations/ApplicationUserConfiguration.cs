@@ -8,44 +8,53 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
 {
     public void Configure(EntityTypeBuilder<ApplicationUser> builder)
     {
-        builder.ToTable("AspNetUsers");
+        builder.ToTable("Users");
 
-        builder.Property(x => x.DisplayName)
+        builder.HasKey(x => x.Id);
+
+        builder.Property(x => x.Id)
+            .ValueGeneratedOnAdd();
+
+        builder.Property(x => x.UserName)
             .IsRequired()
             .HasMaxLength(100);
 
-        builder.Property(x => x.AvatarUrl)
+        builder.HasIndex(x => x.UserName)
+            .IsUnique();
+
+        builder.Property(x => x.Email)
+            .IsRequired()
+            .HasMaxLength(255);
+
+        builder.HasIndex(x => x.Email)
+            .IsUnique();
+
+        builder.Property(x => x.PasswordHash)
+            .IsRequired()
             .HasMaxLength(500);
 
+        builder.Property(x => x.DisplayName)
+            .IsRequired()
+            .HasMaxLength(150);
+
+        builder.Property(x => x.AvatarUrl)
+            .HasMaxLength(1000);
+
         builder.Property(x => x.Bio)
-            .HasColumnType("text");
+            .HasMaxLength(1000);
 
         builder.Property(x => x.IsActive)
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.HasIndex(x => x.IsActive);
+
         builder.Property(x => x.CreatedAt)
-            .IsRequired()
-            .HasDefaultValueSql("NOW()");
+            .IsRequired();
 
-        builder.HasIndex(x => x.Email)
-            .IsUnique()
-            .HasDatabaseName("IX_AspNetUsers_Email");
-
-        builder.HasIndex(x => x.NormalizedEmail)
-            .IsUnique()
-            .HasDatabaseName("IX_AspNetUsers_NormalizedEmail");
-
-        builder.HasIndex(x => x.UserName)
-            .IsUnique()
-            .HasDatabaseName("IX_AspNetUsers_UserName");
-
-        builder.HasIndex(x => x.NormalizedUserName)
-            .IsUnique()
-            .HasDatabaseName("IX_AspNetUsers_NormalizedUserName");
-
-        builder.HasIndex(x => x.IsActive)
-            .HasDatabaseName("IX_AspNetUsers_IsActive");
+        builder.Ignore(x => x.FullName);
+        builder.Ignore(x => x.EmailConfirmed);
+        builder.Ignore(x => x.Roles);
 
         builder.HasMany(x => x.RefreshTokens)
             .WithOne(x => x.User)
