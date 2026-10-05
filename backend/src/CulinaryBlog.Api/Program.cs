@@ -71,6 +71,8 @@ try
     }
 
     // ── Middleware pipeline ───────────────────────────────────────────────────
+    app.UseMiddleware<CulinaryBlog.API.Middleware.ExceptionHandlingMiddleware>();
+
     app.MapOpenApi();
     app.MapScalarApiReference();
 
