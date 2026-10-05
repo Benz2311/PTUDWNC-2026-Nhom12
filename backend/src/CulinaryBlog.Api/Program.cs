@@ -1,5 +1,9 @@
+using System.Diagnostics;
+using System.Security.Claims;
 using CulinaryBlog.API.Endpoints;
+using CulinaryBlog.API.Middleware;
 using CulinaryBlog.Application;
+using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Infrastructure;
 using CulinaryBlog.Infrastructure.Persistence;
 using CulinaryBlog.Infrastructure.Persistence.Seed;
@@ -7,6 +11,7 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Serilog;
+using Serilog.Events;
 
 // ── Serilog — cấu hình trước khi build host ──────────────────────────────────
 Log.Logger = new LoggerConfiguration()
@@ -71,6 +76,9 @@ try
     }
 
     // ── Middleware pipeline ───────────────────────────────────────────────────
+    // 1. CorrelationId Middleware đặt đầu tiên để sinh/đọc header và gắn vào LogContext cho toàn bộ request flow
+    app.UseMiddleware<CorrelationIdMiddleware>();
+
     app.MapOpenApi();
     app.MapScalarApiReference();
 
@@ -85,8 +93,75 @@ try
         app.UseHangfireDashboard("/hangfire");
     }
 
-    // Serilog request logging
-    app.UseSerilogRequestLogging();
+    // 2. Serilog request logging — Structured Logging với đầy đủ properties & cảnh báo Slow Request > 500ms
+    app.UseSerilogRequestLogging(options =>
+    {
+        options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+
+        options.GetLevel = (httpContext, elapsed, ex) =>
+        {
+            if (ex != null || httpContext.Response.StatusCode >= 500)
+            {
+                return LogEventLevel.Error;
+            }
+
+            if (httpContext.Response.StatusCode >= 400)
+            {
+                return LogEventLevel.Warning;
+            }
+
+            if (elapsed > 500)
+            {
+                return LogEventLevel.Warning;
+            }
+
+            return LogEventLevel.Information;
+        };
+
+        options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+        {
+            diagnosticContext.Set("RequestPath", httpContext.Request.Path.Value ?? "/");
+            diagnosticContext.Set("RequestMethod", httpContext.Request.Method);
+            diagnosticContext.Set("StatusCode", httpContext.Response.StatusCode);
+
+            var correlationId = httpContext.Items[CorrelationIdMiddleware.ItemKey]?.ToString()
+                ?? CorrelationIdMiddleware.ResolveCorrelationId(httpContext);
+            diagnosticContext.Set("CorrelationId", correlationId);
+
+            var userId = httpContext.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? httpContext.User?.FindFirstValue("sub");
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                diagnosticContext.Set("UserId", userId);
+            }
+
+            if (Activity.Current != null)
+            {
+                diagnosticContext.Set("TraceId", Activity.Current.TraceId.ToString());
+                diagnosticContext.Set("SpanId", Activity.Current.SpanId.ToString());
+            }
+        };
+    });
+
+    // 3. Custom telemetry metrics recorder middleware
+    app.Use(async (context, next) =>
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            await next(context);
+        }
+        finally
+        {
+            stopwatch.Stop();
+            var telemetry = context.RequestServices.GetService<ICulinaryBlogTelemetry>();
+            telemetry?.RecordHttpRequest(
+                context.Request.Method,
+                context.Request.Path.Value ?? "/",
+                context.Response.StatusCode,
+                stopwatch.Elapsed.TotalMilliseconds);
+        }
+    });
 
     app.MapCategoryEndpoints();
     app.MapRecipeEndpoints();

@@ -1,5 +1,7 @@
+using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Application.Interfaces;
 using CulinaryBlog.Domain.Entities;
+using CulinaryBlog.Domain.Enums;
 
 namespace CulinaryBlog.Application.Features.Recipes;
 
@@ -7,17 +9,38 @@ public sealed class RecipeWriteService : IRecipeWriteService
 {
     private readonly IRecipeRepository _recipeRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICulinaryBlogTelemetry? _telemetry;
 
-    public RecipeWriteService(IRecipeRepository recipeRepository, IUnitOfWork unitOfWork)
+    public RecipeWriteService(
+        IRecipeRepository recipeRepository,
+        IUnitOfWork unitOfWork,
+        ICulinaryBlogTelemetry? telemetry = null)
     {
         _recipeRepository = recipeRepository;
         _unitOfWork = unitOfWork;
+        _telemetry = telemetry;
     }
 
     public async Task CreateAsync(Recipe recipe, CancellationToken cancellationToken = default)
     {
         await _recipeRepository.AddAsync(recipe, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        _telemetry?.RecordRecipeCreated(recipe.CategoryId.ToString());
+        if (recipe.Status == RecipeStatus.Published)
+        {
+            _telemetry?.RecordRecipePublished(recipe.CategoryId.ToString());
+        }
+    }
+
+    public async Task PublishAsync(Recipe recipe, CancellationToken cancellationToken = default)
+    {
+        recipe.Status = RecipeStatus.Published;
+        recipe.PublishedAt ??= DateTime.UtcNow;
+        await _recipeRepository.UpdateAsync(recipe, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        _telemetry?.RecordRecipePublished(recipe.CategoryId.ToString());
     }
 
     public async Task UpdateAsync(Recipe recipe, CancellationToken cancellationToken = default)
