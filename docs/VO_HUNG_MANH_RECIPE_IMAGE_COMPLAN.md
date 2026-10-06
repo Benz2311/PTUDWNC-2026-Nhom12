@@ -64,7 +64,7 @@ sequenceDiagram
         Validator-->>Handler: IsValid = false (thông báo lỗi)
         Handler-->>API: Throw ValidationException (ProblemDetails 400)
         API-->>Client: 400 Bad Request
-    else Tệp hợp lệ (JPEG/PNG/WebP/AVIF)
+    else Tệp hợp lệ (JPEG/PNG/WebP)
         Validator-->>Handler: IsValid = true, Ext, DetectedMime
         Handler->>Storage: UploadAsync(bucket, objectKey, stream, mime)
         Storage-->>Handler: Trả về Public URL (MinIO S3)
@@ -110,7 +110,7 @@ sequenceDiagram
 
 | File | Tầng (Layer) | Chức năng chính | Vì sao phải sửa / tạo |
 | :--- | :--- | :--- | :--- |
-| `backend/src/CulinaryBlog.Application/Common/Utilities/ImageValidator.cs` | Application / Utilities | Bộ kiểm tra an toàn tệp ảnh: dung lượng tối đa 5 MB, danh sách MIME cho phép, kiểm tra Magic bytes (chữ ký số tệp) cho JPEG, PNG, WebP, AVIF | **Tạo mới:** Đảm bảo an ninh tệp tin, chống người dùng đổi đuôi file độc hại (như `virus.exe` đổi tên thành `anh.jpg`) tải lên server. |
+| `backend/src/CulinaryBlog.Application/Common/Utilities/ImageValidator.cs` | Application / Utilities | Bộ kiểm tra an toàn tệp ảnh: dung lượng tối đa 5 MB, danh sách MIME cho phép, kiểm tra Magic bytes (chữ ký số tệp) cho JPEG, PNG, WebP (từ chối AVIF) | **Tạo mới:** Đảm bảo an ninh tệp tin, chống người dùng đổi đuôi file độc hại (như `virus.exe` đổi tên thành `anh.jpg`) tải lên server. |
 | `backend/src/CulinaryBlog.Application/Features/Recipes/Commands/RecipeImages/RecipeImageCommands.cs` | Application / Commands | Khai báo các Command: `UploadRecipeImageCommand`, `UpdateRecipeImageCommand`, `AddRecipeImageCommand`, `SetPrimaryRecipeImageCommand`, `DeleteRecipeImageCommand` và Handler xử lý tập trung | **Cập nhật:** Bổ sung logic Multipart Upload tệp lên MinIO, bổ sung lệnh PATCH cập nhật linh hoạt (AltText, OrderIndex, IsPrimary), tối ưu transaction hoán đổi cờ Primary. |
 | `backend/src/CulinaryBlog.Api/Endpoints/Recipes/RecipeEndpoints.cs` | API / Endpoints | Đăng ký các Endpoint Minimal API: POST (Multipart Upload), PATCH (Cập nhật), DELETE (Xóa mềm) | **Cập nhật:** Hỗ trợ nhận Form Multipart cho `POST /images`, định tuyến chuẩn REST `PATCH /images/{imageId}`, bắt và trả về ProblemDetails 400 khi validation thất bại. |
 | `backend/tests/CulinaryBlog.UnitTests/Application/Common/RecipeImageValidationTests.cs` | Unit Tests | Kiểm thử tự động độc lập cho `ImageValidator` | **Tạo mới:** Đảm bảo kiểm tra toàn diện 100% các ca: file hợp lệ, vượt quá 5MB, rỗng, sai MIME, đổi đuôi virus EXE thành JPG, file HTML giả mạo PNG. |
@@ -127,7 +127,7 @@ sequenceDiagram
 - **Chức năng:** Kiểm tra 3 lớp bảo vệ trước khi tệp được phép đưa lên hệ thống lưu trữ:
   1. Lớp 1: Dung lượng (Size Check `<= 5 MB`).
   2. Lớp 2: Định dạng khai báo (Declared MIME Type Check).
-  3. Lớp 3: Chữ ký số tệp (Magic Bytes / Header Signature Check) và cấu trúc container (IHDR chunk của PNG, VP8 của WebP, ftyp box của AVIF).
+  3. Lớp 3: Chữ ký số tệp (Magic Bytes / Header Signature Check) và cấu trúc container (IHDR chunk của PNG, VP8 của WebP; từ chối AVIF).
 - **Trích đoạn code tiêu biểu:**
 ```csharp
 // Đọc Magic Bytes từ Stream mà không làm mất vị trí đọc (Stream Position)
@@ -198,7 +198,7 @@ catch
 ### 5.1. `POST /api/v1/recipes/{id}/images` — Tải lên hình ảnh
 - **Giao thức:** HTTP POST
 - **Định dạng dữ liệu gửi (Content-Type):** `multipart/form-data`
-  - `file` (bắt buộc): Tệp nhị phân của ảnh (JPEG, PNG, WebP, AVIF), tối đa 5 MB.
+  - `file` (bắt buộc): Tệp nhị phân của ảnh (JPEG, PNG, WebP), tối đa 5 MB.
   - `altText` (tùy chọn): Chuỗi mô tả hình ảnh (tối đa 200 ký tự).
   - `isPrimary` (tùy chọn): Boolean (`true`/`false`).
 - **Quy trình xử lý của Server:**
@@ -270,17 +270,17 @@ Hệ thống sẽ bị lừa! Tệp mã độc được lưu lên server, có th
    - Tệp **JPEG** luôn luôn bắt đầu bằng 3 bytes: `0xFF, 0xD8, 0xFF`.
    - Tệp **PNG** luôn luôn bắt đầu bằng 8 bytes: `0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A`.
    - Tệp **WebP** bắt đầu bằng `RIFF` (4 bytes đầu), theo sau là `WEBP` (offset 8..11) và chunk `VP8 ` / `VP8L` / `VP8X`.
-   - Tệp **AVIF** bắt đầu bằng box `ftyp` (offset 4..7) với brand `avif` hoặc `avis`.
+   - Tệp **AVIF** bị hệ thống từ chối do pipeline resize của ImageSharp chưa hỗ trợ codec AVIF.
    - Trong khi đó, tệp thực thi Windows **EXE** luôn luôn bắt đầu bằng 2 bytes: `0x4D, 0x5A` (ký tự ASCII là 'MZ').
 4. **Header Decoding / Structural Validation:** Đi sâu vào cấu trúc bên trong của ảnh. Ví dụ với PNG, chunk ngay sau 8 bytes chữ ký phải là `IHDR` mang thông tin chiều rộng và chiều cao.
 
 ### 6.3. Dự án thực tế kiểm tra những gì?
 Lớp `ImageValidator` trong dự án thực hiện kiểm tra đa tầng (Multi-layer verification):
 - Kiểm tra dung lượng `<= 5 MB`.
-- Kiểm tra MIME khai báo nằm trong tập hợp cho phép (`image/jpeg`, `image/png`, `image/webp`, `image/avif`).
-- Đọc 64 bytes đầu tiên của tệp, đối chiếu chính xác với các chữ ký số của JPEG, PNG, WebP, AVIF.
+- Kiểm tra MIME khai báo nằm trong tập hợp cho phép (`image/jpeg`, `image/png`, `image/webp`).
+- Đọc 64 bytes đầu tiên của tệp, đối chiếu chính xác với các chữ ký số của JPEG, PNG, WebP.
 - Xác thực tính nhất quán: Nếu khai báo `image/jpeg` nhưng chữ ký là PNG hoặc EXE -> **Từ chối ngay lập tức**.
-- Kiểm tra cấu trúc chunk (IHDR của PNG, VP8 của WebP, ftyp của AVIF).
+- Kiểm tra cấu trúc chunk (IHDR của PNG, VP8 của WebP; từ chối AVIF).
 
 ---
 
@@ -435,7 +435,7 @@ Toàn bộ 13 test case bảo mật và định dạng ảnh đều **PASS**:
 | `Validate_ValidJpeg_ReturnsSuccess` | Stream byte chứa header `FF D8 FF E0...` | `IsValid = true`, detected `image/jpeg`, `.jpg` | Hợp lệ | **PASS** | Chấp nhận ảnh JPEG chuẩn |
 | `Validate_ValidPng_ReturnsSuccess` | Stream byte chứa `89 50 4E 47... IHDR` | `IsValid = true`, detected `image/png`, `.png` | Hợp lệ | **PASS** | Chấp nhận ảnh PNG chuẩn |
 | `Validate_ValidWebp_ReturnsSuccess` | Stream byte chứa `RIFF...WEBPVP8` | `IsValid = true`, detected `image/webp`, `.webp` | Hợp lệ | **PASS** | Chấp nhận ảnh WebP chuẩn |
-| `Validate_ValidAvif_ReturnsSuccess` | Stream byte chứa `ftypavif...` | `IsValid = true`, detected `image/avif`, `.avif` | Hợp lệ | **PASS** | Chấp nhận ảnh hiện đại AVIF |
+| `Validate_AvifFormat_ReturnsUnsupportedMimeTypeError` | Stream byte chứa `ftypavif...` | `IsValid = false`, từ chối MIME không hỗ trợ | Bị từ chối | **PASS** | Từ chối AVIF để đồng bộ Thumbnail Job |
 | `Validate_FileSizeExceeds5Mb_ReturnsError` | Tệp có dung lượng 5 MB + 1 byte | `IsValid = false`, lỗi vượt quá 5 MB | Bị từ chối | **PASS** | Chặn tệp quá kích thước cho phép |
 | `Validate_EmptyFile_ReturnsError` | Tệp có kích thước 0 byte | `IsValid = false`, thông báo tệp rỗng | Bị từ chối | **PASS** | Chặn tệp rỗng không có nội dung |
 | `Validate_HeaderTooShort_ReturnsError` | Tệp chỉ có 3 bytes | `IsValid = false`, không đủ kích thước | Bị từ chối | **PASS** | Chặn tệp cụt header |
@@ -521,7 +521,7 @@ Khi trình chiếu trực tiếp trên giao diện **Scalar API Reference** (`ht
 *Trả lời:* Magic Bytes là các byte đầu tiên cố định trong tệp tin dùng để nhận diện định dạng thực sự (ví dụ JPEG là `FF D8 FF`, PNG là `89 50 4E 47`). Đuôi file chỉ là một chuỗi ký tự ở tên file mà ai cũng có thể đổi được (như đổi `virus.exe` thành `anh.jpg`). Nếu chỉ check đuôi file, hệ thống sẽ bị tấn công tải lên mã độc.
 
 **Câu 3: Hệ thống chấp nhận những định dạng ảnh nào? Giới hạn dung lượng là bao nhiêu?**  
-*Trả lời:* Hệ thống chấp nhận 4 định dạng chuẩn hiện đại: JPEG, PNG, WebP và AVIF. Dung lượng tối đa là 5 MB (5,242,880 bytes).
+*Trả lời:* Hệ thống chấp nhận 3 định dạng ảnh chuẩn: JPEG, PNG và WebP. Dung lượng tối đa là 5 MB (5,242,880 bytes). Định dạng AVIF bị từ chối để đồng bộ hoàn toàn với pipeline xử lý thumbnail.
 
 **Câu 4: Khi người dùng tải lên ảnh đầu tiên cho một công thức, chuyện gì xảy ra?**  
 *Trả lời:* Hệ thống đếm số ảnh đang hoạt động (`IsDeleted == false`). Nếu danh sách rỗng (`count == 0`), hệ thống tự động gán `IsPrimary = true` cho ảnh đó theo đúng đặc tả SRS FR-RCP-008.
@@ -582,7 +582,7 @@ Khi trình chiếu trực tiếp trên giao diện **Scalar API Reference** (`ht
 >
 > *Phân hệ này giải quyết 3 bài toán kỹ thuật trọng tâm:*
 >
-> *Thứ nhất là **Bảo mật tệp tin tải lên (File Security & Validation)**: Hệ thống của em không chỉ dừng lại ở việc kiểm tra đuôi file hay Content-Type do trình duyệt gửi lên, mà xây dựng một bộ `ImageValidator` kiểm tra trực tiếp chữ ký số nhị phân (Magic Bytes) trong 64 bytes đầu của file. Nhờ đó, hệ thống hỗ trợ chuẩn 4 định dạng ảnh JPEG, PNG, WebP, AVIF, giới hạn 5 MB và loại bỏ hoàn toàn nguy cơ tấn công ngụy tạo file thực thi độc hại virus EXE hay chèn mã độc HTML.*
+> *Thứ nhất là **Bảo mật tệp tin tải lên (File Security & Validation)**: Hệ thống của em không chỉ dừng lại ở việc kiểm tra đuôi file hay Content-Type do trình duyệt gửi lên, mà xây dựng một bộ `ImageValidator` kiểm tra trực tiếp chữ ký số nhị phân (Magic Bytes) trong 64 bytes đầu của file. Nhờ đó, hệ thống hỗ trợ chuẩn 3 định dạng ảnh JPEG, PNG, WebP (loại bỏ AVIF để đồng bộ pipeline Thumbnail Job), giới hạn 5 MB và loại bỏ hoàn toàn nguy cơ tấn công ngụy tạo file thực thi độc hại virus EXE hay chèn mã độc HTML.*
 >
 > *Thứ hai là **Quản lý vòng đời và toàn vẹn của Ảnh đại diện (Primary Image Lifecycle)**: Theo đúng đặc tả SRS, ảnh đầu tiên được tải lên sẽ tự động trở thành ảnh đại diện. Khi người dùng thiết lập một ảnh khác làm Primary hoặc xóa mềm ảnh Primary hiện tại, toàn bộ chuỗi thao tác hạ cờ ảnh cũ, nâng cờ ảnh mới hoặc tự động thăng hạng cho ảnh có OrderIndex nhỏ nhất đều được em bao bọc bên trong một **Database Transaction** của PostgreSQL. Điều này đảm bảo tính nguyên tử (Atomicity), kết hợp cùng Unique Filtered Index ở mức database để không bao giờ xảy ra lỗi xung đột hoặc trường hợp công thức bị thiếu ảnh đại diện.*
 >

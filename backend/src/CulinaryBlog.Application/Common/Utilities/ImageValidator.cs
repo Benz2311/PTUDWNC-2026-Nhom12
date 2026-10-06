@@ -11,7 +11,7 @@ public record ImageValidationResult(
 /// <summary>
 /// Trình kiểm tra an toàn và hợp lệ cho tệp hình ảnh:
 /// - Giới hạn kích thước (tối đa 5 MB).
-/// - Định dạng cho phép: JPEG, PNG, WebP, AVIF.
+/// - Định dạng cho phép: JPEG, PNG, WebP.
 /// - Kiểm tra MIME type, Magic bytes (chữ ký số tệp) và phân tích cấu trúc header.
 /// - Ngăn chặn tấn công ngụy tạo đuôi file (ví dụ virus.exe đổi tên thành anh.jpg).
 /// </summary>
@@ -24,8 +24,7 @@ public static class ImageValidator
         "image/jpeg",
         "image/jpg",
         "image/png",
-        "image/webp",
-        "image/avif"
+        "image/webp"
     };
 
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -33,8 +32,7 @@ public static class ImageValidator
         ".jpg",
         ".jpeg",
         ".png",
-        ".webp",
-        ".avif"
+        ".webp"
     };
 
     public static ImageValidationResult Validate(
@@ -64,7 +62,7 @@ public static class ImageValidator
         {
             return new ImageValidationResult(
                 false,
-                $"Định dạng MIME '{declaredContentType}' không được hỗ trợ. Hệ thống chỉ chấp nhận: JPEG, PNG, WebP, AVIF.",
+                $"Định dạng MIME '{declaredContentType}' không được hỗ trợ. Hệ thống chỉ chấp nhận: JPEG, PNG, WebP.",
                 string.Empty,
                 string.Empty);
         }
@@ -108,7 +106,7 @@ public static class ImageValidator
         {
             return new ImageValidationResult(
                 false,
-                "Nội dung tệp (magic bytes) không khớp với bất kỳ định dạng ảnh hợp lệ nào (JPEG, PNG, WebP, AVIF). Tệp có thể đã bị làm giả hoặc bị hỏng.",
+                "Nội dung tệp (magic bytes) không khớp với bất kỳ định dạng ảnh hợp lệ nào (JPEG, PNG, WebP). Tệp có thể đã bị làm giả hoặc bị hỏng.",
                 string.Empty,
                 string.Empty);
         }
@@ -199,36 +197,7 @@ public static class ImageValidator
             return ("image/webp", ".webp");
         }
 
-        // AVIF: ISOBMFF box 'ftyp' tại offset 4..7
-        // Offset 4..7: 'ftyp' (0x66, 0x74, 0x79, 0x70)
-        // Offset 8..11: 'avif' (0x61, 0x76, 0x69, 0x66) hoặc 'avis' (0x61, 0x76, 0x69, 0x73)
-        if (length >= 12 &&
-            header[4] == 0x66 && header[5] == 0x74 && header[6] == 0x79 && header[7] == 0x70)
-        {
-            bool isAvifBrand = (header[8] == 0x61 && header[9] == 0x76 && header[10] == 0x69 && header[11] == 0x66) || // avif
-                               (header[8] == 0x61 && header[9] == 0x76 && header[10] == 0x69 && header[11] == 0x73);   // avis
 
-            if (isAvifBrand)
-            {
-                return ("image/avif", ".avif");
-            }
-
-            // Hoặc major brand là mif1/msf1 và compatible brands chứa avif/avis
-            bool isMif1 = (header[8] == 0x6D && header[9] == 0x69 && header[10] == 0x66 && header[11] == 0x31) ||
-                          (header[8] == 0x6D && header[9] == 0x73 && header[10] == 0x66 && header[11] == 0x31);
-
-            if (isMif1 && length >= 20)
-            {
-                for (int i = 16; i + 3 < length; i += 4)
-                {
-                    if ((header[i] == 0x61 && header[i + 1] == 0x76 && header[i + 2] == 0x69 && header[i + 3] == 0x66) ||
-                        (header[i] == 0x61 && header[i + 1] == 0x76 && header[i + 2] == 0x69 && header[i + 3] == 0x73))
-                    {
-                        return ("image/avif", ".avif");
-                    }
-                }
-            }
-        }
 
         return (string.Empty, string.Empty);
     }

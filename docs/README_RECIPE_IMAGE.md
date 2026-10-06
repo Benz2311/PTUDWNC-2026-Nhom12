@@ -21,8 +21,8 @@ Sau khi triển khai branch này:
   - Khi xóa mềm ảnh đang là Primary, ảnh có `OrderIndex` nhỏ nhất còn lại tự động được thăng cấp làm Primary mới.
 - **Bảo mật tệp tin đa lớp (`ImageValidator`)**:
   - Kiểm tra dung lượng: Chặn tuyệt đối tệp tin $> 5\text{ MB}$ ($5 \times 1024 \times 1024$ bytes).
-  - Kiểm tra MIME Type: Chỉ chấp nhận `image/jpeg`, `image/png`, `image/webp`, `image/avif`.
-  - Phân tích Magic Bytes: Đọc 64 byte đầu tiên từ luồng nhị phân để nhận diện chính xác header file (JPEG `FF D8 FF`, PNG `89 50 4E 47 0D 0A 1A 0A`, WebP `RIFF....WEBP`, AVIF `ftypavif`), từ chối ngay lập tức các tệp mã độc mạo danh đuôi ảnh.
+  - Kiểm tra MIME Type: Chỉ chấp nhận `image/jpeg`, `image/png`, `image/webp` (đồng bộ hoàn toàn với pipeline resize ảnh Thumbnail Job).
+  - Phân tích Magic Bytes: Đọc 64 byte đầu tiên từ luồng nhị phân để nhận diện chính xác header file (JPEG `FF D8 FF`, PNG `89 50 4E 47 0D 0A 1A 0A`, WebP `RIFF....WEBP`), từ chối ngay lập tức các tệp mã độc mạo danh đuôi ảnh và từ chối các định dạng không được pipeline hỗ trợ (như AVIF).
 - **Tự động làm mới bộ nhớ đệm (Cache Invalidation)**: Xóa cache Redis `recipe:{slug}` ngay sau khi thao tác ghi hoàn tất.
 - **Kiểm thử bao phủ**: 13/13 tests trong `RecipeImageValidationTests` và 100/101 tests toàn hệ thống đều vượt qua thành công (100% Pass).
 
@@ -44,7 +44,7 @@ Application Layer: RecipeImageCommandHandler (MediatR)
   │ │    Kiểm tra AuthorId == CurrentUserId hoặc IsAdmin (ném ForbiddenException 403)
   │ │
   │ ├─ 2. Xác thực tệp tin nhị phân (ImageValidator.Validate):
-  │ │    FileLength <= 5MB -> ContentType hợp lệ -> Match Magic Bytes (JPEG/PNG/WebP/AVIF)
+  │ │    FileLength <= 5MB -> ContentType hợp lệ -> Match Magic Bytes (JPEG/PNG/WebP)
   │ │
   │ ├─ 3. Tương tác Object Storage (IStorageService / MinIO):
   │ │    Upload stream nhị phân lên bucket culinaryblog/recipes/{recipeId}/images/{fileId}.ext
@@ -70,10 +70,10 @@ Output
 
 | File | Vai trò | Xử lý gì |
 | :--- | :--- | :--- |
-| `backend/src/CulinaryBlog.Application/Common/Utilities/ImageValidator.cs` | Application / Utility | Trình kiểm tra an toàn tệp ảnh: dung lượng tối đa 5MB, whitelist MIME types, và kiểm tra chữ ký nhị phân (Magic Bytes) cho 4 định dạng JPEG, PNG, WebP, AVIF. |
+| `backend/src/CulinaryBlog.Application/Common/Utilities/ImageValidator.cs` | Application / Utility | Trình kiểm tra an toàn tệp ảnh: dung lượng tối đa 5MB, whitelist MIME types, và kiểm tra chữ ký nhị phân (Magic Bytes) cho 3 định dạng JPEG, PNG, WebP (từ chối AVIF). |
 | `backend/src/CulinaryBlog.Application/Features/Recipes/Commands/RecipeImages/RecipeImageCommands.cs` | Application / MediatR Handler | Chứa các Command (`Add`, `Upload`, `Update`, `SetPrimary`, `Delete`), quản lý quy tắc Primary duy nhất trong Database Transaction, tính toán `OrderIndex`, và xóa cache Redis. |
 | `backend/src/CulinaryBlog.Api/Endpoints/Recipes/RecipeEndpoints.cs` | Presentation / Minimal API | Khai báo và map các route RESTful cho RecipeImage (`POST /images`, `PATCH /images/{id}/primary`, `DELETE /images/{id}`), bóc tách JWT claims, xử lý mã lỗi HTTP. |
-| `backend/tests/CulinaryBlog.UnitTests/Application/Common/RecipeImageValidationTests.cs` | Unit Tests | Bộ 13 unit tests kiểm tra toàn diện: file rỗng, vượt quá 5MB, đuôi file giả mạo, magic bytes của JPEG, PNG, WebP, AVIF, và các định dạng bị cấm (EXE, PDF, BMP). |
+| `backend/tests/CulinaryBlog.UnitTests/Application/Common/RecipeImageValidationTests.cs` | Unit Tests | Bộ 14 unit tests kiểm tra toàn diện: file rỗng, vượt quá 5MB, đuôi file giả mạo, magic bytes của JPEG, PNG, WebP, từ chối AVIF, và các định dạng bị cấm (EXE, PDF, BMP). |
 | `docs/VO_HUNG_MANH_RECIPE_IMAGE_COMPLAN.md` | Tài liệu bảo vệ | Báo cáo giải trình kỹ thuật chuyên sâu (618 dòng) gồm 15 mục chi tiết về kiến trúc, flow, database, và 20 câu hỏi vấn đáp. |
 | `docs/README_RECIPE_IMAGE.md` | Tài liệu kỹ thuật | Tài liệu hướng dẫn kỹ thuật chi tiết theo chuẩn 13 phần. |
 
@@ -104,7 +104,7 @@ Output
      - **JPEG:** Bắt đầu bằng 3 bytes `FF D8 FF`.
      - **PNG:** Bắt đầu bằng 8 bytes `89 50 4E 47 0D 0A 1A 0A`.
      - **WebP:** 4 bytes đầu là `RIFF` (`52 49 46 46`) và bytes 8..11 là `WEBP` (`57 45 42 50`).
-     - **AVIF:** Bytes 4..11 chứa hộp thương hiệu `ftypavif` hoặc `ftypavis`.
+     - **AVIF (Không hỗ trợ):** Bị từ chối để đồng bộ pipeline Thumbnail Job.
 5. **Dung lượng tối đa 5 MB**:
    - Tệp tin tải lên có dung lượng $> 5 \times 1024 \times 1024$ bytes ($5,242,880$ bytes) lập tức bị từ chối với mã lỗi HTTP 400.
 6. **Ràng buộc trường dữ liệu**:
@@ -180,7 +180,7 @@ Output
 
 | Mã lỗi HTTP | Điều kiện kích hoạt thực tế | Phản hồi (Behavior & Response Body) |
 | :--- | :--- | :--- |
-| `HTTP 400 Bad Request` | - File rỗng hoặc dung lượng vượt quá 5 MB.<br>- MIME type không thuộc danh sách JPEG, PNG, WebP, AVIF.<br>- Magic Bytes không khớp với định dạng khai báo (ngụy tạo đuôi file).<br>- `AltText` dài hơn 200 ký tự.<br>- `OrderIndex` là số âm ($< 0$). | Trả về `ValidationProblemDetails` RFC 7807:<br>```json<br>{<br>  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",<br>  "title": "One or more validation errors occurred.",<br>  "status": 400,<br>  "errors": {<br>    "File": ["Kích thước tệp (6291456 bytes) vượt quá giới hạn tối đa cho phép là 5242880 bytes (5 MB)."]<br>  }<br>}<br>``` |
+| `HTTP 400 Bad Request` | - File rỗng hoặc dung lượng vượt quá 5 MB.<br>- MIME type không thuộc danh sách JPEG, PNG, WebP.<br>- Magic Bytes không khớp với định dạng khai báo (ngụy tạo đuôi file).<br>- `AltText` dài hơn 200 ký tự.<br>- `OrderIndex` là số âm ($< 0$). | Trả về `ValidationProblemDetails` RFC 7807:<br>```json<br>{<br>  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",<br>  "title": "One or more validation errors occurred.",<br>  "status": 400,<br>  "errors": {<br>    "File": ["Kích thước tệp (6291456 bytes) vượt quá giới hạn tối đa cho phép là 5242880 bytes (5 MB)."]<br>  }<br>}<br>``` |
 | `HTTP 401 Unauthorized` | Không có header xác thực Bearer token hoặc token không hợp lệ. | Chặn tại ASP.NET Core Authentication Middleware. |
 | `HTTP 403 Forbidden` | Người dùng đã đăng nhập nhưng không phải tác giả (`AuthorId != CurrentUserId`) và không phải `Admin`. | Trả về JSON:<br>```json<br>{<br>  "error": "You do not have permission to modify images for this recipe."<br>}<br>``` |
 | `HTTP 404 Not Found` | - Không tìm thấy công thức với `id` cung cấp.<br>- Không tìm thấy hình ảnh với `imageId` cung cấp trong công thức. | Trả về JSON:<br>```json<br>{<br>  "error": "Recipe with ID '...' was not found."<br>}<br>hoặc<br>{<br>  "error": "Image with ID '...' was not found in Recipe."<br>}<br>``` |
@@ -241,7 +241,7 @@ dotnet test backend/tests/CulinaryBlog.UnitTests/CulinaryBlog.UnitTests.csproj -
   6. `Validate_ReturnsSuccess_ForValidJpegImage`: Xác thực thành công file JPEG thật với header `FF D8 FF`.
   7. `Validate_ReturnsSuccess_ForValidPngImage`: Xác thực thành công file PNG thật với header `89 50 4E 47 0D 0A 1A 0A`.
   8. `Validate_ReturnsSuccess_ForValidWebpImage`: Xác thực thành công file WebP thật với chữ ký `RIFF....WEBP`.
-  9. `Validate_ReturnsSuccess_ForValidAvifImage`: Xác thực thành công file AVIF thật với chữ ký `ftypavif`.
+  9. `Validate_AvifFormat_ReturnsUnsupportedMimeTypeError`: Xác thực từ chối định dạng AVIF để đồng bộ pipeline resize ảnh.
   10. `Validate_ReturnsError_WhenJpegMagicBytesAreInvalid`: Phát hiện file đổi đuôi giả mạo `.jpg` nhưng ruột không phải JPEG.
   11. `Validate_ReturnsError_WhenPngMagicBytesAreInvalid`: Phát hiện file giả mạo đuôi `.png`.
   12. `Validate_ReturnsError_WhenWebpMagicBytesAreInvalid`: Phát hiện file giả mạo đuôi `.webp`.

@@ -8,7 +8,7 @@ namespace CulinaryBlog.UnitTests.Application.Common;
 
 /// <summary>
 /// Unit tests cho ImageValidator:
-/// - Kiểm tra MIME type, Magic bytes (chữ ký số tệp) cho JPEG, PNG, WebP, AVIF.
+/// - Kiểm tra MIME type, Magic bytes (chữ ký số tệp) cho JPEG, PNG, WebP (từ chối AVIF).
 /// - Kiểm tra giới hạn dung lượng tệp tối đa 5 MB.
 /// - Kiểm tra phát hiện và ngăn chặn giả mạo định dạng (disguised files: exe, html, txt).
 /// </summary>
@@ -95,16 +95,26 @@ public class RecipeImageValidationTests
     }
 
     [Fact]
-    public void Validate_ValidAvif_ReturnsSuccess()
+    public void Validate_AvifFormat_ReturnsUnsupportedMimeTypeError()
     {
         using var stream = new MemoryStream(ValidAvifBytes);
 
         var result = ImageValidator.Validate(stream, "image/avif", "banner.avif", ValidAvifBytes.Length);
 
-        result.IsValid.Should().BeTrue();
-        result.DetectedMimeType.Should().Be("image/avif");
-        result.Extension.Should().Be(".avif");
-        result.ErrorMessage.Should().BeNull();
+        result.IsValid.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("không được hỗ trợ");
+        result.ErrorMessage.Should().Contain("JPEG, PNG, WebP");
+    }
+
+    [Fact]
+    public void Validate_DisguisedAvifAsJpeg_ReturnsMagicBytesError()
+    {
+        using var stream = new MemoryStream(ValidAvifBytes);
+
+        var result = ImageValidator.Validate(stream, "image/jpeg", "fake.jpg", ValidAvifBytes.Length);
+
+        result.IsValid.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("magic bytes");
     }
 
     [Fact]
