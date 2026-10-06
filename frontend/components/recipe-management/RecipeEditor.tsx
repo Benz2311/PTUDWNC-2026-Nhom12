@@ -18,6 +18,17 @@ export default function RecipeEditor({ slug }: { slug: string }) {
       .catch((reason: Error) => setError(reason.message));
   }, [slug]);
 
+  useEffect(() => {
+    function syncEtag(event: Event) {
+      const detail = (event as CustomEvent<{ recipeId: string; etag: string }>).detail;
+      if (detail?.recipeId === recipe?.id && detail.etag) {
+        setEtag(detail.etag);
+      }
+    }
+    window.addEventListener('culinary-recipe-etag-change', syncEtag);
+    return () => window.removeEventListener('culinary-recipe-etag-change', syncEtag);
+  }, [recipe?.id]);
+
   if (error) {
     return (
       <div className="empty-state">

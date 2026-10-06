@@ -18,7 +18,10 @@ export default function RecipeSteps({ slug }: { slug: string }) {
 
   return (
     <section className="detail-section">
-      <h2>Các bước thực hiện</h2>
+      <div className="section-heading step-guide-heading">
+        <div><h2>Các bước thực hiện</h2><p>Làm theo từng bước để có kết quả hoàn hảo.</p></div>
+        <a className="primary-button" href={`/recipes/${encodeURIComponent(slug)}/cook`}>Bắt đầu nấu →</a>
+      </div>
       <div className="step-list">
         {steps.map((step) => (
           <article className="step-item" key={step.id}>

@@ -1,2 +1,12 @@
-export default function AdminReviewsPage() { return <AdminPage title="Quản lý đánh giá & bình luận" description="Kiểm duyệt phản hồi, đánh giá và báo cáo nội dung từ cộng đồng." />; }
-function AdminPage({ title, description }: { title: string; description: string }) { return <><div className="flow-kicker">Quản trị viên · Hệ thống</div><h1 className="flow-title">{title}</h1><p className="flow-description">{description}</p><section className="flow-panel" style={{ marginTop: 34 }}><h2>Bảng dữ liệu {title.toLowerCase()}</h2><p>Khu vực bảng, bộ lọc và các thao tác quản trị sẽ được triển khai ở bước chức năng.</p></section></>; }
+import AdminDataPlaceholder from '@/components/admin/AdminDataPlaceholder';
+
+export default function AdminReviewsPage() {
+  return (
+    <>
+      <div className="flow-kicker">Quản trị viên · Hệ thống</div>
+      <h1 className="flow-title">Đánh giá & bình luận</h1>
+      <p className="flow-description">Không gian kiểm duyệt phản hồi và giữ cho cộng đồng ẩm thực luôn tích cực.</p>
+      <AdminDataPlaceholder title="Hàng chờ kiểm duyệt" description="Các đánh giá và bình luận cần được xem xét." columns={['Người gửi', 'Công thức', 'Nội dung', 'Đánh giá', 'Ngày gửi', 'Thao tác']} />
+    </>
+  );
+}

@@ -24,6 +24,28 @@ public static class RecipeEndpoints
 
     private static void MapAdminRecipeGroup(RouteGroupBuilder group)
     {
+        group.MapGet("/trash", async (ClaimsPrincipal principal, ApplicationDbContext db, CancellationToken cancellationToken) =>
+        {
+            if (!principal.IsInRole("Admin"))
+            {
+                return Results.Forbid();
+            }
+
+            var recipes = await db.Recipes
+                .AsNoTracking()
+                .Where(recipe => recipe.IsDeleted)
+                .OrderByDescending(recipe => recipe.DeletedAt ?? recipe.UpdatedAt ?? recipe.CreatedAt)
+                .Select(recipe => new DeletedRecipeResponse(
+                    recipe.Id,
+                    recipe.Title,
+                    recipe.Slug,
+                    recipe.Status.ToString(),
+                    recipe.DeletedAt ?? recipe.UpdatedAt ?? recipe.CreatedAt))
+                .ToListAsync(cancellationToken);
+
+            return Results.Ok(recipes);
+        }).RequireAuthorization();
+
         group.MapPost("/{id:guid}/restore", async (Guid id, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken) =>
         {
             if (!principal.IsInRole("Admin"))
@@ -111,9 +133,12 @@ public static class RecipeEndpoints
 
             var userId = GetUserId(principal);
             var isAdmin = principal.IsInRole("Admin");
-            if (isAdmin && query.Status.HasValue)
+            if (isAdmin)
             {
-                recipes = recipes.Where(recipe => recipe.Status == query.Status.Value);
+                if (query.Status.HasValue)
+                {
+                    recipes = recipes.Where(recipe => recipe.Status == query.Status.Value);
+                }
             }
             else if (userId == Guid.Empty)
             {
@@ -435,7 +460,7 @@ public static class RecipeEndpoints
         MapStatusEndpoint(group, "archive", RecipeStatus.Archived);
         MapStatusEndpoint(group, "unarchive", RecipeStatus.Draft);
 
-        group.MapDelete("/{id:guid}", async (Guid id, ClaimsPrincipal principal, IRecipeRepository recipeRepository, IRecipeWriteService recipeWriteService, CancellationToken cancellationToken) =>
+        group.MapDelete("/{id:guid}", async (Guid id, ClaimsPrincipal principal, HttpContext httpContext, IRecipeRepository recipeRepository, IRecipeWriteService recipeWriteService, CancellationToken cancellationToken) =>
         {
             var recipe = await recipeRepository.GetByIdAsync(id, includeDetails: false, cancellationToken);
             if (recipe is null)
@@ -446,6 +471,11 @@ public static class RecipeEndpoints
             if (!IsOwnerOrAdmin(principal, recipe.AuthorId))
             {
                 return Results.Forbid();
+            }
+
+            if (!MatchesIfMatchHeader(recipe, httpContext.Request.Headers.IfMatch.ToString()))
+            {
+                return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
             }
 
             await recipeWriteService.DeleteAsync(recipe, cancellationToken);
@@ -483,7 +513,7 @@ public static class RecipeEndpoints
                 Quantity = ReadIngredientQuantity(request.Quantity),
                 Unit = request.Unit?.Trim(),
                 Notes = request.Notes?.Trim(),
-                SortOrder = request.SortOrder
+                SortOrder = request.OrderIndex ?? request.SortOrder
             };
             await recipeWriteService.AddIngredientAsync(ingredient, cancellationToken);
             await TouchRecipeAsync(recipe, db, httpContext, cancellationToken);
@@ -524,7 +554,7 @@ public static class RecipeEndpoints
             ingredient.Quantity = ReadIngredientQuantity(request.Quantity);
             ingredient.Unit = request.Unit?.Trim();
             ingredient.Notes = request.Notes?.Trim();
-            ingredient.SortOrder = request.SortOrder;
+            ingredient.SortOrder = request.OrderIndex ?? request.SortOrder;
             await recipeWriteService.UpdateIngredientAsync(ingredient, cancellationToken);
             await TouchRecipeAsync(recipe, db, httpContext, cancellationToken);
             return Results.Ok(ingredient);
@@ -714,7 +744,7 @@ public static class RecipeEndpoints
 
     private static void MapStatusEndpoint(RouteGroupBuilder group, string action, RecipeStatus status)
     {
-        group.MapPatch("/{id:guid}/" + action, async (Guid id, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeWriteService recipeWriteService, CancellationToken cancellationToken) =>
+        async Task<IResult> UpdateStatus(Guid id, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeWriteService recipeWriteService, CancellationToken cancellationToken)
         {
             var recipe = await db.Recipes
                 .Include(item => item.Ingredients)
@@ -739,13 +769,13 @@ public static class RecipeEndpoints
             if (status == RecipeStatus.Published)
             {
                 var author = await db.Users.AsNoTracking().SingleOrDefaultAsync(user => user.Id == recipe.AuthorId, cancellationToken);
-                if (!CanPublishRecipe(recipe, author, principal.IsInRole("Admin")))
+                if (author is null || !author.EmailConfirmed)
                 {
-                    if (!principal.IsInRole("Admin") && (author is null || !author.EmailConfirmed))
-                    {
-                        return Results.Forbid();
-                    }
+                    return Results.UnprocessableEntity(new { error = "The recipe author must have a confirmed email before publishing." });
+                }
 
+                if (!CanPublishRecipe(recipe, author))
+                {
                     return Results.UnprocessableEntity(new { error = "Recipe must have valid fields, an active category, at least one ingredient, and at least one step before publishing." });
                 }
             }
@@ -779,7 +809,10 @@ public static class RecipeEndpoints
             await db.SaveChangesAsync(cancellationToken);
             SetRecipeEtag(httpContext, recipe);
             return Results.Ok(new { recipe.Id, status = recipe.Status.ToString() });
-        }).RequireAuthorization();
+        }
+
+        group.MapPost("/{id:guid}/" + action, UpdateStatus).RequireAuthorization();
+        group.MapPatch("/{id:guid}/" + action, UpdateStatus).RequireAuthorization();
     }
 
     private static async Task<string?> ValidateRequest(RecipeRequest request, ApplicationDbContext db, CancellationToken cancellationToken, Guid? existingId = null)
@@ -885,7 +918,7 @@ public static class RecipeEndpoints
             return "Ingredient unit must be at most 50 characters.";
         }
 
-        if (request.SortOrder < 0)
+        if ((request.OrderIndex ?? request.SortOrder) < 0)
         {
             return "Ingredient sort order cannot be negative.";
         }
@@ -953,7 +986,7 @@ public static class RecipeEndpoints
         return nutrition;
     }
 
-    private static bool CanPublishRecipe(Recipe recipe, ApplicationUser? author, bool isAdmin)
+    private static bool CanPublishRecipe(Recipe recipe, ApplicationUser author)
     {
         if (string.IsNullOrWhiteSpace(recipe.Title) || recipe.Title.Trim().Length is < 5 or > 200 ||
             string.IsNullOrWhiteSpace(recipe.Content) || recipe.PrepTimeMinutes <= 0 ||
@@ -968,7 +1001,7 @@ public static class RecipeEndpoints
             return false;
         }
 
-        if (!isAdmin && (author is null || !author.EmailConfirmed))
+        if (!author.EmailConfirmed)
         {
             return false;
         }
@@ -1010,7 +1043,7 @@ public static class RecipeEndpoints
             Quantity = ReadIngredientQuantity(request.Quantity),
             Unit = request.Unit?.Trim(),
             Notes = request.Notes?.Trim(),
-            SortOrder = request.SortOrder == 0 ? index : request.SortOrder
+            SortOrder = (request.OrderIndex ?? request.SortOrder) == 0 ? index : request.OrderIndex ?? request.SortOrder
         }).ToList();
 
     private static List<RecipeImage> ToImages(IEnumerable<ImageRequest>? requests) =>
@@ -1102,7 +1135,7 @@ public sealed class RecipeSearchQuery
 
 public sealed record RecipeRequest(Guid? AuthorId, Guid CategoryId, string Title, string? Slug, string? Description, string Content, int PrepTimeMinutes, int CookTimeMinutes, int Servings, DifficultyLevel Difficulty, NutritionRequest? Nutrition, IEnumerable<IngredientRequest>? Ingredients, IEnumerable<ImageRequest>? Images, IEnumerable<StepRequest>? Steps = null);
 public sealed record NutritionRequest(decimal Calories, decimal Protein, decimal Carbohydrates, decimal Fat, decimal Fiber);
-public sealed record IngredientRequest(string Name, JsonElement Quantity, string? Unit, int SortOrder = 0, string? Notes = null);
+public sealed record IngredientRequest(string Name, JsonElement Quantity, string? Unit, int SortOrder = 0, string? Notes = null, int? OrderIndex = null);
 public sealed record ImageRequest(string Url, string? AltText);
 public sealed record StepRequest(string? Title, string Description);
 public sealed record RecipeSummaryResponse(Guid Id, string Title, string Slug, string? Description, string Category, string Author, int PrepTimeMinutes, int CookTimeMinutes, int Servings, string Difficulty, string Status, DateTime CreatedAt, string? PrimaryImageUrl);
@@ -1113,3 +1146,4 @@ public sealed record StepResponse(Guid Id, int StepNumber, string Title, string 
 public sealed record NutritionResponse(decimal? Calories, decimal? Protein, decimal? Carbohydrates, decimal? Fat, decimal? Fiber);
 public sealed record ImageResponse(Guid Id, string Url, string? AltText, bool IsPrimary, int SortOrder);
 public sealed record PagedResponse<T>(IReadOnlyCollection<T> Items, int Page, int PageSize, int TotalCount);
+public sealed record DeletedRecipeResponse(Guid Id, string Title, string Slug, string Status, DateTime DeletedAt);

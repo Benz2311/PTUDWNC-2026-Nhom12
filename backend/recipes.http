@@ -1,0 +1,139 @@
+@baseUrl = http://localhost:5000
+@token = replace-with-access-token
+@recipeId = replace-with-recipe-guid
+@ingredientId = replace-with-ingredient-guid
+@etag = "replace-with-current-etag"
+
+### Create a recipe in Draft state
+POST {{baseUrl}}/api/v1/recipes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "categoryId": "replace-with-category-guid",
+  "title": "Example recipe title",
+  "description": "A short recipe description",
+  "content": "Recipe overview.",
+  "prepTimeMinutes": 10,
+  "cookTimeMinutes": 20,
+  "servings": 2,
+  "difficulty": "Easy",
+  "nutrition": {
+    "calories": 250,
+    "protein": 12,
+    "carbohydrates": 30,
+    "fat": 8,
+    "fiber": 4
+  },
+  "ingredients": [
+    { "name": "Tomato", "quantity": 2.5, "unit": "pcs", "sortOrder": 0 }
+  ],
+  "steps": [
+    { "title": "Prepare", "description": "Wash and cut the tomatoes." }
+  ],
+  "images": []
+}
+
+### Update a recipe (replace @etag with the response ETag)
+PUT {{baseUrl}}/api/v1/recipes/{{recipeId}}
+Authorization: Bearer {{token}}
+If-Match: {{etag}}
+Content-Type: application/json
+
+{
+  "categoryId": "replace-with-category-guid",
+  "title": "Updated example recipe title",
+  "description": "Updated description",
+  "content": "Updated recipe overview.",
+  "prepTimeMinutes": 10,
+  "cookTimeMinutes": 20,
+  "servings": 2,
+  "difficulty": "Easy",
+  "nutrition": { "calories": 250, "protein": 12, "carbohydrates": 30, "fat": 8, "fiber": 4 },
+  "ingredients": [{ "name": "Tomato", "quantity": 2.5, "unit": "pcs", "sortOrder": 0 }],
+  "steps": [{ "title": "Prepare", "description": "Wash and cut the tomatoes." }],
+  "images": []
+}
+
+### Publish (replace @etag after every successful mutation)
+POST {{baseUrl}}/api/v1/recipes/{{recipeId}}/publish
+Authorization: Bearer {{token}}
+If-Match: {{etag}}
+
+### Unpublish
+POST {{baseUrl}}/api/v1/recipes/{{recipeId}}/unpublish
+Authorization: Bearer {{token}}
+If-Match: {{etag}}
+
+### Archive
+POST {{baseUrl}}/api/v1/recipes/{{recipeId}}/archive
+Authorization: Bearer {{token}}
+If-Match: {{etag}}
+
+### Unarchive
+POST {{baseUrl}}/api/v1/recipes/{{recipeId}}/unarchive
+Authorization: Bearer {{token}}
+If-Match: {{etag}}
+
+### Soft-delete a recipe
+DELETE {{baseUrl}}/api/v1/recipes/{{recipeId}}
+Authorization: Bearer {{token}}
+If-Match: {{etag}}
+
+### List deleted recipes (Admin)
+GET {{baseUrl}}/api/v1/admin/recipes/trash
+Authorization: Bearer {{token}}
+
+### Restore a deleted recipe (Admin)
+POST {{baseUrl}}/api/v1/admin/recipes/{{recipeId}}/restore
+Authorization: Bearer {{token}}
+
+### Purge a recipe (Admin; destructive)
+DELETE {{baseUrl}}/api/v1/admin/recipes/{{recipeId}}/purge
+Authorization: Bearer {{token}}
+
+### Reject fractional-string ingredient quantity with 422
+POST {{baseUrl}}/api/v1/recipes/{{recipeId}}/ingredients
+Authorization: Bearer {{token}}
+If-Match: {{etag}}
+Content-Type: application/json
+
+{
+  "name": "Flour",
+  "quantity": "1/2",
+  "unit": "cup",
+  "sortOrder": 0
+}
+
+### Add an ingredient
+POST {{baseUrl}}/api/v1/recipes/{{recipeId}}/ingredients
+Authorization: Bearer {{token}}
+If-Match: {{etag}}
+Content-Type: application/json
+
+{
+  "name": "Flour",
+  "quantity": 125.5,
+  "unit": "g",
+  "notes": "Sift before use",
+  "orderIndex": 0
+}
+
+### Update an ingredient (replace @etag with latest response ETag)
+PUT {{baseUrl}}/api/v1/recipes/{{recipeId}}/ingredients/{{ingredientId}}
+Authorization: Bearer {{token}}
+If-Match: {{etag}}
+Content-Type: application/json
+
+{
+  "name": "Bread flour",
+  "quantity": 150.25,
+  "unit": "g",
+  "notes": "Sift before use",
+  "orderIndex": 1
+}
+
+### Delete an ingredient (replace @etag with latest response ETag)
+DELETE {{baseUrl}}/api/v1/recipes/{{recipeId}}/ingredients/{{ingredientId}}
+Authorization: Bearer {{token}}
+If-Match: {{etag}}

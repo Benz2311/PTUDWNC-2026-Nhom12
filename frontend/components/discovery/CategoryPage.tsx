@@ -38,16 +38,16 @@ export default function CategoryPage({ slug }: { slug: string }) {
       <h1 className="flow-title">{category.name}</h1>
       {category.description && <p className="flow-description">{category.description}</p>}
       <section className="flow-panel">
-        <h2>{recipes.length} công thức đã xuất bản</h2>
+        <div className="section-heading"><div><h2>{recipes.length} công thức đã xuất bản</h2><p>Khám phá món ngon trong danh mục {category.name}.</p></div></div>
         {recipes.length === 0 ? <p>Chưa có công thức nào trong danh mục này.</p> : (
-          <ul className="list-plain">
+          <div className="recipe-card-grid">
             {recipes.map((recipe) => (
-              <li key={recipe.id}>
-                <a className="card-action" href={`/recipes/${recipe.slug}`}>{recipe.title}</a>
-                {recipe.description && <p>{recipe.description}</p>}
-              </li>
+              <a className="recipe-card" key={recipe.id} href={`/recipes/${encodeURIComponent(recipe.slug)}`}>
+                <div className="recipe-image" role={recipe.primaryImageUrl ? 'img' : undefined} aria-label={recipe.primaryImageUrl ? `Ảnh món ${recipe.title}` : undefined} style={recipe.primaryImageUrl ? { backgroundImage: `url("${recipe.primaryImageUrl}")` } : undefined}><span className="recipe-tag">{category.name}</span></div>
+                <div className="recipe-body"><h3>{recipe.title}</h3><p>{recipe.description || 'Món ăn hấp dẫn được cộng đồng chia sẻ.'}</p><div className="recipe-meta"><span>◷ {recipe.prepTimeMinutes + recipe.cookTimeMinutes} phút</span><span>{recipe.difficulty}</span></div><span className="recipe-card-link">Xem công thức →</span></div>
+              </a>
             ))}
-          </ul>
+          </div>
         )}
       </section>
     </>

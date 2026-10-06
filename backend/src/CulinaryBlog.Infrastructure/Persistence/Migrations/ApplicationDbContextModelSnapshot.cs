@@ -224,6 +224,11 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AuthorId");
@@ -557,6 +562,12 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
                                 .HasPrecision(8, 2)
                                 .HasColumnType("numeric(8,2)")
                                 .HasColumnName("Nutrition_Sodium");
+
+                            b1.Property<string>("Source")
+                                .IsRequired()
+                                .HasMaxLength(40)
+                                .HasColumnType("character varying(40)")
+                                .HasColumnName("Nutrition_Source");
 
                             b1.HasKey("RecipeId");
 

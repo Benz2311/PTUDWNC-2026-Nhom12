@@ -1,5 +1,6 @@
 using Minio;
 using Minio.DataModel.Args;
+using CulinaryBlog.Api.Helpers;
 
 namespace CulinaryBlog.Api.Endpoints.Files;
 
@@ -23,13 +24,7 @@ public static class FileEndpoints
 
         var bucketName = configuration["Minio:BucketName"] ?? "culinary-blog";
         var publicEndpoint = (configuration["Minio:PublicEndpoint"] ?? configuration["Minio:Endpoint"] ?? $"{request.Scheme}://{request.Host}").TrimEnd('/');
-        var bucketExists = await minio.BucketExistsAsync(new BucketExistsArgs().WithBucket(bucketName), cancellationToken);
-        if (!bucketExists)
-        {
-            await minio.MakeBucketAsync(new MakeBucketArgs().WithBucket(bucketName), cancellationToken);
-        }
-
-        await minio.SetPolicyAsync(new SetPolicyArgs().WithBucket(bucketName).WithPolicy("public"), cancellationToken);
+        await MinioBucketAccessPolicy.EnsurePublicReadAsync(minio, bucketName, cancellationToken);
 
         var uploaded = new List<ImageUploadResponse>();
 

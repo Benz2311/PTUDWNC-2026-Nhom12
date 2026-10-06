@@ -3,6 +3,8 @@ using CulinaryBlog.Domain.Enums;
 using CulinaryBlog.Api.Endpoints.Recipes;
 using CulinaryBlog.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.AspNetCore.Http;
 using System.Text.Json;
@@ -49,7 +51,7 @@ public sealed class RecipePersistenceModelTests
     }
 
     [Fact]
-    public void PublishGuard_RejectsUnconfirmedAuthorWithoutAdminOverride()
+    public void PublishGuard_RejectsUnconfirmedAuthor()
     {
         var method = typeof(RecipeEndpoints).GetMethod("CanPublishRecipe", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
@@ -63,7 +65,7 @@ public sealed class RecipePersistenceModelTests
         };
         var author = new ApplicationUser { EmailConfirmed = false };
 
-        var result = (bool)method.Invoke(null, [recipe, author, false])!;
+        var result = (bool)method.Invoke(null, [recipe, author])!;
 
         Assert.False(result);
     }
@@ -93,7 +95,7 @@ public sealed class RecipePersistenceModelTests
     }
 
     [Fact]
-    public void PublishGuard_AllowsConfirmedAuthorAndAdminWhenRecipeIsComplete()
+    public void PublishGuard_RequiresConfirmedAuthorEvenForAdmin()
     {
         var method = typeof(RecipeEndpoints).GetMethod("CanPublishRecipe", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
@@ -110,11 +112,11 @@ public sealed class RecipePersistenceModelTests
             Steps = [new RecipeStep { StepNumber = 1, Description = "Mix and cook." }]
         };
 
-        var result = (bool)method.Invoke(null, [recipe, new ApplicationUser { EmailConfirmed = true }, false])!;
-        var adminResult = (bool)method.Invoke(null, [recipe, new ApplicationUser { EmailConfirmed = false }, true])!;
+        var result = (bool)method.Invoke(null, [recipe, new ApplicationUser { EmailConfirmed = true }])!;
+        var unconfirmedAuthorResult = (bool)method.Invoke(null, [recipe, new ApplicationUser { EmailConfirmed = false }])!;
 
         Assert.True(result);
-        Assert.True(adminResult);
+        Assert.False(unconfirmedAuthorResult);
     }
 
     [Fact]
@@ -129,10 +131,12 @@ public sealed class RecipePersistenceModelTests
         var fractionError = (string?)method.Invoke(null, [new IngredientRequest("Salt", fractionDocument.RootElement, null)]);
         var decimalError = (string?)method.Invoke(null, [new IngredientRequest("Salt", decimalDocument.RootElement, null)]);
         var nullError = (string?)method.Invoke(null, [new IngredientRequest("Salt", nullDocument.RootElement, null)]);
+        var negativeOrderError = (string?)method.Invoke(null, [new IngredientRequest("Salt", nullDocument.RootElement, null, OrderIndex: -1)]);
 
         Assert.NotNull(fractionError);
         Assert.Null(decimalError);
         Assert.Null(nullError);
+        Assert.NotNull(negativeOrderError);
     }
 
     [Fact]
@@ -155,6 +159,26 @@ public sealed class RecipePersistenceModelTests
         using var context = CreateContext();
 
         Assert.Contains("20261003090000_AddRecipeLifecycleSupport", context.Database.GetMigrations());
+        Assert.Contains("20261003100000_AddRecipeNutritionSource", context.Database.GetMigrations());
+    }
+
+    [Fact]
+    public void MigrationSnapshot_MatchesCurrentModel()
+    {
+        using var context = CreateContext();
+        var migrationsAssembly = context.GetService<IMigrationsAssembly>();
+        var modelDiffer = context.GetService<IMigrationsModelDiffer>();
+        var modelInitializer = context.GetService<IModelRuntimeInitializer>();
+        var snapshot = Assert.IsAssignableFrom<ModelSnapshot>(migrationsAssembly.ModelSnapshot);
+        var snapshotModel = modelInitializer.Initialize(snapshot.Model, designTime: true);
+        var currentModel = context.GetService<IDesignTimeModel>().Model;
+
+        var differences = modelDiffer.GetDifferences(
+            snapshotModel.GetRelationalModel(),
+            currentModel.GetRelationalModel());
+
+        Assert.True(differences.Count == 0, string.Join(", ", differences.Select(operation =>
+            $"{operation.GetType().Name} {operation.GetType().GetProperty("Table")?.GetValue(operation)}.{operation.GetType().GetProperty("Name")?.GetValue(operation)}")));
     }
 
     private static ApplicationDbContext CreateContext()

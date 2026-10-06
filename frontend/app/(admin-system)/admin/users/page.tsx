@@ -1,2 +1,12 @@
-export default function AdminUsersPage() { return <AdminPage title="Quản lý người dùng" description="Danh sách tài khoản, vai trò, trạng thái và thao tác quản trị người dùng." />; }
-function AdminPage({ title, description }: { title: string; description: string }) { return <><div className="flow-kicker">Quản trị viên · Hệ thống</div><h1 className="flow-title">{title}</h1><p className="flow-description">{description}</p><section className="flow-panel" style={{ marginTop: 34 }}><h2>Bảng dữ liệu {title.toLowerCase()}</h2><p>Khu vực bảng, bộ lọc và các thao tác quản trị sẽ được triển khai ở bước chức năng.</p></section></>; }
+import AdminDataPlaceholder from '@/components/admin/AdminDataPlaceholder';
+
+export default function AdminUsersPage() {
+  return (
+    <>
+      <div className="flow-kicker">Quản trị viên · Hệ thống</div>
+      <h1 className="flow-title">Quản lý người dùng</h1>
+      <p className="flow-description">Theo dõi tài khoản, vai trò và trạng thái hoạt động của cộng đồng.</p>
+      <AdminDataPlaceholder title="Danh sách thành viên" description="Quản lý tài khoản và quyền truy cập." columns={['Thành viên', 'Email', 'Vai trò', 'Công thức', 'Trạng thái', 'Thao tác']} />
+    </>
+  );
+}

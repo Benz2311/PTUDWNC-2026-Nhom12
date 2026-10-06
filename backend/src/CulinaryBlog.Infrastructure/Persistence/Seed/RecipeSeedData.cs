@@ -256,6 +256,7 @@ public static class RecipeSeedData
 }
 
 await db.SaveChangesAsync(cancellationToken);
+    await RecipeSampleImageSeeder.EnsureImagesAsync(db, DemoUserId, cancellationToken);
     }
 
     private static Category CreateCategory(

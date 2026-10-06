@@ -17,11 +17,12 @@ API được đăng ký dưới cả prefix `/api/v1` và alias `/api`. Các end
 |---|---|---|
 | `POST` | `/api/v1/recipes` | Đăng nhập; tác giả được gán từ user hiện tại; recipe mới ở trạng thái Draft. |
 | `PUT` | `/api/v1/recipes/{id}` | Owner hoặc Admin; bắt buộc `If-Match`. |
-| `PATCH` | `/api/v1/recipes/{id}/publish` | Owner hoặc Admin; bắt buộc `If-Match`; phải thỏa điều kiện publish. |
-| `PATCH` | `/api/v1/recipes/{id}/unpublish` | Owner hoặc Admin; bắt buộc `If-Match`; chỉ chuyển Published về Draft. |
-| `PATCH` | `/api/v1/recipes/{id}/archive` | Owner hoặc Admin; bắt buộc `If-Match`; chuyển sang Archived. |
-| `PATCH` | `/api/v1/recipes/{id}/unarchive` | Owner hoặc Admin; bắt buộc `If-Match`; chỉ chuyển Archived về Draft. |
-| `DELETE` | `/api/v1/recipes/{id}` | Owner hoặc Admin; xóa mềm. |
+| `POST` | `/api/v1/recipes/{id}/publish` | Owner hoặc Admin; bắt buộc `If-Match`; tác giả phải xác nhận email và recipe thỏa điều kiện publish. `PATCH` vẫn được hỗ trợ tương thích ngược. |
+| `POST` | `/api/v1/recipes/{id}/unpublish` | Owner hoặc Admin; bắt buộc `If-Match`; chỉ chuyển Published về Draft. `PATCH` vẫn được hỗ trợ tương thích ngược. |
+| `POST` | `/api/v1/recipes/{id}/archive` | Owner hoặc Admin; bắt buộc `If-Match`; chuyển sang Archived. `PATCH` vẫn được hỗ trợ tương thích ngược. |
+| `POST` | `/api/v1/recipes/{id}/unarchive` | Owner hoặc Admin; bắt buộc `If-Match`; chỉ chuyển Archived về Draft. `PATCH` vẫn được hỗ trợ tương thích ngược. |
+| `DELETE` | `/api/v1/recipes/{id}` | Owner hoặc Admin; bắt buộc `If-Match`; xóa mềm. |
+| `GET` | `/api/v1/admin/recipes/trash` | Admin; liệt kê recipe đã xóa mềm. |
 | `POST` | `/api/v1/admin/recipes/{id}/restore` | Admin; chỉ restore recipe đã xóa mềm và còn trong thời hạn retention. |
 | `DELETE` | `/api/v1/admin/recipes/{id}/purge` | Admin; xóa vật lý recipe hiện có. |
 | `POST` | `/api/v1/recipes/{id}/ingredients` | Owner hoặc Admin; bắt buộc `If-Match` của Recipe. |
@@ -54,7 +55,7 @@ API được đăng ký dưới cả prefix `/api/v1` và alias `/api`. Các end
 
 ### Publish / Unpublish
 
-- Publish yêu cầu email tác giả đã xác nhận; Admin có thể publish thay.
+- Publish luôn yêu cầu email của tác giả đã xác nhận, kể cả khi Admin thực hiện thao tác.
 - Recipe cần có Category chưa xóa, field cơ bản hợp lệ, ít nhất một Ingredient và ít nhất một Step.
 - Khi publish, `Status` thành `Published`; `PublishedAt` chỉ được gán lần đầu và được giữ lại khi unpublish.
 - Gọi lại action khi Recipe đã ở trạng thái đích trả kết quả hiện tại (idempotent).
@@ -73,7 +74,7 @@ API được đăng ký dưới cả prefix `/api/v1` và alias `/api`. Các end
 - `Name` bắt buộc, tối đa 200 ký tự.
 - `Quantity` nhận JSON number decimal hoặc `null`; nếu có thì phải lớn hơn 0.
 - `Unit` có thể null, tối đa 50 ký tự; `Notes` có thể null, tối đa 500 ký tự.
-- `SortOrder` không được âm.
+- `SortOrder` (hoặc alias `OrderIndex`) không được âm.
 - Giá trị phân số dạng chuỗi, ví dụ `"1/2"`, không phải JSON number và bị từ chối với `422 Unprocessable Entity`.
 
 ## Xóa mềm, Restore và Purge
@@ -137,9 +138,15 @@ Không bật purge job trên môi trường thật trước khi xác nhận chí
 
 ## Frontend liên quan
 
+- Giao diện được sắp theo luồng tham chiếu: Trang chủ/giới thiệu → Đăng ký → Đăng nhập → Hồ sơ → Trang chủ sau đăng nhập → Danh sách → Chi tiết → Chế độ nấu từng bước → Tìm kiếm → Tạo → Chỉnh sửa → Quản trị công thức/người dùng/đánh giá → Thống kê → Giới thiệu/liên hệ → 404.
+- `SiteHeader` dùng chung cho các nhóm route; giao diện danh sách/khám phá lấy công thức và danh mục từ API thật.
+- `CookingGuide` cung cấp checklist nguyên liệu, tiến độ và điều hướng từng bước nấu.
+- Dashboard và báo cáo sử dụng `/api/v1/dashboard/statistics`. Màn quản trị người dùng và đánh giá hiện hiển thị trạng thái chưa tích hợp dữ liệu vì backend chưa có endpoint cho hai module này.
 - `frontend/lib/api.ts` cung cấp fetch giữ lại response headers để client đọc ETag.
 - `RecipeForm` gửi `If-Match` khi chỉnh sửa Recipe.
-- `RecipeActions` gửi ETag khi publish/unpublish và cập nhật ETag từ response mới.
+- `RecipeActions` gửi ETag khi publish/unpublish/archive/unarchive/xóa mềm; thao tác xung đột 409 hiển thị hướng dẫn tải lại phiên bản.
+- `IngredientEditor`, `StepEditor` và `ImageManager` tích hợp trong biểu mẫu tạo/chỉnh sửa recipe.
+- Trang `/admin/recipes/trash` hỗ trợ khôi phục và xóa vĩnh viễn recipe; purge yêu cầu xác nhận.
 - Category page dùng route `/categories/[slug]`, là route được sitemap tham chiếu.
 
 ## Kiểm thử
@@ -155,7 +162,7 @@ Kiểm thử hiện có bao gồm:
 - Recipe write service gọi repository và lưu thay đổi; ingredient/step/image operations được kiểm tra delegation và số lần save.
 - EF model/indexes, `DeletedAt`, slug history, audit log và khả năng discover migration.
 - ETag được phát theo `xmin`; stale ETag bị guard từ chối.
-- Publish guard: tác giả chưa xác nhận bị từ chối, recipe hợp lệ cho phép tác giả đã xác nhận hoặc Admin.
+- Publish guard: recipe chỉ được xuất bản khi hợp lệ và tác giả đã xác nhận email (không có ngoại lệ Admin).
 - Ingredient quantity: JSON decimal và null được chấp nhận; phân số dạng string bị từ chối.
 - PostgreSQL integration test cho quan hệ Recipe/Ingredient, owned Nutrition, replace children và soft delete.
 
@@ -170,7 +177,7 @@ npm run build
 
 ### Kết quả xác minh gần nhất
 
-- Backend: 21 tests, 20 passed, 1 skipped, 0 failed; test bị skip do chưa cấu hình PostgreSQL test database.
+- Backend: 22 tests, 21 passed, 1 skipped, 0 failed; test bị skip do chưa cấu hình PostgreSQL test database.
 - Frontend: `npm run build` thành công.
 - `git diff --check`: không phát hiện lỗi whitespace trong lần xác minh gần nhất.
 

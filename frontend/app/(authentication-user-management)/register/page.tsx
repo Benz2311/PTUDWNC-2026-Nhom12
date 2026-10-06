@@ -28,9 +28,9 @@ export default function RegisterPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fullName: form.fullName, email: form.email, userName: form.userName || null, password: form.password })
-      });
+      }, false);
       saveAuth(payload);
-      router.push('/profile');
+      router.replace('/');
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Không thể đăng ký lúc này.');
     } finally {
@@ -39,11 +39,19 @@ export default function RegisterPage() {
   }
 
   return (
-    <>
-      <div className="flow-kicker">Xác thực tài khoản</div>
-      <h1 className="flow-title">Tạo tài khoản</h1>
-      <p className="flow-description">Tham gia cộng đồng yêu bếp, lưu lại cảm hứng và chia sẻ công thức của riêng bạn.</p>
-      <section className="auth-form-panel">
+    <div className="auth-stage">
+      <section className="auth-story">
+        <div className="flow-kicker">Bếp nhà, câu chuyện riêng</div>
+        <h2 className="flow-title">Cùng nhau làm nên bữa cơm đáng nhớ.</h2>
+        <p>Tạo tài khoản miễn phí để lưu công thức, ghi lại kinh nghiệm và lan tỏa tình yêu nấu nướng.</p>
+        <ul className="auth-benefits"><li>Chia sẻ công thức nấu ăn</li><li>Lưu lại những món muốn thử</li><li>Tham gia cộng đồng yêu ẩm thực</li></ul>
+      </section>
+      <div className="auth-stage-form">
+        <div className="flow-kicker">Tài khoản Culinary Blog</div>
+        <h1 className="flow-title">Tạo tài khoản</h1>
+        <p className="flow-description">Chỉ mất một phút để bắt đầu hành trình vào bếp.</p>
+        <section className="auth-form-panel">
+        <h2>Đăng ký thành viên</h2><p>Điền thông tin cơ bản của bạn.</p>
         <form className="auth-form" onSubmit={handleSubmit}>
           <label className="field">Họ và tên<input value={form.fullName} onChange={(event) => updateField('fullName', event.target.value)} required autoComplete="name" /></label>
           <label className="field">Email<input type="email" value={form.email} onChange={(event) => updateField('email', event.target.value)} required autoComplete="email" /></label>
@@ -57,6 +65,7 @@ export default function RegisterPage() {
         </form>
         <p className="auth-switch">Đã có tài khoản? <a href="/login">Đăng nhập</a></p>
       </section>
-    </>
+      </div>
+    </div>
   );
 }

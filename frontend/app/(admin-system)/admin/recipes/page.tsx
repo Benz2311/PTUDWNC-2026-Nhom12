@@ -1,2 +1,13 @@
-export default function AdminRecipesPage() { return <AdminPage title="Quản lý công thức" description="Duyệt, chỉnh sửa, xuất bản hoặc lưu trữ nội dung công thức trong hệ thống." />; }
-function AdminPage({ title, description }: { title: string; description: string }) { return <><div className="flow-kicker">Quản trị viên · Hệ thống</div><h1 className="flow-title">{title}</h1><p className="flow-description">{description}</p><section className="flow-panel" style={{ marginTop: 34 }}><h2>Bảng dữ liệu {title.toLowerCase()}</h2><p>Khu vực bảng, bộ lọc và các thao tác quản trị sẽ được triển khai ở bước chức năng.</p></section></>; }
+import RecipeList from '@/components/recipe-management/RecipeList';
+
+export default function AdminRecipesPage() {
+  return (
+    <>
+      <div className="flow-kicker">Quản trị viên · Hệ thống</div>
+      <h1 className="flow-title">Quản lý công thức</h1>
+      <p className="flow-description">Duyệt, chỉnh sửa, xuất bản hoặc lưu trữ nội dung công thức trong hệ thống.</p>
+      <div className="admin-page-actions"><a className="outline-button" href="/admin/recipes/trash">Mở thùng rác công thức</a></div>
+      <RecipeList admin />
+    </>
+  );
+}

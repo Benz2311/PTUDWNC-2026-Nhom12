@@ -1,13 +1,15 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import Image from 'next/image';
 import { apiFetch, apiJson } from '@/lib/api';
+import IngredientEditor, { IngredientDraft } from './IngredientEditor';
+import StepEditor, { StepDraft } from './StepEditor';
+import ImageManager, { RecipeImageDraft } from './ImageManager';
 
 type Category = { id: string; name: string };
-type Ingredient = { name: string; quantity: string; unit: string };
-type Step = { title: string; description: string };
-type ExistingImage = { url: string; altText: string };
+type Ingredient = IngredientDraft;
+type Step = StepDraft;
+type ExistingImage = RecipeImageDraft;
 type UploadedImage = { url: string; originalName: string };
 
 export type InitialRecipe = {
@@ -20,7 +22,7 @@ export type InitialRecipe = {
   cookTimeMinutes: number;
   servings: number;
   difficulty: string;
-  ingredients: { name: string; quantity: number | null; unit: string | null }[];
+  ingredients: { name: string; quantity: number | null; unit: string | null; notes?: string | null }[];
   steps: { title: string; description: string }[];
   nutrition: {
     calories: number | null;
@@ -42,10 +44,9 @@ export default function RecipeForm({ recipeId, initialRecipe, etag }: { recipeId
   const [prepTimeMinutes, setPrepTimeMinutes] = useState('1');
   const [servings, setServings] = useState('1');
   const [difficulty, setDifficulty] = useState('Easy');
-  const [ingredients, setIngredients] = useState<Ingredient[]>([{ name: '', quantity: '', unit: '' }]);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([{ name: '', quantity: '', unit: '', notes: '' }]);
   const [steps, setSteps] = useState<Step[]>([{ title: '', description: '' }]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<{ name: string; url: string }[]>([]);
   const [initialImages, setInitialImages] = useState<ExistingImage[]>([]);
   const [nutrition, setNutrition] = useState({ calories: '0', protein: '0', carbohydrates: '0', fat: '0', fiber: '0' });
   const [message, setMessage] = useState('');
@@ -82,8 +83,9 @@ export default function RecipeForm({ recipeId, initialRecipe, etag }: { recipeId
         name: ingredient.name,
         quantity: ingredient.quantity?.toString() ?? '',
         unit: ingredient.unit ?? '',
+        notes: ingredient.notes ?? '',
       }))
-      : [{ name: '', quantity: '', unit: '' }]);
+      : [{ name: '', quantity: '', unit: '', notes: '' }]);
     setSteps(initialRecipe.steps.length > 0 ? initialRecipe.steps : [{ title: '', description: '' }]);
     setInitialImages(initialRecipe.images.map((image) => ({ url: image.url, altText: image.altText ?? initialRecipe.title })));
 
@@ -93,26 +95,6 @@ export default function RecipeForm({ recipeId, initialRecipe, etag }: { recipeId
       ) as typeof nutrition);
     }
   }, [initialRecipe]);
-
-  useEffect(() => () => {
-    imagePreviews.forEach((preview) => URL.revokeObjectURL(preview.url));
-  }, [imagePreviews]);
-
-  function updateIngredient(index: number, key: keyof Ingredient, value: string) {
-    setIngredients((current) => current.map((item, itemIndex) =>
-      itemIndex === index ? { ...item, [key]: value } : item));
-  }
-
-  function updateStep(index: number, key: keyof Step, value: string) {
-    setSteps((current) => current.map((item, itemIndex) =>
-      itemIndex === index ? { ...item, [key]: value } : item));
-  }
-
-  function handleImageSelection(files: FileList | null) {
-    const selectedFiles = Array.from(files ?? []);
-    setImageFiles(selectedFiles);
-    setImagePreviews(selectedFiles.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })));
-  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -167,6 +149,7 @@ export default function RecipeForm({ recipeId, initialRecipe, etag }: { recipeId
                 name: ingredient.name,
                 quantity: ingredient.quantity ? Number(ingredient.quantity) : null,
                 unit: ingredient.unit || null,
+                notes: ingredient.notes || null,
                 sortOrder: index,
               })),
             images: [...initialImages, ...uploadedImages],
@@ -177,7 +160,11 @@ export default function RecipeForm({ recipeId, initialRecipe, etag }: { recipeId
 
       window.location.href = `/recipes/${saved.slug}`;
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Không thể lưu công thức.');
+      if ((error as { status?: number }).status === 403) {
+        setMessage('Bạn không có quyền sửa công thức này. Chỉ tác giả hoặc quản trị viên mới được cập nhật.');
+      } else {
+        setMessage(error instanceof Error ? error.message : 'Không thể lưu công thức.');
+      }
       setSaving(false);
     }
   }
@@ -190,13 +177,13 @@ export default function RecipeForm({ recipeId, initialRecipe, etag }: { recipeId
           <div><h2>Thông tin món ăn</h2><p>Đặt nền tảng cho công thức của bạn.</p></div>
         </div>
         <div className="form-grid">
-          <label className="field field-wide"><span>Tên công thức</span><input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ví dụ: Phở bò truyền thống" /></label>
+          <label className="field field-wide"><span>Tên công thức</span><input required minLength={5} maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ví dụ: Phở bò truyền thống" /></label>
           <label className="field"><span>Danh mục</span><select required value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="" disabled>Chọn danh mục</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           <label className="field"><span>Thời gian chuẩn bị (phút)</span><input required min="1" type="number" value={prepTimeMinutes} onChange={(event) => setPrepTimeMinutes(event.target.value)} /></label>
           <label className="field"><span>Thời gian nấu (phút)</span><input required min="0" type="number" value={cookTimeMinutes} onChange={(event) => setCookTimeMinutes(event.target.value)} /></label>
           <label className="field"><span>Khẩu phần</span><input required min="1" type="number" value={servings} onChange={(event) => setServings(event.target.value)} /></label>
           <label className="field"><span>Độ khó</span><select value={difficulty} onChange={(event) => setDifficulty(event.target.value)}><option>Easy</option><option>Medium</option><option>Hard</option><option>Expert</option></select></label>
-          <label className="field field-wide"><span>Mô tả ngắn</span><input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Một câu giới thiệu hấp dẫn" /></label>
+          <label className="field field-wide"><span>Mô tả ngắn</span><input maxLength={2000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Một câu giới thiệu hấp dẫn" /></label>
           <label className="field field-wide"><span>Cách thực hiện tổng quát</span><textarea required rows={5} value={content} onChange={(event) => setContent(event.target.value)} placeholder="Mô tả tổng quan cách nấu món ăn..." /></label>
         </div>
       </div>
@@ -204,40 +191,17 @@ export default function RecipeForm({ recipeId, initialRecipe, etag }: { recipeId
       <div className="form-section">
         <div className="form-section-heading">
           <span className="step-number">02</span>
-          <div><h2>Nguyên liệu</h2><p>Liệt kê nguyên liệu theo thứ tự sử dụng.</p></div>
-          <button className="small-button" type="button" onClick={() => setIngredients((current) => [...current, { name: '', quantity: '', unit: '' }])}>+ Thêm dòng</button>
+          <div><h2>Nguyên liệu</h2><p>Liệt kê nguyên liệu theo thứ tự sử dụng; có thể lưu nháp khi danh sách chưa hoàn chỉnh.</p></div>
         </div>
-        <div className="ingredient-editor">
-          <div className="ingredient-header"><span>Nguyên liệu</span><span>Số lượng</span><span>Đơn vị</span><span /></div>
-          {ingredients.map((ingredient, index) => (
-            <div className="ingredient-row" key={index}>
-              <input required={index === 0} value={ingredient.name} onChange={(event) => updateIngredient(index, 'name', event.target.value)} placeholder="Tên nguyên liệu" />
-              <input min="0.001" step="0.001" type="number" value={ingredient.quantity} onChange={(event) => updateIngredient(index, 'quantity', event.target.value)} placeholder="500" />
-              <input value={ingredient.unit} onChange={(event) => updateIngredient(index, 'unit', event.target.value)} placeholder="g" />
-              <button type="button" aria-label="Xóa nguyên liệu" onClick={() => setIngredients((current) => current.length === 1 ? current : current.filter((_, itemIndex) => itemIndex !== index))}>×</button>
-            </div>
-          ))}
-        </div>
+        <IngredientEditor ingredients={ingredients} onChange={setIngredients} />
       </div>
 
       <div className="form-section">
         <div className="form-section-heading">
           <span className="step-number">03</span>
           <div><h2>Các bước thực hiện</h2><p>Thêm ít nhất một bước để có thể xuất bản công thức.</p></div>
-          <button className="small-button" type="button" onClick={() => setSteps((current) => [...current, { title: '', description: '' }])}>+ Thêm bước</button>
         </div>
-        <div className="step-editor">
-          {steps.map((step, index) => (
-            <div className="step-row" key={index}>
-              <strong>{String(index + 1).padStart(2, '0')}</strong>
-              <div className="form-grid">
-                <label className="field field-wide"><span>Tiêu đề bước</span><input value={step.title} onChange={(event) => updateStep(index, 'title', event.target.value)} placeholder="Sơ chế nguyên liệu" /></label>
-                <label className="field field-wide"><span>Hướng dẫn</span><textarea required={index === 0} rows={3} value={step.description} onChange={(event) => updateStep(index, 'description', event.target.value)} placeholder="Mô tả thao tác cần thực hiện..." /></label>
-              </div>
-              <button className="small-button" type="button" onClick={() => setSteps((current) => current.length === 1 ? current : current.filter((_, itemIndex) => itemIndex !== index))}>Xóa bước</button>
-            </div>
-          ))}
-        </div>
+        <StepEditor steps={steps} onChange={setSteps} />
       </div>
 
       <div className="form-section">
@@ -254,15 +218,7 @@ export default function RecipeForm({ recipeId, initialRecipe, etag }: { recipeId
 
       <div className="form-section">
         <div className="form-section-heading"><span className="step-number">05</span><div><h2>Ảnh món ăn</h2><p>Chọn nhiều ảnh, tối đa 5 MB mỗi ảnh.</p></div></div>
-        <label className="upload-dropzone">
-          <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple onChange={(event) => handleImageSelection(event.target.files)} />
-          <strong>Chọn ảnh món ăn</strong><span>JPG, PNG, WebP hoặc AVIF</span>
-        </label>
-        {imagePreviews.length > 0 && (
-          <div className="upload-preview-grid">
-            {imagePreviews.map((preview) => <div className="upload-preview" key={`${preview.name}-${preview.url}`}><Image src={preview.url} alt={preview.name} width={320} height={320} unoptimized /><span>{preview.name}</span></div>)}
-          </div>
-        )}
+        <ImageManager images={initialImages} onImagesChange={setInitialImages} onFilesChange={setImageFiles} />
       </div>
 
       {message && <p className="form-error" role="alert">{message}</p>}

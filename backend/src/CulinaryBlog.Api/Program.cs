@@ -82,6 +82,7 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
         .AllowAnyMethod()));
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<SitemapGenerationHostedService>();
+builder.Services.AddHostedService<MinioBucketPolicyHostedService>();
 if (builder.Configuration.GetValue<bool>("Recipes:PurgeJobEnabled"))
 {
     builder.Services.AddHostedService<RecipePurgeHostedService>();
@@ -110,6 +111,7 @@ app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
         detail: "An unexpected error occurred.",
         type: "INTERNAL_SERVER_ERROR").ExecuteAsync(context);
 }));
+app.UseCors();
 app.UseRateLimiter();
 
 if (app.Environment.IsDevelopment())
@@ -119,7 +121,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseCors();
 app.UseStaticFiles();
 
 app.MapAuthEndpoints();

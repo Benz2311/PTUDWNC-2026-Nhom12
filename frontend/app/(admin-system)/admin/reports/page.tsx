@@ -1,2 +1,12 @@
-export default function AdminReportsPage() { return <AdminPage title="Thống kê & báo cáo" description="Theo dõi số liệu hoạt động, tăng trưởng nội dung và mức độ tương tác của hệ thống." />; }
-function AdminPage({ title, description }: { title: string; description: string }) { return <><div className="flow-kicker">Quản trị viên · Hệ thống</div><h1 className="flow-title">{title}</h1><p className="flow-description">{description}</p><section className="flow-panel" style={{ marginTop: 34 }}><h2>Khu vực phân tích</h2><p>Biểu đồ, chỉ số và bộ lọc thời gian sẽ được triển khai ở bước chức năng.</p></section></>; }
+import AdminStatistics from '@/components/admin/AdminStatistics';
+
+export default function AdminReportsPage() {
+  return (
+    <>
+      <div className="flow-kicker">Quản trị viên · Hệ thống</div>
+      <h1 className="flow-title">Thống kê & báo cáo</h1>
+      <p className="flow-description">Theo dõi số lượng công thức, trạng thái xuất bản và phân bổ nội dung theo danh mục.</p>
+      <AdminStatistics />
+    </>
+  );
+}
