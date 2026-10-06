@@ -49,8 +49,7 @@ public sealed class S3StorageService : IStorageService
             BucketName = bucketName,
             Key = objectKey,
             InputStream = content,
-            ContentType = contentType,
-            DisablePayloadSigning = true  // MinIO compatibility
+            ContentType = contentType
         };
 
         await _s3Client.PutObjectAsync(request, ct);

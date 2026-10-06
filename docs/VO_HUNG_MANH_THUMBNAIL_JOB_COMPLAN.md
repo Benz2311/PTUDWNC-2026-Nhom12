@@ -360,7 +360,7 @@ Toàn bộ **10 bài kiểm thử đơn vị** của `ImageResizeJobTests` đề
 ---
 
 ## 30. CÁC GIỚI HẠN KỸ THUẬT (LIMITATIONS)
-* **Định dạng AVIF:** Thư viện `SixLabors.ImageSharp` thuần C# phiên bản 4.1.2 hiện tại chưa tích hợp sẵn codec giải mã AVIF. Nếu người dùng tải ảnh AVIF, hệ thống sẽ lưu ảnh gốc bình thường nhưng background job sẽ không thể decode để resize, và giữ nguyên `OriginalUrl`.
+* **Định dạng AVIF:** Thư viện `SixLabors.ImageSharp` thuần C# phiên bản 4.1.2 hiện tại chưa tích hợp sẵn codec giải mã AVIF. Do đó, hệ thống đã chuẩn hóa backend contract từ chối định dạng AVIF ngay từ khâu upload (HTTP 400), đảm bảo toàn bộ ảnh được lưu vào hệ thống đều được Thumbnail Job xử lý thành công 100%.
 * **Ảnh SVG:** SVG là đồ họa vector dưới dạng mã XML, không thể áp dụng thuật toán resize ma trận điểm ảnh raster của ImageSharp.
 
 ---
@@ -390,7 +390,7 @@ Toàn bộ **10 bài kiểm thử đơn vị** của `ImageResizeJobTests` đề
 > **Trả lời:** Em sử dụng thư viện `SixLabors.ImageSharp` (phiên bản 4.1.2). Đây là thư viện đồ họa 2D thuần C# (managed code), hoàn toàn độc lập nền tảng (chạy mượt mà trên cả Linux, Windows, macOS và trong Docker container), không phụ thuộc vào thư viện C++ native của hệ điều hành như `System.Drawing.Common` (vốn đã bị Microsoft khai tử trên non-Windows từ .NET 6).
 
 ### Câu 6: Hệ thống của em hỗ trợ những định dạng ảnh nào? Định dạng AVIF thì sao?
-> **Trả lời:** Hệ thống hỗ trợ đầy đủ các định dạng phổ biến gồm: JPEG, PNG, WebP và GIF. Khi resize, định dạng gốc được bảo toàn (ảnh gốc PNG sẽ xuất ra Medium/Thumbnail dạng PNG). Riêng định dạng AVIF, thư viện ImageSharp hiện tại chưa có decoder tích hợp sẵn, do đó hệ thống chỉ lưu trữ ảnh gốc và ghi nhận đây là một giới hạn kỹ thuật (limitation).
+> **Trả lời:** Hệ thống hỗ trợ đầy đủ các định dạng phổ biến gồm: JPEG, PNG, WebP và GIF. Khi resize, định dạng gốc được bảo toàn (ảnh gốc PNG sẽ xuất ra Medium/Thumbnail dạng PNG). Riêng định dạng AVIF, do ImageSharp chưa có decoder tích hợp sẵn, backend contract đã được tinh chỉnh để từ chối AVIF ngay từ tầng upload (HTTP 400), tránh tình trạng lưu ảnh gốc mà không sinh được thumbnail.
 
 ### Câu 7: Hangfire lưu trữ dữ liệu hàng đợi ở đâu?
 > **Trả lời:** Hangfire trong dự án của em lưu trữ toàn bộ metadata, thông số job và trạng thái vào cơ sở dữ liệu PostgreSQL trong schema có tên là `hangfire`. Nhờ đó, nếu server có bị sập hoặc khởi động lại, các job đang chờ vẫn không bị mất (Persistent Job Queue).

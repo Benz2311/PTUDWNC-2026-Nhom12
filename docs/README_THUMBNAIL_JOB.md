@@ -252,7 +252,7 @@ dotnet build backend/CulinaryBlog.sln
 
 1. **Hạn chế giải mã định dạng AVIF**:
    - Thư viện đồ họa thuần C# `SixLabors.ImageSharp` hiện tại chưa tích hợp sẵn bộ giải mã (decoder) cho định dạng AVIF mặc định (định dạng này đòi hỏi các thư viện native C/C++ ngoài như `libheif`).
-   - Nếu người dùng tải lên ảnh định dạng AVIF, hệ thống vẫn lưu trữ và phục vụ ảnh gốc `OriginalUrl` bình thường, nhưng tính năng Thumbnail Job sẽ từ chối giải mã và giữ nguyên các trường thumbnail là null.
+   - Do đó, backend đã thống nhất hợp đồng dữ liệu chỉ chấp nhận các định dạng mà Thumbnail Job giải mã được (JPEG, PNG, WebP) và từ chối tải lên ảnh AVIF ngay từ tầng validation (HTTP 400).
 2. **Phụ thuộc môi trường Hangfire Server**:
    - Thumbnail Job đòi hỏi tiến trình Hangfire Server phải đang chạy song song với ứng dụng để tiêu thụ các job từ hàng đợi.
 
