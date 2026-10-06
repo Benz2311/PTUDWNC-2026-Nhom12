@@ -58,8 +58,7 @@ public class S3StorageServiceTests
             It.Is<PutObjectRequest>(r =>
                 r.BucketName == "culinaryblog" &&
                 r.Key == objectKey &&
-                r.ContentType == "image/jpeg" &&
-                r.DisablePayloadSigning == true),
+                r.ContentType == "image/jpeg"),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 

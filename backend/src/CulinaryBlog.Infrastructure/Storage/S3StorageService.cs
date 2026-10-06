@@ -86,7 +86,7 @@ public sealed class S3StorageService : IStorageService
                     Key = sanitizedKey,
                     InputStream = content,
                     ContentType = resolvedContentType,
-                    DisablePayloadSigning = true // MinIO compatibility
+                    AutoCloseStream = false
                 };
 
                 return await _s3Client.PutObjectAsync(request, ct);
@@ -291,6 +291,11 @@ public sealed class S3StorageService : IStorageService
 
                     await Task.Delay(delayMs, ct);
                 }
+            }
+            catch (ObjectDisposedException) when (lastException != null)
+            {
+                _logger?.LogWarning("Luồng dữ liệu đã bị đóng sau sự cố kết nối ở lần thử trước ({Operation}). Dừng retry.", operationName);
+                break;
             }
             catch (Exception ex)
             {

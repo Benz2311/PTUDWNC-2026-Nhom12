@@ -77,7 +77,7 @@ Hệ thống sử dụng cơ chế truyền luồng (Stream) từ HTTP Request t
 [ S3StorageService (Infrastructure) ]
                │  - SanitizeKey chống Path Traversal
                │  - ExecuteWithRetryAsync (tự động thử lại nếu lỗi tạm thời)
-               │  - Gán PutObjectRequest (InputStream = content, DisablePayloadSigning = true)
+               │  - Gán PutObjectRequest (InputStream = content, ContentType = contentType, Payload Signing mặc định)
                ▼
 [ MinIO / Object Storage Server (Port 9000) ]
                │
@@ -309,8 +309,8 @@ Toàn bộ **130 test cases** đều chạy thành công (`PASS: 130, FAILED: 0,
 ### Câu 14: Tại sao trong cấu hình AmazonS3Config cần bật `ForcePathStyle = true`?
 > **Trả lời:** AWS S3 mặc định sử dụng Virtual-Hosted Style URL (`http://bucket-name.s3.amazonaws.com/object`). Tuy nhiên các hệ thống Object Storage cục bộ như MinIO chạy trên IP/localhost không có DNS wildcard cho từng bucket, do đó bắt buộc phải sử dụng Path-Style URL (`http://localhost:9000/bucket-name/object`).
 
-### Câu 15: Tại sao cần `DisablePayloadSigning = true` trong PutObjectRequest?
-> **Trả lời:** Mặc định AWS SDK sẽ tính toán mã băm SHA256 trên toàn bộ nội dung của payload stream để ký xác thực. Việc này buộc SDK phải đọc toàn bộ stream trước khi gửi, làm mất đi lợi thế truyền stream trực tiếp và có thể gây lỗi với stream không seek được. Tắt ký payload giúp tương thích tối đa và tăng tốc độ truyền tệp lên MinIO.
+### Câu 15: Tại sao cần để AWS SDK thực hiện Payload Signing mặc định trong PutObjectRequest?
+> **Trả lời:** Mặc định AWS SDK thực hiện ký payload (Payload Signing) theo chuẩn AWS Signature Version 4. Khi giao tiếp với MinIO local qua giao thức HTTP không mã hóa, AWS SDK bắt buộc payload phải được ký để đảm bảo tính toàn vẹn (nếu đặt `DisablePayloadSigning = true` trên HTTP, SDK sẽ chặn lại và ném ra `AmazonClientException: Disabling payload signing is only supported for HTTPS endpoints`). Để AWS SDK thực hiện payload signing mặc định giúp tương thích 100% với cả MinIO local HTTP lẫn AWS S3/Cloudflare R2 HTTPS trên production.
 
 ### Câu 16: Phương thức `GetPresignedUrlAsync` dùng để làm gì?
 > **Trả lời:** Dùng để tạo một đường dẫn URL có chữ ký bảo mật và có thời hạn sử dụng (ví dụ hết hạn sau 15 phút). Tính năng này cho phép Client tải trực tiếp file riêng tư từ MinIO mà không cần mở public toàn bộ bucket.
