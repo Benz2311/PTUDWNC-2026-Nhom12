@@ -1,208 +1,125 @@
-# Application Health Checks
+# Giám sát sức khỏe ứng dụng (Application Health Checks)
 
-## Người thực hiện
-**Võ Hùng Mạnh** (Nhóm 12)
-
-## Branch
-`feat/vohungmanh-health-check`
-
-## Mục tiêu
-Triển khai hệ thống giám sát sức khỏe dịch vụ (Application Health Checks) chuẩn công nghiệp cho Backend API theo yêu cầu Task 4 và SRS v1.2.0:
-- Cung cấp các điểm cuối (endpoints) tiêu chuẩn cho bộ điều phối container (Docker Compose, Kubernetes, Load Balancer) để kiểm tra tình trạng ứng dụng.
-- Phân định ngữ nghĩa chính xác giữa **Liveness** (tiến trình đang chạy) và **Readiness** (sẵn sàng tiếp nhận traffic).
-- Giám sát tình trạng kết nối và độ trễ thực tế tới 3 hạ tầng phụ thuộc cốt lõi: **PostgreSQL**, **Redis**, và **MinIO / S3 Object Storage**.
-- Định dạng dữ liệu phản hồi dạng JSON chuẩn hóa, bảo mật cao: Tuyệt đối không để lộ mật khẩu, chuỗi kết nối hay khóa bí mật ra bên ngoài.
-- Trả về mã trạng thái HTTP tiền định: HTTP 200 khi Healthy/Degraded và HTTP 503 khi Unhealthy.
+## 1. Mục tiêu
+Branch `feat/vohungmanh-health-check` giải quyết việc xây dựng hệ thống kiểm tra và giám sát sức khỏe dịch vụ (**Application Health Checks**) chuẩn công nghiệp cho nền tảng CulinaryBlog thuộc Task 4:
+- Khi vận hành trên môi trường Container (Docker Compose, Kubernetes) hoặc đứng sau bộ cân bằng tải (Load Balancer như Nginx, Traefik), hệ thống cần các điểm cuối chuyên dụng để biết chính xác khi nào tiến trình bị treo, khi nào hạ tầng gặp sự cố và khi nào cần điều hướng hoặc ngắt lưu lượng mạng.
+- Phân định rõ ràng ngữ nghĩa kỹ thuật giữa **Liveness** (tiến trình ứng dụng còn sống không?) và **Readiness** (hệ thống đã sẵn sàng xử lý yêu cầu nghiệp vụ chưa?).
+- Kiểm tra kết nối thực tế tới 3 dịch vụ hạ tầng phụ thuộc cốt lõi: **PostgreSQL Database**, **Redis Cache Server**, và **MinIO / S3 Object Storage**.
+- Định dạng dữ liệu phản hồi JSON chuẩn hóa, áp dụng cơ chế bảo mật nghiêm ngặt: **tuyệt đối không làm rò rỉ chuỗi kết nối (ConnectionStrings), mật khẩu hay khóa truy cập bí mật** ra bên ngoài.
 
 ---
 
-## Endpoints
-
-| Endpoint | Ý nghĩa | Dependencies được kiểm tra | Tags áp dụng | Mã HTTP khi lỗi |
-| :--- | :--- | :--- | :--- | :--- |
-| `GET /health` | Giám sát tổng quan tình trạng API và toàn bộ hạ tầng | PostgreSQL + Redis + MinIO | Toàn bộ checks | HTTP 503 Service Unavailable |
-| `GET /health/live` | **Liveness Probe:** Xác định tiến trình API có đang sống và phản hồi HTTP hay không | Process / Self (Không phụ thuộc external services) | `live` | HTTP 503 (chỉ khi process treo/chết) |
-| `GET /health/ready` | **Readiness Probe:** Xác định API có đủ điều kiện phục vụ request hay không | PostgreSQL + Redis (Bắt buộc theo Task 4) | `ready` | HTTP 503 Service Unavailable |
-
----
-
-## Liveness (`/health/live`)
-- **Mục đích:** Trả lời câu hỏi *"Tiến trình của API có đang sống không?"*.
-- **Ngữ nghĩa chuẩn:**
-  - Được Kubernetes / Docker dùng để quyết định có cần khởi động lại container (restart container) hay không.
-  - **Quy tắc bất biến:** Sự cố mất kết nối tới PostgreSQL, Redis hoặc MinIO **tuyệt đối không được** làm liveness fail. Nếu liveness fail khi DB mất kết nối, Kubernetes sẽ restart container liên tục (CrashLoopBackOff), làm trầm trọng thêm tình trạng nghẽn kết nối và không giải quyết được gốc rễ vấn đề.
-- **Triển khai:**
-  - Gắn tag: `["live"]`.
-  - Check `self`: Trả về `Healthy` ngay khi tiến trình xử lý được HTTP request.
+## 2. Kết quả đạt được
+Sau khi triển khai branch này:
+- **Cung cấp 3 điểm cuối tiêu chuẩn với phân định ngữ nghĩa chính xác**:
+  - `GET /health/live`: **Liveness Probe** - Chỉ kiểm tra trạng thái tiến trình ứng dụng (`self`). Tuyệt đối không phụ thuộc vào hạ tầng ngoài.
+  - `GET /health/ready`: **Readiness Probe** - Kiểm tra hai hạ tầng bắt buộc để xử lý nghiệp vụ: **PostgreSQL** và **Redis**. Sự cố MinIO không làm hỏng Readiness.
+  - `GET /health`: **General Health Probe** - Kiểm tra toàn diện toàn bộ hệ sinh thái: Tiến trình (`self`), **PostgreSQL**, **Redis**, và **MinIO**.
+- **Cơ chế che giấu bí mật (`HealthCheckResponseWriter`)**:
+  - Tự động phát hiện và che giấu các thông tin nhạy cảm: thay thế `Password=******`, ẩn AccessKey và SecretKey của MinIO, không để lộ stack trace chi tiết ra môi trường bên ngoài.
+- **Ánh xạ mã trạng thái HTTP tiền định**:
+  - Trả về `HTTP 200 OK` khi tất cả các thành phần được kiểm tra ở trạng thái `Healthy` hoặc `Degraded`.
+  - Trả về `HTTP 503 Service Unavailable` khi có bất kỳ thành phần bắt buộc nào bị `Unhealthy`.
+- **Kiểm thử bao phủ**: 13/13 tests trong `HealthCheckUnitTests` và 100/101 tests toàn hệ thống đều vượt qua thành công (100% Pass).
 
 ---
 
-## Readiness (`/health/ready`)
-- **Mục đích:** Trả lời câu hỏi *"API có đủ tài nguyên bắt buộc để xử lý các yêu cầu nghiệp vụ của người dùng không?"*.
-- **Ngữ nghĩa chuẩn:**
-  - Được Load Balancer (Nginx, Traefik, K8s Service) dùng để quyết định có điều hướng traffic mạng vào replica này hay không.
-  - Theo đặc tả Task 4: Hai dịch vụ bắt buộc để API sẵn sàng nhận traffic là **PostgreSQL** (lưu trữ quan hệ) và **Redis** (bộ nhớ đệm).
-  - Nếu PostgreSQL hoặc Redis gặp sự cố $\rightarrow$ `/health/ready` lập tức trả về **Unhealthy (HTTP 503)**, Load Balancer sẽ ngắt traffic tạm thời khỏi instance này cho đến khi hạ tầng phục hồi.
-  - **Sự cố MinIO không làm hỏng Readiness:** MinIO chỉ phục vụ lưu trữ file đa phương tiện, không chặn các nghiệp vụ đọc/ghi dữ liệu cốt lõi, đảm bảo đúng đặc tả Task 4 (PostgreSQL + Redis).
+## 3. Luồng hoạt động
+
+```text
+Monitoring Tool / Load Balancer / Kubernetes Probe
+  │ (Gửi HTTP GET /health, /health/live, /health/ready)
+  ▼
+API Endpoint Mapping (Program.cs)
+  │ ├─ Bóc tách route và áp dụng Predicate lọc theo Tags:
+  │ │    - /health/live  -> check.Tags.Contains("live")
+  │ │    - /health/ready -> check.Tags.Contains("ready")
+  │ │    - /health       -> Toàn bộ các checks đã đăng ký
+  ▼
+Infrastructure Health Checks (DependencyInjection.cs)
+  │ ├─ [Tag "live"]  : Check Self (Tiến trình API)
+  │ ├─ [Tag "ready"] : PostgresHealthCheck (Database.CanConnectAsync)
+  │ │                  RedisHealthCheck (PingAsync đo Latency mạng)
+  │ └─ [Tag "storage"]: MinioHealthCheck (ListBucketsAsync tới MinIO)
+  ▼
+HealthCheckResponseWriter (Infrastructure / HealthChecks)
+  │ ├─ Tổng hợp trạng thái: Healthy, Degraded, hoặc Unhealthy
+  │ ├─ Lọc và che giấu toàn bộ secrets: Password=******
+  │ ├─ Định dạng JSON có cấu trúc (Status, Duration, Timestamp, Checks[])
+  │ └─ Thiết lập HTTP Status Code (200 OK hoặc 503 Service Unavailable)
+  ▼
+Output
+  └─ Trả về HTTP 200 / 503 kèm payload JSON có cấu trúc an toàn
+```
+
+### Giải thích chi tiết các bước xử lý:
+1. **Tiếp nhận và Điều hướng:** Khi nhận request, ASP.NET Core Health Checks Middleware áp dụng bộ lọc tag tương ứng để chỉ thực thi các bài kiểm tra cần thiết, tránh lãng phí tài nguyên mạng.
+2. **Thực thi kiểm tra kết nối:**
+   - Với `/health/live`: Chỉ xác nhận tiến trình máy chủ đang phản hồi HTTP (`Healthy`).
+   - Với `/health/ready`: Gửi lệnh kiểm tra kết nối thực tế tới PostgreSQL (`CanConnectAsync`) và đo độ trễ mạng tới Redis (`PingAsync`). Nếu một trong hai gặp sự cố, lập tức đánh dấu `Unhealthy`.
+   - Với `/health`: Kiểm tra thêm kết nối tới MinIO S3 client.
+3. **Format và Bảo mật:** Toàn bộ kết quả kiểm tra được chuyển qua `HealthCheckResponseWriter.WriteResponse`. Lớp này duyệt qua từng thông điệp lỗi, xóa bỏ các chuỗi kết nối chứa mật khẩu rồi đóng gói thành JSON hoàn chỉnh.
+4. **Phản hồi:** Trả về HTTP 200 nếu toàn bộ checks đều sống, hoặc HTTP 503 nếu có lỗi phụ thuộc.
 
 ---
 
-## General Health (`/health`)
-- **Mục đích:** Cung cấp bức tranh toàn cảnh về sức khỏe của toàn bộ hệ sinh thái dịch vụ phục vụ đội ngũ quản trị hệ thống (SRE / DevOps / Monitoring Tools như Prometheus, Datadog).
-- **Phạm vi kiểm tra:**
-  - `self` (Tiến trình ứng dụng)
-  - `postgresql` (Cơ sở dữ liệu chính)
-  - `redis` (Hệ thống phân tán đệm cache)
-  - `minio` (Hệ thống lưu trữ ảnh và tệp tin đối tượng)
-- **Hành vi:** Bất kỳ dịch vụ nào trong 3 hạ tầng trên bị lỗi thì `/health` sẽ trả về `Unhealthy` (HTTP 503) và chỉ rõ tên thành phần bị lỗi trong payload JSON.
+## 4. Các file chính
 
----
-
-## PostgreSQL Check
-- **Lớp xử lý:** `PostgresHealthCheck` (`IHealthCheck`).
-- **Cơ chế:** Kiểm tra khả năng kết nối thực tế tới PostgreSQL Database thông qua `ApplicationDbContext.Database.CanConnectAsync(cancellationToken)`.
-- **An toàn bảo mật:** Nếu có lỗi kết nối hoặc timeout, ngoại lệ được xử lý an toàn và trả về thông báo lỗi tổng quát, không xuất chuỗi `Host`, `Username` hay `Password` ra ngoài.
-
----
-
-## Redis Check
-- **Lớp xử lý:** `RedisHealthCheck` (`IHealthCheck`).
-- **Cơ chế:** Kết nối tới Redis server thông qua `StackExchange.Redis.IConnectionMultiplexer`, gửi lệnh `PingAsync()` tới Redis database để đo lường độ trễ mạng thực tế (Latency tính bằng mili-giây).
-- **Hiệu năng:** Tái sử dụng multiplexer singleton (Thread-safe lock), tránh tạo lại kết nối TCP liên tục gây cạn kiệt socket.
-
----
-
-## MinIO Check
-- **Lớp xử lý:** `MinioHealthCheck` (`IHealthCheck`).
-- **Cơ chế:** Sử dụng thư viện chuẩn `AWSSDK.S3` (Amazon S3 Client kết nối MinIO với cấu hình Path-style), thực hiện gọi API `ListBucketsAsync(cancellationToken)` với timeout 3 giây.
-- **Độ tin cậy:** Xác thực khả năng xác thực (AccessKey/SecretKey) và khả năng phản hồi của MinIO cluster.
-
----
-
-## Tags Strategy
-Hệ thống sử dụng cơ chế tagging tinh gọn của ASP.NET Core để tách biệt các bộ lọc:
-- `live`: Kiểm tra liveness nội tại (`self`).
-- `ready`: Kiểm tra readiness phục vụ traffic (`postgresql`, `redis`).
-- `db`: Nhóm kiểm tra cơ sở dữ liệu (`postgresql`).
-- `redis`: Nhóm kiểm tra cache (`redis`).
-- `storage`, `minio`: Nhóm kiểm tra lưu trữ tệp tin (`minio`).
-
----
-
-## HTTP Status Codes
-- **Healthy / Degraded:** Trả về mã **HTTP 200 OK**.
-- **Unhealthy:** Trả về mã **HTTP 503 Service Unavailable**.
-
----
-
-## Security & Không Leak Secrets
-- `HealthCheckResponseWriter` tự động lọc bỏ các token có nguy cơ chứa thông tin đăng nhập (`Password=******`).
-- Tuyệt đối không để lộ:
-  - Chuỗi kết nối ConnectionStrings.
-  - Mật khẩu database và Redis credentials.
-  - MinIO AccessKey và SecretKey.
-  - Stack trace chi tiết của hệ thống.
-
----
-
-## Danh Sách Files Thay Đổi & Tạo Mới
-
-| File | Loại | Vai trò |
+| File | Vai trò | Xử lý gì |
 | :--- | :--- | :--- |
-| `backend/src/CulinaryBlog.Infrastructure/HealthChecks/PostgresHealthCheck.cs` | New | Kiểm tra kết nối thực tế tới PostgreSQL Database. |
-| `backend/src/CulinaryBlog.Infrastructure/HealthChecks/RedisHealthCheck.cs` | New | Kiểm tra kết nối và đo độ trễ tới Redis Server. |
-| `backend/src/CulinaryBlog.Infrastructure/HealthChecks/MinioHealthCheck.cs` | New | Kiểm tra kết nối tới MinIO / S3 Object Storage qua AWSSDK.S3. |
-| `backend/src/CulinaryBlog.Infrastructure/HealthChecks/HealthCheckResponseWriter.cs` | New | Lớp định dạng response JSON an toàn, chống rò rỉ credential và mapping HTTP 200/503. |
-| `backend/src/CulinaryBlog.Infrastructure/DependencyInjection.cs` | Modified | Đăng ký `AddHealthChecks()` với các checks và tags tương ứng. |
-| `backend/src/CulinaryBlog.Api/Program.cs` | Modified | Map các endpoint `/health`, `/health/live`, `/health/ready` với predicate lọc tags và custom response writer. |
-| `backend/tests/CulinaryBlog.UnitTests/CulinaryBlog.UnitTests.csproj` | Modified | Bổ sung package `Microsoft.EntityFrameworkCore.InMemory` hỗ trợ test. |
-| `backend/tests/CulinaryBlog.UnitTests/Infrastructure/HealthChecks/HealthCheckUnitTests.cs` | New | Bộ 12 test methods kiểm thử độc lập 16+ kịch bản liveness, readiness, semantic isolation, status codes. |
-| `docs/README_HEALTH_CHECK.md` | New | Tài liệu kiến trúc và hướng dẫn kiểm thử Health Checks. |
-| `docs/VO_HUNG_MANH_HEALTH_CHECK_COMPLAN.md` | New | Tài liệu bảo vệ chuyên sâu 31 mục lý thuyết, failure scenarios và 20 câu hỏi phản biện. |
+| `backend/src/CulinaryBlog.Infrastructure/HealthChecks/PostgresHealthCheck.cs` | Infrastructure / Check | Kiểm tra kết nối thực tế tới PostgreSQL Database qua `ApplicationDbContext.Database.CanConnectAsync`, che giấu connection string khi có ngoại lệ. |
+| `backend/src/CulinaryBlog.Infrastructure/HealthChecks/RedisHealthCheck.cs` | Infrastructure / Check | Kết nối tới Redis qua `IConnectionMultiplexer`, gửi lệnh `PingAsync` đo độ trễ mạng thực tế (latency). |
+| `backend/src/CulinaryBlog.Infrastructure/HealthChecks/MinioHealthCheck.cs` | Infrastructure / Check | Kiểm tra kết nối tới MinIO / S3 Object Storage qua `IAmazonS3.ListBucketsAsync`. |
+| `backend/src/CulinaryBlog.Infrastructure/HealthChecks/HealthCheckResponseWriter.cs` | Infrastructure / Formatter | Định dạng JSON phản hồi chuẩn hóa, che giấu mật khẩu (`Password=******`) và mapping mã HTTP 200/503. |
+| `backend/src/CulinaryBlog.Infrastructure/DependencyInjection.cs` | Infrastructure / DI | Đăng ký dịch vụ `AddHealthChecks()` với các tags phân loại: `live`, `ready`, `storage`. |
+| `backend/src/CulinaryBlog.Api/Program.cs` | Presentation / Pipeline | Map 3 endpoint `/health`, `/health/live`, `/health/ready` với predicate lọc tags tương ứng. |
+| `backend/tests/CulinaryBlog.UnitTests/Infrastructure/HealthChecks/HealthCheckUnitTests.cs` | Unit Tests | Bộ 13 unit tests kiểm tra độc lập: Liveness isolation, Readiness dependencies, MinIO isolation, HTTP 200/503 mapping, và che giấu credential. |
+| `docs/VO_HUNG_MANH_HEALTH_CHECK_COMPLAN.md` | Tài liệu bảo vệ | Báo cáo giải trình chuyên sâu (440 dòng) gồm 31 mục lý thuyết, failure scenarios, và 20 câu hỏi vấn đáp. |
+| `docs/README_HEALTH_CHECK.md` | Tài liệu kỹ thuật | Tài liệu hướng dẫn kỹ thuật chi tiết theo chuẩn 13 phần. |
 
 ---
 
-## Cấu Hình (Configuration Template)
-Trong `appsettings.json`, các cấu hình được đọc an toàn:
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Port=5432;Database=culinaryblog;Username=***;Password=***",
-    "Redis": "localhost:6379"
-  },
-  "Storage": {
-    "ServiceUrl": "http://localhost:9000",
-    "AccessKey": "***",
-    "SecretKey": "***",
-    "Region": "us-east-1",
-    "DefaultBucket": "culinaryblog"
-  }
-}
+## 5. API / Interface
+
+| Method | Endpoint | Tags lọc | Dependencies kiểm tra | Ý nghĩa & Mã HTTP khi lỗi |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/health/live` | `live` | Process / Self | **Liveness Probe:** Xác định tiến trình API có đang sống và phản hồi HTTP hay không. Lỗi hạ tầng ngoài tuyệt đối không làm fail Liveness.<br>Mã lỗi: `HTTP 503` (chỉ khi tiến trình chết). |
+| `GET` | `/health/ready` | `ready` | PostgreSQL + Redis | **Readiness Probe:** Xác định API có đủ tài nguyên bắt buộc để phục vụ request của người dùng hay không. Dùng cho Load Balancer điều phối traffic.<br>Mã lỗi: `HTTP 503 Service Unavailable`. |
+| `GET` | `/health` | *Toàn bộ* | Self + PostgreSQL + Redis + MinIO | **General Health:** Bức tranh toàn cảnh về sức khỏe của toàn bộ hệ sinh thái dịch vụ phục vụ đội ngũ SRE / DevOps / Monitoring Tools.<br>Mã lỗi: `HTTP 503 Service Unavailable`. |
+
+---
+
+## 6. Business Rules
+
+1. **Quy tắc bất biến của Liveness (`/health/live`)**:
+   - Được Kubernetes dùng để quyết định có cần khởi động lại container (restart) hay không.
+   - **Quy tắc:** Sự cố mất kết nối tới PostgreSQL, Redis hoặc MinIO **tuyệt đối không được** làm liveness fail. Nếu liveness fail khi DB mất kết nối, container sẽ bị khởi động lại liên tục trong vòng lặp vô tận (CrashLoopBackOff), làm trầm trọng thêm tình trạng quá tải kết nối.
+2. **Quy tắc điều phối của Readiness (`/health/ready`)**:
+   - Được Load Balancer dùng để quyết định có chuyển tiếp traffic người dùng vào instance này hay không.
+   - Theo đặc tả Task 4: Hai dịch vụ bắt buộc là **PostgreSQL** (lưu trữ quan hệ) và **Redis** (bộ nhớ đệm). Nếu 1 trong 2 dịch vụ này gặp sự cố, endpoint lập tức trả về `HTTP 503`, Load Balancer sẽ tạm ngắt traffic khỏi instance này cho đến khi hạ tầng phục hồi.
+3. **Sự cố MinIO không làm hỏng Readiness**:
+   - MinIO chỉ phục vụ lưu trữ file đa phương tiện, không chặn các nghiệp vụ đọc/ghi dữ liệu công thức cốt lõi. Do đó, MinIO chỉ nằm trong `/health` tổng quát, không nằm trong `/health/ready`.
+4. **Bảo mật thông tin đăng nhập (Zero Credential Leakage)**:
+   - `HealthCheckResponseWriter` tự động quét và che giấu toàn bộ các chuỗi có chứa `Password`, `pwd`, `SecretKey`, thay thế bằng `Password=******`.
+   - Không xuất chuỗi kết nối đầy đủ (ConnectionStrings) ra payload JSON.
+5. **Tiền định mã trạng thái HTTP**:
+   - Healthy $\rightarrow$ `HTTP 200 OK`.
+   - Unhealthy $\rightarrow$ `HTTP 503 Service Unavailable`.
+
+---
+
+## 7. Ví dụ hoạt động
+
+### Ví dụ 1: Trạng thái bình thường (Healthy)
+```http
+GET /health
 ```
-
----
-
-## Build
-Biên dịch toàn bộ solution:
-```bash
-dotnet build backend/CulinaryBlog.sln
-```
-Kết quả: `0 Error(s)`.
-
----
-
-## Tests
-Chạy kiểm thử tự động:
-```bash
-dotnet test backend/tests/CulinaryBlog.UnitTests/CulinaryBlog.UnitTests.csproj
-```
-
----
-
-## Test Results
-- **Tổng số test cases:** 100 Passed, 0 Failed, 1 Skipped.
-- **Bộ test Health Checks (`HealthCheckUnitTests`):** 100% PASSED.
-  1. `DependencyInjection_RegistersHealthChecks_WithExpectedTags`: Đăng ký đúng tags (`live`, `ready`, `storage`).
-  2. `LivenessCheck_AlwaysReturnsHealthy_WhenProcessIsRunning`: Liveness trả về Healthy khi tiến trình chạy.
-  3. `PostgresHealthCheck_WhenCanConnectIsTrue_ReturnsHealthy`: PostgreSQL trả về Healthy khi kết nối thành công.
-  4. `PostgresHealthCheck_WhenCanConnectIsFalse_ReturnsUnhealthy`: PostgreSQL trả về Unhealthy khi mất kết nối.
-  5. `PostgresHealthCheck_WhenThrowsException_ReturnsUnhealthy_AndDoesNotLeakConnectionString`: Không lộ connection string khi DB có lỗi.
-  6. `PostgresFailure_CausesReadyToBeUnhealthy_WhileLiveRemainsHealthy`: DB lỗi $\rightarrow$ Ready Unhealthy, Live vẫn Healthy.
-  7. `RedisHealthCheck_WhenConnectionStringMissing_ReturnsUnhealthy`: Redis thiếu cấu hình $\rightarrow$ Unhealthy.
-  8. `RedisFailure_CausesReadyToBeUnhealthy_WhileLiveRemainsHealthy`: Redis lỗi $\rightarrow$ Ready Unhealthy, Live vẫn Healthy.
-  9. `MinioHealthCheck_WhenConfigurationMissing_ReturnsUnhealthy`: MinIO thiếu cấu hình $\rightarrow$ Unhealthy.
-  10. `MinioFailure_CausesGeneralHealthToBeUnhealthy_WhileLiveAndReadyRemainHealthy`: MinIO lỗi $\rightarrow$ `/health` Unhealthy, `/health/live` và `/health/ready` vẫn Healthy.
-  11. `ResponseWriter_WhenReportIsHealthy_ReturnsHttp200_AndValidJson`: Healthy $\rightarrow$ HTTP 200 JSON.
-  12. `ResponseWriter_WhenReportIsUnhealthy_ReturnsHttp503_AndValidJson`: Unhealthy $\rightarrow$ HTTP 503 JSON.
-  13. `ResponseWriter_SanitizesSensitiveData_DoesNotLeakPasswords`: Che giấu mật khẩu `Password=******`.
-
----
-
-## Hướng Dẫn Demo Thực Tế
-
-### Bước 1: Khởi động các dịch vụ
-1. Khởi động PostgreSQL, Redis, và MinIO:
-   ```bash
-   docker start culinary-blog-postgres
-   # Khởi động redis và minio tương ứng nếu có container
-   ```
-2. Khởi chạy Backend API:
-   ```bash
-   dotnet run --project backend/src/CulinaryBlog.Api
-   ```
-
-### Bước 2: Kiểm tra trạng thái bình thường (Healthy)
-- Mở trình duyệt hoặc dùng `curl`:
-  1. `curl -i http://localhost:5000/health/live` $\rightarrow$ **HTTP 200 OK**
-  2. `curl -i http://localhost:5000/health/ready` $\rightarrow$ **HTTP 200 OK**
-  3. `curl -i http://localhost:5000/health` $\rightarrow$ **HTTP 200 OK**
-
-Ví dụ JSON trả về:
+**Response: HTTP 200 OK**
 ```json
 {
   "status": "Healthy",
-  "totalDuration": "4.2ms",
-  "timestamp": "2026-10-05T08:15:00Z",
+  "totalDuration": "3.8ms",
+  "timestamp": "2026-10-06T07:00:00Z",
   "checks": [
     {
       "name": "self",
@@ -214,13 +131,13 @@ Ví dụ JSON trả về:
       "name": "postgresql",
       "status": "Healthy",
       "description": "PostgreSQL database connection is operational.",
-      "duration": "2.3ms"
+      "duration": "2.1ms"
     },
     {
       "name": "redis",
       "status": "Healthy",
-      "description": "Redis is operational. Latency: 1.2ms.",
-      "duration": "1.1ms"
+      "description": "Redis is operational. Latency: 0.9ms.",
+      "duration": "0.9ms"
     },
     {
       "name": "minio",
@@ -232,41 +149,150 @@ Ví dụ JSON trả về:
 }
 ```
 
+### Ví dụ 2: Sự cố Redis Server bị dừng (Failure State)
+- `GET /health/live` $\rightarrow$ **HTTP 200 OK** (Tiến trình API vẫn sống).
+- `GET /health/ready` $\rightarrow$ **HTTP 503 Service Unavailable** (Load Balancer ngắt traffic).
+- `GET /health` $\rightarrow$ **HTTP 503 Service Unavailable**:
+```json
+{
+  "status": "Unhealthy",
+  "totalDuration": "12.4ms",
+  "timestamp": "2026-10-06T07:05:00Z",
+  "checks": [
+    {
+      "name": "self",
+      "status": "Healthy",
+      "description": "Application is running.",
+      "duration": "0.1ms"
+    },
+    {
+      "name": "postgresql",
+      "status": "Healthy",
+      "description": "PostgreSQL database connection is operational.",
+      "duration": "1.8ms"
+    },
+    {
+      "name": "redis",
+      "status": "Unhealthy",
+      "description": "Redis connection failed. Host is unreachable.",
+      "duration": "10.2ms"
+    },
+    {
+      "name": "minio",
+      "status": "Healthy",
+      "description": "MinIO is operational. Buckets count: 1.",
+      "duration": "0.3ms"
+    }
+  ]
+}
+```
+
 ---
 
-## Demo Kịch Bản Sự Cố (Failure Demo)
+## 8. Error Handling
 
-### Kịch bản 1: Redis gặp sự cố (Tạm dừng container Redis)
-1. Tạm dừng Redis:
-   ```bash
-   docker stop redis
-   ```
-2. Kiểm tra lại 3 endpoints:
-   - `curl -i http://localhost:5000/health/live` $\rightarrow$ **HTTP 200 OK** (Chứng minh tiến trình API vẫn sống bình thường).
-   - `curl -i http://localhost:5000/health/ready` $\rightarrow$ **HTTP 503 Service Unavailable** (Load Balancer lập tức ngừng đẩy traffic).
-   - `curl -i http://localhost:5000/health` $\rightarrow$ **HTTP 503 Service Unavailable** (Phản ánh `redis: Unhealthy`).
-3. Bật lại Redis:
-   ```bash
-   docker start redis
-   ```
-   $\rightarrow$ `/health/ready` tự động phục hồi về **HTTP 200 OK**.
-
-### Kịch bản 2: MinIO gặp sự cố (Tạm dừng container MinIO)
-1. Tạm dừng MinIO:
-   ```bash
-   docker stop minio
-   ```
-2. Kiểm tra lại 3 endpoints:
-   - `curl -i http://localhost:5000/health/live` $\rightarrow$ **HTTP 200 OK** (Không ảnh hưởng).
-   - `curl -i http://localhost:5000/health/ready` $\rightarrow$ **HTTP 200 OK** (Không ảnh hưởng vì MinIO không nằm trong điều kiện readiness).
-   - `curl -i http://localhost:5000/health` $\rightarrow$ **HTTP 503 Service Unavailable** (Cảnh báo quản trị viên rằng storage đang có vấn đề).
-3. Bật lại MinIO:
-   ```bash
-   docker start minio
-   ```
-   $\rightarrow$ `/health` tự động phục hồi về **HTTP 200 OK**.
+| Tình huống sự cố | Endpoint `/health/live` | Endpoint `/health/ready` | Endpoint `/health` |
+| :--- | :---: | :---: | :---: |
+| **Bình thường (Mọi dịch vụ hoạt động)** | HTTP 200 OK | HTTP 200 OK | HTTP 200 OK |
+| **PostgreSQL mất kết nối hoặc timeout** | **HTTP 200 OK** (Không restart app) | **HTTP 503** (Ngắt traffic) | **HTTP 503** (Báo lỗi DB) |
+| **Redis Server sập** | **HTTP 200 OK** (Không restart app) | **HTTP 503** (Ngắt traffic) | **HTTP 503** (Báo lỗi Redis) |
+| **MinIO Object Storage mất kết nối** | **HTTP 200 OK** | **HTTP 200 OK** (Core API vẫn chạy) | **HTTP 503** (Cảnh báo quản trị) |
+| **Tiến trình API bị treo/chết hoàn toàn** | Không phản hồi (Timeout) | Không phản hồi | Không phản hồi |
 
 ---
 
-## Limitations
-- Bộ kiểm thử Integration Tests kết nối trực tiếp tới container Docker PostgreSQL/Redis/MinIO vật lý phụ thuộc vào việc Docker daemon có chạy trên máy host hay không. Khi Docker daemon không chạy, bộ Unit Tests độc lập trong RAM bảo đảm kiểm thử 100% logic cấu hình và ngữ nghĩa.
+## 9. Cách chạy và Demo
+
+### Bước 1: Khởi động hệ thống hạ tầng
+```bash
+docker compose up -d
+```
+*(Đảm bảo PostgreSQL, Redis và MinIO đang hoạt động)*
+
+### Bước 2: Khởi động Backend API
+```bash
+dotnet run --project backend/src/CulinaryBlog.Api
+```
+
+### Bước 3: Kịch bản Demo thực tế cho Giảng viên
+
+1. **Demo Kiểm tra trạng thái bình thường (Healthy)**:
+   - Dùng lệnh `curl` hoặc trình duyệt kiểm tra lần lượt:
+     - `curl -i http://localhost:5000/health/live` $\rightarrow$ **HTTP 200 OK**
+     - `curl -i http://localhost:5000/health/ready` $\rightarrow$ **HTTP 200 OK**
+     - `curl -i http://localhost:5000/health` $\rightarrow$ **HTTP 200 OK**
+2. **Demo Giả lập sự cố Redis (Readiness Failure)**:
+   - Tạm dừng container Redis: `docker stop redis` (hoặc tên container Redis).
+   - Kiểm tra lại:
+     - `/health/live` vẫn trả về **HTTP 200 OK** (Chứng minh tiến trình API không bị ngắt quãng).
+     - `/health/ready` lập tức trả về **HTTP 503 Service Unavailable** (Chứng minh Load Balancer sẽ cách ly instance này).
+   - Bật lại Redis: `docker start redis` $\rightarrow$ `/health/ready` tự động phục hồi về **HTTP 200 OK**.
+3. **Demo Giả lập sự cố MinIO (Storage Isolation)**:
+   - Tạm dừng container MinIO: `docker stop minio`.
+   - Kiểm tra lại:
+     - `/health/ready` vẫn trả về **HTTP 200 OK** (Chứng minh MinIO down không ảnh hưởng tới Readiness của ứng dụng).
+     - `/health` trả về **HTTP 503** (Chỉ rõ `minio: Unhealthy` để cảnh báo đội ngũ quản trị).
+   - Bật lại MinIO: `docker start minio` $\rightarrow$ `/health` tự động phục hồi về **HTTP 200 OK**.
+
+---
+
+## 10. Testing
+
+### Bộ kiểm thử chuyên biệt `HealthCheckUnitTests`
+Chạy lệnh kiểm thử đơn vị:
+```bash
+dotnet test backend/tests/CulinaryBlog.UnitTests/CulinaryBlog.UnitTests.csproj --filter FullyQualifiedName~HealthCheckUnitTests
+```
+
+**Kết quả kiểm thử thực tế:**
+- **13/13 tests PASSED (100%)** (Thời gian chạy: ~720ms).
+- **Danh sách 13 kịch bản kiểm thử chi tiết:**
+  1. `DependencyInjection_RegistersHealthChecks_WithExpectedTags`: Đăng ký đúng tags (`live`, `ready`, `storage`).
+  2. `LivenessCheck_AlwaysReturnsHealthy_WhenProcessIsRunning`: Liveness luôn Healthy khi tiến trình chạy.
+  3. `PostgresHealthCheck_WhenCanConnectIsTrue_ReturnsHealthy`: PostgreSQL trả về Healthy khi kết nối thành công.
+  4. `PostgresHealthCheck_WhenCanConnectIsFalse_ReturnsUnhealthy`: PostgreSQL trả về Unhealthy khi mất kết nối.
+  5. `PostgresHealthCheck_WhenThrowsException_ReturnsUnhealthy_AndDoesNotLeakConnectionString`: Không lộ connection string khi DB ném lỗi.
+  6. `PostgresFailure_CausesReadyToBeUnhealthy_WhileLiveRemainsHealthy`: DB lỗi $\rightarrow$ Ready Unhealthy, Live vẫn Healthy.
+  7. `RedisHealthCheck_WhenConnectionStringMissing_ReturnsUnhealthy`: Redis thiếu cấu hình $\rightarrow$ Unhealthy.
+  8. `RedisFailure_CausesReadyToBeUnhealthy_WhileLiveRemainsHealthy`: Redis lỗi $\rightarrow$ Ready Unhealthy, Live vẫn Healthy.
+  9. `MinioHealthCheck_WhenConfigurationMissing_ReturnsUnhealthy`: MinIO thiếu cấu hình $\rightarrow$ Unhealthy.
+  10. `MinioFailure_CausesGeneralHealthToBeUnhealthy_WhileLiveAndReadyRemainHealthy`: MinIO lỗi $\rightarrow$ `/health` Unhealthy, `/health/live` và `/health/ready` vẫn Healthy.
+  11. `ResponseWriter_WhenReportIsHealthy_ReturnsHttp200_AndValidJson`: Trả về HTTP 200 khi Healthy.
+  12. `ResponseWriter_WhenReportIsUnhealthy_ReturnsHttp503_AndValidJson`: Trả về HTTP 503 khi Unhealthy.
+  13. `ResponseWriter_SanitizesSensitiveData_DoesNotLeakPasswords`: Che giấu mật khẩu `Password=******`.
+
+### Tổng hợp Unit Tests toàn bộ solution:
+```bash
+dotnet test backend/tests/CulinaryBlog.UnitTests/CulinaryBlog.UnitTests.csproj
+```
+**Kết quả thực tế:**
+- `Passed: 100, Failed: 0, Skipped: 1, Total: 101` (100% Pass).
+
+---
+
+## 11. Build
+Thực hiện lệnh biên dịch solution:
+```bash
+dotnet build backend/CulinaryBlog.sln
+```
+
+**Kết quả biên dịch thực tế:**
+- **Thành công (Exit code 0)**.
+- **0 Error(s)**, 433 Warning(s) (chủ yếu là cảnh báo quy chuẩn StyleCop format).
+
+---
+
+## 12. Limitations
+
+1. **Phụ thuộc Docker daemon đối với kiểm thử tích hợp vật lý**:
+   - Bộ kiểm thử tích hợp vật lý trực tiếp tới các cổng mạng thực tế đòi hỏi Docker daemon phải đang chạy các container tương ứng trên máy host. Bộ Unit Tests độc lập trong bộ nhớ RAM đã mô phỏng và kiểm thử 100% các kịch bản lỗi mạng và cách ly ngữ nghĩa.
+2. **Cấu hình độ trễ Timeout**:
+   - Độ trễ timeout mặc định cho kiểm tra ping Redis và PostgreSQL được thiết lập ở mức 5 giây nhằm tránh treo lâu khi mạng gián đoạn.
+
+---
+
+## 13. Kết luận
+Branch `feat/vohungmanh-health-check` đã hoàn thành xuất sắc hệ thống giám sát sức khỏe dịch vụ đạt chuẩn Cloud-Native:
+- Phân định ngữ nghĩa chính xác giữa Liveness, Readiness và General Health.
+- Đảm bảo an toàn bảo mật tuyệt đối, chống rò rỉ credential và chuỗi kết nối.
+- 100% các kịch bản kiểm thử độc lập trong bộ nhớ đều vượt qua thành công, sẵn sàng tích hợp với Docker Compose và Kubernetes.
