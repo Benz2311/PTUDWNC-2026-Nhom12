@@ -10,29 +10,6 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
     {
         builder.ToTable("Users");
 
-        builder.HasKey(x => x.Id);
-
-        builder.Property(x => x.Id)
-            .ValueGeneratedOnAdd();
-
-        builder.Property(x => x.UserName)
-            .IsRequired()
-            .HasMaxLength(100);
-
-        builder.HasIndex(x => x.UserName)
-            .IsUnique();
-
-        builder.Property(x => x.Email)
-            .IsRequired()
-            .HasMaxLength(255);
-
-        builder.HasIndex(x => x.Email)
-            .IsUnique();
-
-        builder.Property(x => x.PasswordHash)
-            .IsRequired()
-            .HasMaxLength(500);
-
         builder.Property(x => x.DisplayName)
             .IsRequired()
             .HasMaxLength(150);
@@ -53,8 +30,12 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
             .IsRequired();
 
         builder.Ignore(x => x.FullName);
-        builder.Ignore(x => x.EmailConfirmed);
-        builder.Ignore(x => x.Roles);
+
+        // Roles được lưu trữ dưới dạng mảng PostgreSQL (text[]) thay vì qua bảng
+        // IdentityRole, phù hợp với thiết kế role in-memory -> JWT tại AuthService.
+        builder.Property(x => x.Roles)
+            .HasColumnName("Roles")
+            .HasColumnType("text[]");
 
         builder.HasMany(x => x.RefreshTokens)
             .WithOne(x => x.User)

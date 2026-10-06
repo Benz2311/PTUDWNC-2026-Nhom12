@@ -33,25 +33,33 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Đăng ký PostgreSQL extensions phục vụ tìm kiếm tiếng Việt và fuzzy fallback theo SRS v1.2.0
-        modelBuilder.HasPostgresExtension("unaccent");
-        modelBuilder.HasPostgresExtension("pg_trgm");
+        var isInMemory = Database.ProviderName?.Contains("InMemory") == true;
+
+        if (!isInMemory)
+        {
+            // Đăng ký PostgreSQL extensions phục vụ tìm kiếm tiếng Việt và fuzzy fallback theo SRS v1.2.0
+            modelBuilder.HasPostgresExtension("unaccent");
+            modelBuilder.HasPostgresExtension("pg_trgm");
+        }
 
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(ApplicationDbContext).Assembly);
 
-        modelBuilder.Entity<Recipe>(entity =>
+        if (!isInMemory)
         {
-            entity.OwnsOne(r => r.Nutrition);
+            modelBuilder.Entity<Recipe>(entity =>
+            {
+                entity.OwnsOne(r => r.Nutrition);
 
-            // Cấu hình Shadow Property SearchVectorFts kiểu tsvector và ánh xạ vào cột "SearchVector"
-            // Tránh xung đột với CLR property [NotMapped] string? SearchVector trên Recipe.cs của Domain
-            entity.Property<NpgsqlTsVector>("SearchVectorFts")
-                .HasColumnName("SearchVector")
-                .HasColumnType("tsvector");
+                // Cấu hình Shadow Property SearchVectorFts kiểu tsvector và ánh xạ vào cột "SearchVector"
+                // Tránh xung đột với CLR property [NotMapped] string? SearchVector trên Recipe.cs của Domain
+                entity.Property<NpgsqlTsVector>("SearchVectorFts")
+                    .HasColumnName("SearchVector")
+                    .HasColumnType("tsvector");
 
-            entity.HasIndex("SearchVectorFts")
-                .HasMethod("GIN");
-        });
+                entity.HasIndex("SearchVectorFts")
+                    .HasMethod("GIN");
+            });
+        }
     }
 }

@@ -13,7 +13,7 @@
 /app/src/CulinaryBlog.Application/obj/Debug/net10.0/refint/CulinaryBlog.Application.dll
 /app/src/CulinaryBlog.Application/obj/Debug/net10.0/CulinaryBlog.Application.pdb
 /app/src/CulinaryBlog.Application/obj/Debug/net10.0/ref/CulinaryBlog.Application.dll
-D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\bin\Debug\net10.0\CulinaryBlog.Application.deps.json
+d:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\bin\Debug\net10.0\CulinaryBlog.Application.deps.json
 D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\bin\Debug\net10.0\CulinaryBlog.Application.dll
 D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\bin\Debug\net10.0\CulinaryBlog.Application.pdb
 D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\bin\Debug\net10.0\CulinaryBlog.Domain.dll
@@ -24,8 +24,8 @@ D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Debug\net10.0\Cu
 D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Debug\net10.0\CulinaryBlog.Application.AssemblyInfo.cs
 D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Debug\net10.0\CulinaryBlog.Application.csproj.CoreCompileInputs.cache
 D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Debug\net10.0\CulinaryBlog.Application.sourcelink.json
-D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Debug\net10.0\Culinary.995F3C4F.Up2Date
+d:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Debug\net10.0\Culinary.995F3C4F.Up2Date
 D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Debug\net10.0\CulinaryBlog.Application.dll
 D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Debug\net10.0\refint\CulinaryBlog.Application.dll
 D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Debug\net10.0\CulinaryBlog.Application.pdb
-D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Debug\net10.0\ref\CulinaryBlog.Application.dll
+d:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Application\obj\Debug\net10.0\ref\CulinaryBlog.Application.dll

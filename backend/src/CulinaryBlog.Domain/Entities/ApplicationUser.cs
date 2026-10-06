@@ -1,12 +1,9 @@
+using Microsoft.AspNetCore.Identity;
+
 namespace CulinaryBlog.Domain.Entities;
 
-public class ApplicationUser
+public class ApplicationUser : IdentityUser<Guid>
 {
-    public Guid Id { get; set; }
-
-    public string UserName { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
-    public string PasswordHash { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string FullName
     {
@@ -17,7 +14,6 @@ public class ApplicationUser
     public string? AvatarUrl { get; set; }
     public string? Bio { get; set; }
 
-    public bool EmailConfirmed { get; set; }
     public string[] Roles { get; set; } = ["Author"];
 
     public bool IsActive { get; set; } = true;

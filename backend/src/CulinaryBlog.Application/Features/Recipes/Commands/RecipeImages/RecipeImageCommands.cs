@@ -1,6 +1,6 @@
 using ICacheService = CulinaryBlog.Application.Common.Interfaces.ICacheService;
+using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Exceptions;
-using CulinaryBlog.Application.Features.Recipes.Dtos;
 using CulinaryBlog.Application.Interfaces;
 using CulinaryBlog.Domain.Entities;
 using MediatR;
@@ -135,16 +135,12 @@ public class RecipeImageCommandHandler :
             // Major-02: Invalidate Recipe Detail cache sau khi transaction đã commit thành công
             await InvalidateRecipeDetailCacheAsync(recipe.Slug, cancellationToken);
 
-            return new RecipeImageDto
-            {
-                Id = newImage.Id,
-                OriginalUrl = newImage.OriginalUrl,
-                MediumUrl = newImage.MediumUrl,
-                ThumbnailUrl = newImage.ThumbnailUrl,
-                AltText = newImage.AltText,
-                IsPrimary = newImage.IsPrimary,
-                OrderIndex = newImage.OrderIndex
-            };
+            return new RecipeImageDto(
+                newImage.Id,
+                newImage.OriginalUrl,
+                newImage.AltText,
+                newImage.IsPrimary,
+                newImage.SortOrder);
         }
         catch
         {
@@ -178,16 +174,12 @@ public class RecipeImageCommandHandler :
 
         if (targetImage.IsPrimary)
         {
-            return new RecipeImageDto
-            {
-                Id = targetImage.Id,
-                OriginalUrl = targetImage.OriginalUrl,
-                MediumUrl = targetImage.MediumUrl,
-                ThumbnailUrl = targetImage.ThumbnailUrl,
-                AltText = targetImage.AltText,
-                IsPrimary = targetImage.IsPrimary,
-                OrderIndex = targetImage.OrderIndex
-            };
+            return new RecipeImageDto(
+                targetImage.Id,
+                targetImage.OriginalUrl,
+                targetImage.AltText,
+                targetImage.IsPrimary,
+                targetImage.SortOrder);
         }
 
         await using var transaction = await _context.BeginTransactionAsync(cancellationToken);
@@ -211,16 +203,12 @@ public class RecipeImageCommandHandler :
             // Major-02: Invalidate Recipe Detail cache sau khi transaction đã commit thành công
             await InvalidateRecipeDetailCacheAsync(recipe.Slug, cancellationToken);
 
-            return new RecipeImageDto
-            {
-                Id = targetImage.Id,
-                OriginalUrl = targetImage.OriginalUrl,
-                MediumUrl = targetImage.MediumUrl,
-                ThumbnailUrl = targetImage.ThumbnailUrl,
-                AltText = targetImage.AltText,
-                IsPrimary = targetImage.IsPrimary,
-                OrderIndex = targetImage.OrderIndex
-            };
+            return new RecipeImageDto(
+                targetImage.Id,
+                targetImage.OriginalUrl,
+                targetImage.AltText,
+                targetImage.IsPrimary,
+                targetImage.SortOrder);
         }
         catch
         {
