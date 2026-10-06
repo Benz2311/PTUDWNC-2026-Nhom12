@@ -6,14 +6,13 @@ namespace CulinaryBlog.IntegrationTests.Api;
 
 /// <summary>
 /// Smoke-level integration tests — verifies that the API host boots successfully.
-/// Requires a running database; skipped automatically via WebApplicationFactory
-/// if DI configuration fails (e.g., in CI without a DB).
+/// Uses in-memory database for testing.
 /// </summary>
-public class CategoriesEndpointTests : IClassFixture<WebApplicationFactory<global::Program>>
+public class CategoriesEndpointTests : IClassFixture<TestWebApplicationFactory>
 {
     private readonly HttpClient _client;
 
-    public CategoriesEndpointTests(WebApplicationFactory<global::Program> factory)
+    public CategoriesEndpointTests(TestWebApplicationFactory factory)
     {
         _client = factory.CreateClient();
     }
@@ -21,10 +20,10 @@ public class CategoriesEndpointTests : IClassFixture<WebApplicationFactory<globa
     public async Task GetCategories_ReturnsSuccessStatusCode()
     {
         // Act
-        var response = await _client.GetAsync("/api/categories");
+        var response = await _client.GetAsync("/api/v1/categories");
 
         // Assert
         response.IsSuccessStatusCode.Should().BeTrue(
-            $"GET /api/categories should return 2xx but returned {(int)response.StatusCode}");
+            $"GET /api/v1/categories should return 2xx but returned {(int)response.StatusCode}");
     }
 }

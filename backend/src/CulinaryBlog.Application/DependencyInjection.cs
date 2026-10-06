@@ -1,4 +1,7 @@
 using CulinaryBlog.Application.Behaviors;
+using CulinaryBlog.Application.Features.Categories;
+using CulinaryBlog.Application.Features.Recipes;
+using CulinaryBlog.Application.Interfaces;
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,7 +27,9 @@ public static class DependencyInjection
         // FluentValidation — tự scan toàn bộ validators trong assembly
         services.AddValidatorsFromAssembly(assembly);
 
-        services.AddScoped<Interfaces.IRecipeWriteService, Features.Recipes.RecipeWriteService>();
+        services.AddScoped<IRecipeWriteService, Features.Recipes.RecipeWriteService>();
+        services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<IRecipeService, RecipeService>();
 
         return services;
     }

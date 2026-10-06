@@ -1135,11 +1135,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj",
+      "projectUniqueName": "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj",
       "projectName": "CulinaryBlog.Application",
-      "projectPath": "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj",
+      "projectPath": "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj",
       "packagesPath": "C:\\Users\\Admin\\.nuget\\packages\\",
-      "outputPath": "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\obj\\",
+      "outputPath": "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

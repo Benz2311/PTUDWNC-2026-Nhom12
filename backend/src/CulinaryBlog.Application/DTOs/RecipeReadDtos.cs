@@ -115,7 +115,8 @@ public record RecipeDetailDto(
     IReadOnlyList<RecipeStepDto> Steps,
     IReadOnlyList<RecipeImageDto> Images,
     RecipeNutritionDto Nutrition,
-    RecipeAuthorDto? Author = null);
+    RecipeAuthorDto? Author = null,
+    RecipeStatus Status = RecipeStatus.Draft);
 
 public record CategoryRecipesDataDto(
     RecipeCategoryDto Category,

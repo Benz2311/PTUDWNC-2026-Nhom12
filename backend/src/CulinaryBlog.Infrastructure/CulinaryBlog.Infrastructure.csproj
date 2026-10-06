@@ -59,6 +59,9 @@
     <!-- Email -->
     <PackageReference Include="MailKit" Version="4.12.1" />
 
+    <!-- Google Auth -->
+    <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
+
     <!-- Static analysis -->
     <PackageReference Include="SonarAnalyzer.CSharp" Version="10.7.0.110445">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

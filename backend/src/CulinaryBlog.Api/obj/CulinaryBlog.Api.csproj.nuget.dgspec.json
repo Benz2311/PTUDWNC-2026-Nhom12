@@ -33,11 +33,11 @@
           "net10.0": {
             "targetAlias": "net10.0",
             "projectReferences": {
-              "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj": {
-                "projectPath": "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj"
+              "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj": {
+                "projectPath": "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj"
               },
-              "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj": {
-                "projectPath": "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj"
+              "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj": {
+                "projectPath": "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj"
               }
             }
           }
@@ -526,14 +526,14 @@
         }
       }
     },
-    "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj": {
+    "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj",
+        "projectUniqueName": "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj",
         "projectName": "CulinaryBlog.Application",
-        "projectPath": "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj",
+        "projectPath": "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj",
         "packagesPath": "C:\\Users\\Admin\\.nuget\\packages\\",
-        "outputPath": "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\obj\\",
+        "outputPath": "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -1391,14 +1391,14 @@
         }
       }
     },
-    "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj": {
+    "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj",
+        "projectUniqueName": "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj",
         "projectName": "CulinaryBlog.Infrastructure",
-        "projectPath": "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj",
+        "projectPath": "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\CulinaryBlog.Infrastructure.csproj",
         "packagesPath": "C:\\Users\\Admin\\.nuget\\packages\\",
-        "outputPath": "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\obj\\",
+        "outputPath": "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Infrastructure\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -1420,8 +1420,8 @@
           "net10.0": {
             "targetAlias": "net10.0",
             "projectReferences": {
-              "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj": {
-                "projectPath": "d:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj"
+              "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj": {
+                "projectPath": "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Application\\CulinaryBlog.Application.csproj"
               },
               "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Domain\\CulinaryBlog.Domain.csproj": {
                 "projectPath": "D:\\PTUDWNC-2026-Nhom12\\backend\\src\\CulinaryBlog.Domain\\CulinaryBlog.Domain.csproj"
@@ -1452,6 +1452,10 @@
             "Bogus": {
               "target": "Package",
               "version": "[35.6.5, )"
+            },
+            "Google.Apis.Auth": {
+              "target": "Package",
+              "version": "[1.69.0, )"
             },
             "Hangfire.AspNetCore": {
               "target": "Package",
