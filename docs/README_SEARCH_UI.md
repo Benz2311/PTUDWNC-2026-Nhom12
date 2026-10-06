@@ -1,263 +1,284 @@
-# Võ Hùng Mạnh - Giao diện Tìm kiếm công thức (Recipe Search UI)
+# Giao diện Tìm kiếm công thức (Recipe Search UI)
 
-## 1. Thông tin branch
-- **Thành viên:** Võ Hùng Mạnh
-- **Task:** Task 4 - Frontend Recipe Search UI
-- **Tên branch:** `feat/vohungmanh-search-ui`
-- **Base branch / Base commit:** `origin/main` (`a91589618f6460fc37e9b4861f2c5a0e946311b5`)
-- **Mục tiêu branch:** Xây dựng module giao diện tìm kiếm công thức nấu ăn toàn diện (`SearchBox`, `SearchResultCard`, `SearchContainer`, trang `/search`), hỗ trợ tìm kiếm toàn văn Full-Text Search (FTS) và gợi ý Trigram Fuzzy Fallback, xử lý từ khóa tiếng Việt không dấu và có dấu ("pho bo" -> "Phở bò"), phân trang, bộ lọc và sắp xếp, đồng bộ visual design với dự án Culinary Blog.
+## 1. Mục tiêu
 
----
-
-## 2. Branch này làm gì?
-Branch triển khai đầy đủ các tính năng tìm kiếm công thức thực tế trong mã nguồn:
-- **Search Box:** Thanh tìm kiếm hiện đại với biểu tượng kính lúp, nút xóa nhanh từ khóa (`x`), gợi ý từ khóa phổ biến (Phở bò, Bún chả, Gà nướng...).
-- **Xác thực từ khóa (Query Validation):** Kiểm tra độ dài từ 2 đến 100 ký tự theo chuẩn hợp đồng nghiệp vụ backend. Báo lỗi thân thiện nếu từ khóa < 2 ký tự.
-- **Tìm kiếm đa phương thức:** Kích hoạt tìm kiếm linh hoạt bằng nút bấm "Tìm kiếm" hoặc phím `Enter` trên bàn phím.
-- **Search Results Display:** Hiển thị danh sách kết quả dưới dạng thẻ bài viết trực quan, hình ảnh tỉ lệ 16:9, tiêu đề, tóm tắt, thời gian chuẩn bị và nấu, độ khó, tác giả và danh mục.
-- **Badge phân biệt phương thức khớp dữ liệu:**
-  - `Khớp toàn văn (FTS):` Badge xanh lá đậm cho kết quả tìm thấy qua PostgreSQL Full-Text Search.
-  - `Gợi ý tương đồng (Fuzzy):` Badge vàng/amber cho kết quả tìm thấy qua thuật toán pg_trgm similarity (khi người dùng gõ sai chính tả nhẹ).
-- **Bộ lọc & Sắp xếp (Filter & Sort):**
-  - Lọc nhanh theo Độ khó: Tất cả, Dễ, Trung bình, Khó.
-  - Sắp xếp theo: Độ liên quan (FTS Rank), Mới nhất, Thời gian nấu nhanh nhất.
-- **Phân trang (Pagination):** Hiển thị số trang hiện tại `Trang {page} / {totalPages}`, tổng số lượng kết quả, nút chuyển trang trước và sau với kiểm soát trạng thái biên.
-- **Xử lý trạng thái (UI States):**
-  - *Initial state:* Màn hình hướng dẫn khi người dùng chưa nhập từ khóa.
-  - *Loading state:* Skeleton cards tạo hiệu ứng mượt mà trong khi chờ kết quả API.
-  - *No results state:* Thông báo "Không tìm thấy công thức phù hợp" kèm gợi ý từ khóa liên quan.
-  - *Error state:* Banner thông báo lỗi màu đỏ khi mất kết nối máy chủ.
-- **Trang độc lập:** Khởi tạo trang `/search` hỗ trợ đọc query param trực tiếp từ URL (vd: `/search?q=pho+bo`).
+Module Giao diện Tìm kiếm công thức (`Recipe Search UI`) được phát triển nhằm đáp ứng nhu cầu tra cứu công thức nấu ăn nhanh chóng, chính xác và trực quan cho người dùng CulinaryBlog:
+- **Tối ưu trải nghiệm tìm kiếm cho người dùng Việt Nam**: Cung cấp giao diện tra cứu hỗ trợ nhập tiếng Việt có dấu hoặc không dấu (vd: `pho bo` tìm ra `Phở bò Hà Nội`), hiển thị rõ ràng kết quả khớp chính xác (Full-Text Search) hoặc gợi ý tương đồng (Fuzzy Search Fallback).
+- **Bộ điều khiển toàn diện (Filter, Sort & Pagination)**: Cho phép người dùng lọc kết quả theo Độ khó (Tất cả, Dễ, Trung bình, Khó), sắp xếp theo Độ liên quan / Mới nhất / Thời gian nấu nhanh nhất, và điều hướng phân trang mượt mà.
+- **Độc lập và khả năng tái sử dụng**: Xây dựng thành các component chuyên trách (`SearchBox`, `SearchResultCard`, `SearchContainer`) và tuyến trang riêng biệt `/search` (với Suspense boundary), dễ dàng nhúng thanh tìm kiếm vào Navbar hoặc Header chung sau này mà không làm ảnh hưởng đến mã nguồn của các thành viên khác.
 
 ---
 
-## 3. Branch này KHÔNG làm gì?
-Nhằm đảm bảo tính độc lập và phân chia nhiệm vụ rành mạch trong Nhóm 12:
-- KHÔNG chỉnh sửa form tạo/sửa công thức (`RecipeForm.tsx` thuộc quyền quản lý của TV3 - Phạm Nguyễn Ngọc Phước).
-- KHÔNG chỉnh sửa `StepEditor` (thuộc branch riêng `feat/vohungmanh-step-ui`).
-- KHÔNG chỉnh sửa `ImageManager` (thuộc branch riêng `feat/vohungmanh-image-ui`).
-- KHÔNG can thiệp vào trang danh mục (`Category` của TV2 - Lê Thị Ánh Nhung) hay quản lý người dùng (Auth của TV1).
-- KHÔNG can thiệp chỉnh sửa cấu hình Full-Text Search trong PostgreSQL ở branch này (tầng DB đã được tích hợp trước đó).
+## 2. Kết quả đạt được
+
+Sau khi branch `feat/vohungmanh-search-ui` được triển khai, hệ thống đạt được các năng lực UI thực tế:
+- **Thanh tìm kiếm SearchBox đa năng**: Hỗ trợ kích hoạt tìm kiếm bằng phím `Enter` hoặc bấm nút kính lúp, nút xóa nhanh từ khóa (`x`), và danh sách thẻ gợi ý từ khóa phổ biến (Phở bò, Bún chả, Gà nướng...).
+- **Xác thực từ khóa Client-side**: Kiểm tra độ dài từ khóa từ 2 đến 100 ký tự theo đúng hợp đồng nghiệp vụ, báo lỗi thân thiện ngay dưới input nếu nhập dưới 2 ký tự.
+- **Component SearchResultCard trực quan**: Render từng bài viết với hình ảnh tỷ lệ 16:9, tiêu đề, tóm tắt nội dung (line-clamp), thời gian chuẩn bị và nấu, độ khó, tác giả, danh mục, và badge phân biệt phương thức khớp dữ liệu:
+  - `Khớp toàn văn (FTS)`: Badge màu xanh lá đậm cho kết quả chính xác từ PostgreSQL FTS.
+  - `Gợi ý tương đồng (Fuzzy)`: Badge màu vàng/amber khi kích hoạt thuật toán Trigram similarity (gõ sai chính tả).
+- **Container quản lý trạng thái hoàn chỉnh (SearchContainer)**: Điều phối trạng thái Khởi tạo (Initial), Đang tải (Loading Skeleton), Không có kết quả (Empty/No results kèm gợi ý), và Báo lỗi mạng (Error Banner).
+- **Trang `/search` độc lập**: Đồng bộ trạng thái tìm kiếm với URL query parameters (vd: `/search?q=pho+bo`), cho phép bookmark và chia sẻ liên kết trực tiếp.
+- **Bộ kiểm thử tự động 100% PASS**: 15/15 unit tests chuyên biệt cho `SearchUI.test.tsx` (tổng 27/27 tests frontend) đạt kết quả thành công.
 
 ---
 
-## 4. Cấu trúc file
-Dưới đây là danh sách CHÍNH XÁC các file được tạo hoặc sửa đổi trên branch:
+## 3. Luồng hoạt động
 
-- `frontend/culinary-blog-web/components/search/SearchBox.tsx`: Component thanh tìm kiếm (input, icon kính lúp, nút xóa, nút submit, validation 2-100 ký tự, hỗ trợ phím Enter).
-- `frontend/culinary-blog-web/components/search/SearchResultCard.tsx`: Thẻ hiển thị từng công thức trong kết quả tìm kiếm kèm badge FTS / Fuzzy và thông tin chi tiết.
-- `frontend/culinary-blog-web/components/search/SearchContainer.tsx`: Container component chính quản lý toàn bộ luồng tìm kiếm, bộ lọc, sắp xếp, phân trang và các trạng thái giao diện.
-- `frontend/culinary-blog-web/app/search/page.tsx`: Tuyến trang Next.js độc lập (`/search`) nhúng `SearchContainer` với Suspense wrapper.
-- `frontend/culinary-blog-web/components/search/__tests__/SearchUI.test.tsx`: Test suite gồm 15 kịch bản kiểm thử toàn diện cho module Search UI.
-- `frontend/culinary-blog-web/lib/api.ts`: Module abstraction dùng chung cho HTTP request (`apiFetch`, `apiJson`, `ApiError`).
-- `frontend/culinary-blog-web/lib/api/search.ts`: API Client tương tác với endpoint tìm kiếm của Backend.
-- `frontend/culinary-blog-web/types/search.ts`: Định nghĩa TypeScript interfaces (`RecipeSearchResult`, `SearchResponse`, `SearchFilterState`).
-- `frontend/culinary-blog-web/jest.config.mjs`: Cấu hình Jest ES Module native.
-- `frontend/culinary-blog-web/package.json`: Cập nhật script test trỏ tới `jest.config.mjs`.
-- `docs/README_SEARCH_UI.md`: Tài liệu kỹ thuật chi tiết của branch Search UI.
-- `docs/VO_HUNG_MANH_SEARCH_UI_COMPLAN.md`: Báo cáo giải trình kỹ thuật bảo vệ đồ án, FTS/Trigram, 10 câu hỏi phản biện.
-
----
-
-## 5. Component Architecture
-Kiến trúc luồng dữ liệu của module Search UI:
+Luồng dữ liệu và điều khiển từ khi người dùng nhập từ khóa đến khi kết quả hiển thị:
 
 ```
-[ app/search/page.tsx ] (Next.js Page)
-          │
-          ▼
-┌────────────────────────────────────────────────────────┐
-│                  SearchContainer.tsx                   │
-│  - Quản lý state: activeQuery, page, searchResponse    │
-│  - Quản lý bộ lọc (difficulty) & sắp xếp (sortBy)      │
-│  - Điều khiển phân trang (Pagination Controls)         │
-│  - Quản lý Loading (Skeleton), Empty, No Results, Error│
-└───────────────┬────────────────────────┬───────────────┘
-                │                        │
-       renders  │               renders  │ (Lặp qua từng item)
-                ▼                        ▼
-     ┌────────────────────┐    ┌────────────────────┐
-     │   SearchBox.tsx    │    │ SearchResultCard   │
-     │  - Input form      │    │  - Thumbnail cover │
-     │  - Validation 2-100│    │  - FTS/Fuzzy badge │
-     │  - Nút Enter/Click │    │  - Category/Time   │
-     └────────────────────┘    │  - Link chi tiết   │
-                               └────────────────────┘
+User nhập từ khóa (SearchBox)
+   │ (Nhấn Enter hoặc click nút "Tìm kiếm")
+   ▼
+Validation Client-side (Độ dài từ 2 đến 100 ký tự sau khi trim)
+   │
+   ├── [Dưới 2 ký tự] ──> Báo lỗi đỏ & Chặn gửi request
+   │
+   └── [Hợp lệ]
+         │
+         ▼
+      SearchContainer kích hoạt Loading State (hiển thị 3 Card Skeletons)
+         │
+         ▼
+      Search API Client (lib/api/search.ts via apiFetch / apiJson)
+         │ [GET /api/v1/recipes/search?q={query}&page={page}&pageSize={pageSize}]
+         ▼
+      Backend Search Endpoint (FTS Vector -> Trigram Fuzzy Fallback -> Redis Cache)
+         │
+         ├── [Thành công có dữ liệu] ──> Render danh sách SearchResultCard (Badge FTS / Fuzzy)
+         │                                 + Bảng điều khiển Filter (Difficulty) & Sort (Relevant/Newest/CookTime)
+         │                                 + Điều hướng phân trang (Pagination: Prev/Next)
+         │
+         ├── [Thành công không có kết quả] ──> Render No Results State kèm từ khóa gợi ý
+         │
+         └── [Lỗi kết nối / Server 500]   ──> Render Error Banner màu đỏ
+```
+
+### Giải thích chi tiết các bước:
+1. **Bước 1 - Người dùng nhập từ khóa**: Người dùng gõ từ khóa vào `SearchBox` (hoặc bấm chọn một thẻ gợi ý từ khóa) và nhấn phím `Enter` hoặc click nút "Tìm kiếm".
+2. **Bước 2 - Kiểm tra hợp lệ (Validation)**: Chuỗi tìm kiếm được `.trim()`. Nếu độ dài $< 2$ ký tự, giao diện hiển thị cảnh báo đỏ và không gọi API. Nếu độ dài từ 2 đến 100 ký tự, cho phép thực hiện.
+3. **Bước 3 - Hiển thị Loading State**: `SearchContainer` đặt `isLoading = true`, tạm ẩn kết quả cũ và hiển thị các khối Card Skeleton với hiệu ứng nhấp nháy (shimmer).
+4. **Bước 4 - Gửi HTTP Request**: API Client gọi `searchRecipes(query, page, pageSize)` tương ứng với `GET /api/v1/recipes/search?q=...`.
+5. **Bước 5 - Nhận kết quả và Render UI**:
+   - Khi nhận được dữ liệu, tắt loading. Mỗi phần tử trong mảng `items` được render thành một `SearchResultCard`.
+   - Dựa vào trường `matchType`, card hiển thị badge tương ứng: `Khớp toàn văn (FTS)` nếu là `FullTextSearch`, hoặc `Gợi ý tương đồng (Fuzzy)` nếu là `FuzzyTrigram`.
+   - Nếu mảng `items` rỗng, hiển thị màn hình thông báo không tìm thấy kết quả và đề xuất các từ khóa thay thế.
+   - Nếu có lỗi kết nối, hiển thị Banner màu đỏ ở đầu trang có nút `x` để đóng.
+6. **Bước 6 - Tương tác lọc, sắp xếp và phân trang**: Người dùng chọn độ khó (Easy, Medium, Hard), sắp xếp theo thời gian, hoặc chuyển trang -> `SearchContainer` cập nhật state và kích hoạt lấy lại dữ liệu trang mới tương ứng.
+
+---
+
+## 4. Các file chính
+
+| File | Vai trò | Xử lý gì |
+| :--- | :--- | :--- |
+| `frontend/culinary-blog-web/components/search/SearchBox.tsx` | Thanh tìm kiếm | Ô nhập liệu, icon kính lúp, nút xóa nhanh (`x`), nút tìm kiếm, validation 2-100 ký tự, hỗ trợ phím Enter và danh sách thẻ gợi ý từ khóa |
+| `frontend/culinary-blog-web/components/search/SearchResultCard.tsx` | Thẻ kết quả bài viết | Hiển thị thumbnail 16:9, badge phương thức khớp (FTS màu xanh lá / Fuzzy màu vàng), thời gian nấu, độ khó, tác giả, danh mục và link chi tiết |
+| `frontend/culinary-blog-web/components/search/SearchContainer.tsx` | Container điều phối | Quản lý active query, kết quả tìm kiếm, bộ lọc độ khó, sắp xếp, phân trang, các trạng thái Initial, Loading Skeleton, Empty, và Error banner |
+| `frontend/culinary-blog-web/app/search/page.tsx` | Tuyến trang Next.js | Trang độc lập `/search`, đọc query param `?q=` từ URL và bọc `SearchContainer` bên trong `Suspense` boundary |
+| `frontend/culinary-blog-web/lib/api/search.ts` | API Client Module | Chứa hàm `searchRecipes(query, page, pageSize)` gọi endpoint `GET /api/v1/recipes/search` |
+| `frontend/culinary-blog-web/lib/api.ts` | Core HTTP Client | Hàm tiện ích `apiFetch`, `apiJson`, xử lý query parameters và parse lỗi HTTP |
+| `frontend/culinary-blog-web/types/search.ts` | TypeScript Interfaces | Định nghĩa kiểu `RecipeSearchResult`, `SearchResponse`, `SearchFilterState` |
+| `frontend/culinary-blog-web/components/search/__tests__/SearchUI.test.tsx` | Unit Test Suite | 15 test cases kiểm tra SearchBox, validation, phím Enter, Loading Skeleton, FTS/Fuzzy badge, filter, sort, pagination, empty và error states |
+| `frontend/culinary-blog-web/jest.config.mjs` | Test Configuration | Cấu hình Jest ES Module cho Next.js 15 |
+| `docs/README_SEARCH_UI.md` | Tài liệu kỹ thuật | Hướng dẫn kiến trúc, luồng hoạt động, validation và kết quả kiểm thử của branch Search UI |
+| `docs/VO_HUNG_MANH_SEARCH_UI_COMPLAN.md` | Tài liệu giải trình | Báo cáo chi tiết, câu hỏi bảo vệ và ma trận đánh giá rủi ro |
+
+---
+
+## 5. API / Interface
+
+### Component Props & Interface
+
+| Component | Input / Props | API sử dụng | Output UI |
+| :--- | :--- | :--- | :--- |
+| **SearchBox** | `initialQuery?: string`<br>`onSearch: (query: string) => void`<br>`isLoading?: boolean`<br>`placeholder?: string` | Không gọi trực tiếp (gửi callback lên cha) | Thanh tìm kiếm, nút submit, nút xóa nhanh, danh sách gợi ý từ khóa phổ biến, thông báo lỗi validation |
+| **SearchResultCard** | `recipe: RecipeSearchResult` | Không gọi trực tiếp | Thẻ bài viết tỷ lệ 16:9, badge `Khớp toàn văn (FTS)` hoặc `Gợi ý tương đồng (Fuzzy)`, metadata thời gian, tác giả |
+| **SearchContainer** | `initialQuery?: string` | `searchRecipes` | Giao diện tìm kiếm hoàn chỉnh: SearchBox, thanh công cụ Lọc & Sắp xếp, danh sách `SearchResultCard`, phân trang, Loading Skeletons |
+
+### REST Endpoints mà `lib/api/search.ts` giao tiếp:
+
+| Method | Endpoint | Query Parameters | Output | Authorization |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/recipes/search` | `q`: string (2-100 ký tự)<br>`page`: number (mặc định 1)<br>`pageSize`: number (mặc định 10) | `SearchResponse` (`items: RecipeSearchResult[]`, `totalCount`, `totalPages`, `hasPreviousPage`, `hasNextPage`) | Không bắt buộc (Public API) |
+
+---
+
+## 6. Business Rules
+
+1. **Quy tắc kiểm tra độ dài từ khóa (Query Length Validation)**:
+   - Từ khóa sau khi cắt khoảng trắng thừa (`trim`) phải có độ dài tối thiểu là **2 ký tự** (theo quy định SRS FR-SRCH-001 để tránh full scan cơ sở dữ liệu với từ khóa 1 ký tự).
+   - Độ dài tối đa được khống chế ở mức **100 ký tự** (`maxLength={100}`) để ngăn chặn request quá tải.
+2. **Kích hoạt tìm kiếm kép (Dual Trigger)**:
+   - Người dùng có thể kích hoạt tìm kiếm bằng cách bấm chuột vào nút "Tìm kiếm" hoặc nhấn phím `Enter` trên bàn phím khi đang focus trong ô nhập liệu.
+3. **Phân biệt trực quan phương thức khớp dữ liệu (Match Type Badges)**:
+   - Nếu `matchType === "FullTextSearch"`: Giao diện hiển thị badge màu xanh lá cây đậm `"Khớp toàn văn (FTS)"` khẳng định kết quả khớp chính xác theo chỉ mục văn bản.
+   - Nếu `matchType === "FuzzyTrigram"`: Giao diện hiển thị badge màu vàng/amber `"Gợi ý tương đồng (Fuzzy)"` giải thích cho người dùng biết kết quả được gợi ý do gõ sai chính tả nhẹ.
+4. **Quy tắc phân trang an toàn (Safe Pagination)**:
+   - Nút "Trang trước" tự động vô hiệu hóa (`disabled`) khi `hasPreviousPage === false` hoặc `page <= 1`.
+   - Nút "Trang sau" tự động vô hiệu hóa (`disabled`) khi `hasNextPage === false` hoặc `page >= totalPages`.
+5. **Bộ lọc cục bộ & Sắp xếp linh hoạt**:
+   - Hỗ trợ lọc tức thì danh sách kết quả theo độ khó (`All`, `Easy`, `Medium`, `Hard`).
+   - Hỗ trợ sắp xếp danh sách kết quả theo Độ liên quan (thứ tự FTS rank mặc định), Thời gian nấu nhanh nhất (`cookTimeMinutes` tăng dần), hoặc Mới nhất (`publishedAt` giảm dần).
+
+---
+
+## 7. Ví dụ hoạt động
+
+### Ví dụ: Tìm kiếm từ khóa không dấu "pho bo"
+
+```
+INPUT:
+- Người dùng truy cập trang /search
+- Nhập từ khóa: "pho bo"
+- Nhấn phím Enter trên bàn phím
+
+↓ PROCESS:
+1. SearchBox kiểm tra: "pho bo".length = 6 -> Nằm trong [2, 100] -> HỢP LỆ.
+2. Gọi callback onSearch("pho bo").
+3. SearchContainer chuyển sang trạng thái isLoading = true, hiển thị 3 Card Skeletons nhấp nháy.
+4. API Client gọi: GET /api/v1/recipes/search?q=pho+bo&page=1&pageSize=10.
+5. Backend xử lý:
+   - Chuẩn hóa text tiếng Việt không dấu: "pho bo"
+   - Truy vấn PostgreSQL FTS Vector, tìm thấy công thức "Phở bò Hà Nội truyền thống".
+   - Trả về JSON:
+     {
+       "items": [{
+         "id": "c1f7b8e2-...",
+         "title": "Phở bò Hà Nội truyền thống",
+         "slug": "pho-bo-ha-noi-truyen-thong",
+         "description": "Nước dùng trong vắt, đậm đà từ xương bò hầm 8 tiếng...",
+         "prepTimeMinutes": 30,
+         "cookTimeMinutes": 180,
+         "difficulty": "Medium",
+         "matchType": "FullTextSearch",
+         "primaryImageUrl": "https://example.com/pho-bo.jpg"
+       }],
+       "totalCount": 1,
+       "page": 1,
+       "totalPages": 1
+     }
+6. SearchContainer cập nhật searchResponse, tắt loading.
+
+↓ OUTPUT:
+- Giao diện hiển thị:
+  * Thanh thông báo: "Tìm thấy 1 kết quả cho từ khóa 'pho bo'"
+  * Thẻ SearchResultCard cho bài viết "Phở bò Hà Nội truyền thống"
+  * Badge màu xanh lá đậm: "Khớp toàn văn (FTS)"
+  * Nhãn thời gian: "Chuẩn bị: 30p | Nấu: 180p"
+  * Nhãn độ khó: "Trung bình"
 ```
 
 ---
 
-## 6. API được sử dụng
-Module giao tiếp với RESTful endpoint tìm kiếm sau trên Backend:
+## 8. Error Handling
 
-- **Endpoint:** `GET /api/v1/recipes/search`
-- **Query Parameters:**
-  - `q` (string, bắt buộc từ 2-100 ký tự): Từ khóa tìm kiếm (hỗ trợ cả tiếng Việt không dấu và có dấu, ví dụ `pho bo` hoặc `phở bò`).
-  - `page` (int, mặc định `1`): Số thứ tự trang hiện tại.
-  - `pageSize` (int, mặc định `10`, tối đa `100`): Số lượng kết quả trên một trang.
-- **Response DTO (`PagedResult<RecipeSearchResultDto>`):**
-  ```json
-  {
-    "items": [
-      {
-        "id": "c1f7b8e2-...",
-        "title": "Phở bò Hà Nội truyền thống",
-        "slug": "pho-bo-ha-noi-truyen-thong",
-        "description": "Nước dùng trong vắt, đậm đà từ xương bò hầm 8 tiếng...",
-        "prepTimeMinutes": 30,
-        "cookTimeMinutes": 180,
-        "servings": 4,
-        "difficulty": "Medium",
-        "publishedAt": "2026-03-01T08:00:00Z",
-        "primaryImageUrl": "https://example.com/pho-bo.jpg",
-        "authorName": "Võ Hùng Mạnh",
-        "categoryName": "Món Nước",
-        "categorySlug": "mon-nuoc",
-        "matchType": "FullTextSearch"
-      }
-    ],
-    "page": 1,
-    "pageSize": 10,
-    "totalCount": 1,
-    "totalPages": 1,
-    "hasPreviousPage": false,
-    "hasNextPage": false
-  }
-  ```
+| Tình huống lỗi | Hành vi UI | Thông điệp hiển thị |
+| :--- | :--- | :--- |
+| Nhập từ khóa dưới 2 ký tự (vd: "a") | Chặn gửi request | Chữ đỏ dưới ô input: `"Từ khóa tìm kiếm phải có ít nhất 2 ký tự."` |
+| Nhập chuỗi chỉ gồm khoảng trắng (vd: "   ") | Chặn gửi request | Chữ đỏ dưới ô input: `"Từ khóa tìm kiếm phải có ít nhất 2 ký tự."` |
+| Không tìm thấy công thức nào phù hợp | Tắt loading, chuyển sang Empty State | Tiêu đề: `"Không tìm thấy công thức phù hợp"`, gợi ý thử từ khóa khác hoặc bấm vào các thẻ đề xuất |
+| Mất kết nối máy chủ hoặc lỗi HTTP 500 từ Backend | Bắt lỗi trong `catch` block | Banner cảnh báo đỏ ở đầu trang: `"Không thể kết nối đến máy chủ tìm kiếm. Vui lòng thử lại sau."` |
+| Lỗi tải ảnh đại diện bài viết | Fallback ảnh mặc định | Ẩn ảnh hỏng hoặc hiển thị placeholder để không làm vỡ layout |
 
 ---
 
-## 7. Luồng hoạt động
+## 9. Cách chạy và Demo
 
-### Luồng tìm kiếm từ khóa ("pho bo" -> "Phở bò"):
-1. Người dùng nhập từ khóa "pho bo" vào `SearchBox` và nhấn phím `Enter` (hoặc bấm nút "Tìm kiếm").
-2. `SearchBox` kiểm tra validation: từ khóa có độ dài 6 ký tự (hợp lệ trong khoảng 2–100 ký tự).
-3. `SearchContainer` kích hoạt trạng thái Loading (hiển thị 3 skeleton card nhấp nháy).
-4. API Client gọi `GET /api/v1/recipes/search?q=pho+bo&page=1&pageSize=10`.
-5. Tại Backend:
-   - Backend chuẩn hóa từ khóa `VietnameseTextNormalizer.Normalize("pho bo")` -> `pho bo`.
-   - Đối chiếu với shadow property `SearchVectorFts` (được đánh chỉ mục GIN với hàm `unaccent` và từ điển `simple`).
-   - Tìm thấy công thức "Phở bò Hà Nội truyền thống", chấm điểm xếp hạng `ts_rank` và trả về với `matchType = "FullTextSearch"`.
-   - Kết quả được lưu tạm 1 phút trong Redis Cache.
-6. Client nhận response JSON, tắt loading và hiển thị `SearchResultCard` với badge "Khớp toàn văn (FTS)".
+### Điều kiện tiên quyết
+- Node.js 18+ hoặc 20+
+- Dependencies frontend đã cài đặt đầy đủ
 
-### Luồng Fuzzy Search Fallback (Gõ sai chính tả):
-1. Người dùng gõ nhầm từ khóa "phoo bo" -> Gửi request lên Backend.
-2. Giai đoạn 1 (FTS) không tìm thấy bản ghi nào khớp chính xác.
-3. Backend tự động chuyển sang Giai đoạn 2: Thuật toán Trigram Similarity (`pg_trgm`) so sánh độ tương đồng với ngưỡng `> 0.3`.
-4. Tìm thấy công thức "Phở bò Hà Nội truyền thống", trả về kết quả với `matchType = "FuzzyTrigram"`.
-5. Client hiển thị kết quả với badge màu vàng/amber "Gợi ý tương đồng (Fuzzy)".
-
----
-
-## 8. Validation
-- **Độ dài tối thiểu:** Từ khóa phải có ít nhất 2 ký tự (theo quy định SRS FR-SRCH-001 để tránh full table scan với từ khóa quá ngắn). Nếu < 2 ký tự, UI hiển thị thông báo lỗi màu đỏ và không gửi request lên server.
-- **Độ dài tối đa:** Ô nhập liệu giới hạn thuộc tính `maxLength={100}`, ngăn người dùng nhập quá 100 ký tự.
-- **Loại bỏ khoảng trắng thừa:** Chuỗi tìm kiếm tự động được `.trim()` trước khi kiểm tra và gửi đi.
-
----
-
-## 9. Error Handling
-- **Lỗi mạng hoặc 500 Internal Server Error:** Hiển thị Error Banner màu đỏ thân thiện ở đầu trang: "Không thể kết nối đến máy chủ tìm kiếm. Vui lòng thử lại sau."
-- **Không có kết quả tìm kiếm (Empty Response):** Hiển thị màn hình rỗng thông báo "Không tìm thấy công thức phù hợp cho từ khóa..." kèm theo các từ khóa gợi ý thay thế.
-- **Đóng thông báo:** Nút `x` trên banner cho phép người dùng đóng cảnh báo lỗi bất cứ lúc nào.
-
----
-
-## 10. Visual Design
-Giao diện bám sát phong cách thiết kế đặc trưng của Culinary Blog:
-- **Tone màu chủ đạo:** Màu xanh lá đậm (`#166534` / `bg-green-800` / `hover:bg-green-900`) dùng cho nút "Tìm kiếm", badge danh mục và badge FTS.
-- **Thẻ Card kết quả:** Nền trắng (`bg-white`), bo góc mềm mại (`rounded-xl`), viền xám mảnh nhẹ (`border-gray-200 hover:border-gray-300`), không sử dụng shadow đậm.
-- **Typography:** Phông chữ rõ ràng, phân cấp thị giác hợp lý giữa Tiêu đề bài viết (font-bold) và Mô tả tóm tắt (line-clamp-2, text-gray-600).
-- **Responsive:** Co giãn linh hoạt từ điện thoại di động (layout 1 cột, ảnh trên chữ dưới) đến máy tính bảng và desktop (layout hàng ngang, ảnh bên trái, thông tin bên phải).
-
----
-
-## 11. Testing
-- **File kiểm thử:** `frontend/culinary-blog-web/components/search/__tests__/SearchUI.test.tsx`
-- **Lệnh chạy kiểm thử:**
-  ```powershell
-  cd frontend/culinary-blog-web
-  npm test
-  ```
-- **Danh sách 15 kịch bản kiểm thử đã thực hiện:**
-  1. Render Search Box với đầy đủ ô nhập liệu, icon và nút tìm kiếm.
-  2. Báo lỗi khi từ khóa tìm kiếm ít hơn 2 ký tự.
-  3. Giới hạn độ dài ô nhập liệu tối đa 100 ký tự.
-  4. Kích hoạt tìm kiếm khi người dùng nhấn nút Tìm kiếm.
-  5. Kích hoạt tìm kiếm khi người dùng nhấn phím Enter trên bàn phím.
-  6. Hiển thị trạng thái Loading Skeletons trong khi đang chờ kết quả từ API.
-  7. Render đầy đủ các thẻ kết quả công thức với thông tin chuẩn DTO.
-  8. Hiển thị badge "Khớp toàn văn (FTS)" màu xanh lá cho kết quả FTS.
-  9. Hiển thị badge "Gợi ý tương đồng (Fuzzy)" màu vàng cho kết quả Trigram.
-  10. Tìm kiếm từ khóa không dấu "pho bo" gọi đúng hàm searchRecipes.
-  11. Hiển thị thông điệp "Không tìm thấy công thức phù hợp" khi API trả về danh sách rỗng.
-  12. Hiển thị Error Banner màu đỏ thân thiện khi API trả về lỗi.
-  13. Điều khiển phân trang gọi đúng trang tiếp theo.
-  14. Lọc kết quả danh sách theo độ khó Easy.
-  15. Sắp xếp các công thức theo thời gian nấu tăng dần.
-- **Kết quả kiểm thử thực tế mới nhất:**
-  - `Test Suites:` **2 passed, 2 total**
-  - `Tests:` **27 passed, 27 total** (15/15 test cases của `SearchUI.test.tsx` + 12 test cases của `recipe-utils.test.ts` PASS 100%)
-  - `Time:` 4.703 s
-
----
-
-## 12. Build
-- **Lệnh đóng gói build:**
-  ```powershell
-  cd frontend/culinary-blog-web
-  $env:NODE_OPTIONS="--max-old-space-size=4096"; npm run build
-  ```
-- **Kết quả build thực tế:**
-  - Next.js 15.5.25 (Turbopack)
-  - `Compiled successfully in 2.1s`
-  - Đã xuất bản thành công trang tĩnh `/search` (`○ /search 6.22 kB`)
-  - Zero TypeScript error, exit code 0.
-
----
-
-## 13. Cách chạy branch
-Khởi chạy branch từ đầu trên môi trường phát triển:
-
+### Lệnh chạy môi trường phát triển
 ```bash
-git switch feat/vohungmanh-search-ui
 cd frontend/culinary-blog-web
-npm install
 npm run dev
 ```
+Truy cập trình duyệt: `http://localhost:3000/search`.
 
-- **URL truy cập local:** `http://localhost:3000/search` hoặc `http://localhost:3000/search?q=pho+bo`
-
----
-
-## 14. Cách demo với giảng viên
-Trình tự demo 8 bước chi tiết:
-
-1. **Khởi động trang Tìm kiếm:** Truy cập `http://localhost:3000/search` -> Trình diễn giao diện khởi tạo với SearchBox nổi bật và các thẻ gợi ý từ khóa.
-2. **Kiểm tra Validation < 2 ký tự:** Nhập chữ "a" và nhấn Enter -> Hệ thống lập tức báo lỗi đỏ: "Từ khóa tìm kiếm phải có ít nhất 2 ký tự."
-3. **Tìm kiếm tiếng Việt không dấu ("pho bo"):** Nhập "pho bo" và bấm nút "Tìm kiếm" -> Hệ thống hiển thị 3 skeleton loading nhấp nháy, sau đó render kết quả bài viết "Phở bò Hà Nội truyền thống".
-4. **Trình bày Badge Khớp toàn văn (FTS):** Chỉ cho giảng viên thấy badge màu xanh lá "Khớp toàn văn (FTS)" trên thẻ bài viết phở bò.
-5. **Thử nghiệm Gõ sai chính tả (Fuzzy Fallback):** Nhập từ khóa "phoo bo" -> Hệ thống vẫn thông minh tìm thấy món "Phở bò" và gắn badge màu vàng "Gợi ý tương đồng (Fuzzy)".
-6. **Lọc theo Độ khó (Difficulty Filter):** Tại thanh công cụ lọc, chọn độ khó "Dễ" (Easy) -> Danh sách tự động lọc chỉ hiển thị các món ăn dễ làm.
-7. **Sắp xếp theo Thời gian nấu (Sort by Cook Time):** Chọn sắp xếp theo thời gian nấu nhanh nhất -> Các món ăn có thời gian ngắn hơn tự động đảo lên đầu.
-8. **Tìm kiếm không có kết quả:** Nhập từ khóa "xyzabc123" -> Giao diện hiển thị trạng thái "Không tìm thấy công thức phù hợp" cùng các nút bấm từ khóa gợi ý.
+### Kịch bản Demo cho Giảng viên (8 bước):
+1. **Demo Trang Tìm kiếm ban đầu**: Mở `http://localhost:3000/search` -> Trình diễn giao diện khởi tạo với thanh tìm kiếm nổi bật và danh sách các thẻ từ khóa gợi ý (Phở bò, Bún chả...).
+2. **Demo Validation dưới 2 ký tự**: Nhập chữ "a" và nhấn Enter -> Hệ thống lập tức hiển thị cảnh báo đỏ và không gọi request.
+3. **Demo Tìm kiếm tiếng Việt không dấu ("pho bo")**: Nhập "pho bo" và bấm "Tìm kiếm" -> Xem hiệu ứng Skeleton loading nhấp nháy, sau đó render kết quả bài viết "Phở bò Hà Nội truyền thống".
+4. **Demo Badge Khớp toàn văn (FTS)**: Chỉ rõ badge màu xanh lá `"Khớp toàn văn (FTS)"` trên thẻ kết quả phở bò.
+5. **Demo Gợi ý tương đồng khi gõ sai (Fuzzy Fallback)**: Nhập từ khóa "phoo bo" -> Hệ thống hiển thị kết quả với badge màu vàng `"Gợi ý tương đồng (Fuzzy)"`.
+6. **Demo Bộ lọc Độ khó (Difficulty Filter)**: Tại thanh công cụ lọc, chọn độ khó "Dễ" -> Danh sách chỉ hiển thị các công thức có độ khó tương ứng.
+7. **Demo Sắp xếp theo Thời gian nấu (Sort by Cook Time)**: Chọn sắp xếp theo thời gian nấu nhanh nhất -> Thứ tự các thẻ kết quả được cập nhật tương ứng.
+8. **Demo Trạng thái không có kết quả**: Nhập từ khóa ngẫu nhiên "xyz123abc" -> Giao diện hiển thị màn hình thông báo không tìm thấy kết quả và đề xuất các từ khóa thay thế.
 
 ---
 
-## 15. Ranh giới ownership
-- **Mã nguồn do Võ Hùng Mạnh sở hữu:** `SearchBox.tsx`, `SearchResultCard.tsx`, `SearchContainer.tsx`, `app/search/page.tsx`, `lib/api/search.ts`, `types/search.ts`, `SearchUI.test.tsx`.
-- **Điểm tích hợp với thành viên khác:** `SearchBox` có thể được tái sử dụng để nhúng trực tiếp vào Header / Navbar của trang web (do TV2 hoặc TV1 phụ trách) mà không cần viết lại logic tìm kiếm.
-- **Cam kết:** Branch này **tuyệt đối không chỉnh sửa `RecipeForm.tsx`**, không sửa các module Step, Image, Category hay Auth của các thành viên khác.
+## 10. Testing
+
+### Bộ kiểm thử tự động Frontend
+Chạy kiểm thử bằng Jest:
+```powershell
+cd frontend/culinary-blog-web
+npm test
+```
+
+### Kết quả kiểm thử thực tế
+- **Test Suites**: `2 passed, 2 total`
+- **Tests**: `27 passed, 27 total`
+- **Snapshots**: `0 total`
+- **Time**: ~7.057 s
+
+### 15 kịch bản kiểm thử trong `SearchUI.test.tsx` (15/15 PASS):
+1. `renders search box with input and buttons`: PASS
+2. `shows validation error when query length is less than 2`: PASS
+3. `enforces max length of 100 characters on input`: PASS
+4. `triggers search when clicking search button`: PASS
+5. `triggers search when pressing Enter key`: PASS
+6. `shows loading skeleton during search`: PASS
+7. `renders search results correctly with metadata`: PASS
+8. `displays FullTextSearch badge correctly`: PASS
+9. `displays FuzzyTrigram badge correctly`: PASS
+10. `searches unaccented query "pho bo" successfully`: PASS
+11. `renders empty state when no results found`: PASS
+12. `displays error banner when API returns error`: PASS
+13. `handles pagination page change correctly`: PASS
+14. `filters search results by difficulty`: PASS
+15. `sorts search results by cook time`: PASS
 
 ---
 
-## 16. Hạn chế hiện tại
-- `SearchBox` hiện tại được gắn mặc định tại trang `/search`, chưa được mount trực tiếp vào Navbar chung của toàn bộ website (để bảo vệ mã nguồn layout chung của nhóm).
-- Cần có backend (.NET Web API) và PostgreSQL đang chạy để thực hiện tìm kiếm trực tiếp trên dữ liệu thật.
+## 11. Build
+
+### Lệnh đóng gói build
+```powershell
+cd frontend/culinary-blog-web
+$env:NODE_OPTIONS="--max-old-space-size=4096"; npm run build
+```
+
+### Kết quả build thực tế
+- **Framework**: Next.js 15.5.25 (Turbopack)
+- **Status**: Compiled successfully (exit code 0)
+- **Static Pages Generated**: `6/6` routes (bao gồm tuyến tĩnh `/search` dung lượng `6.22 kB`)
+- **Type Checking**: Zero TypeScript error
+- **Bundle Output**:
+  - Route `/search`: 6.22 kB (First Load JS: 122 kB)
+  - Route `/`: 5.47 kB (First Load JS: 121 kB)
+  - Shared JS chunks: 124 kB
 
 ---
 
-## 17. Tài liệu COMPLAN
-Báo cáo giải trình chuyên sâu về kỹ thuật PostgreSQL Full-Text Search, GIN Index, hàm `unaccent`, giải thuật Trigram Similarity và 10 câu hỏi bảo vệ đồ án được lưu trữ tại:
-- [VO_HUNG_MANH_SEARCH_UI_COMPLAN.md](file:///b:/PTUDWNC-2026-Nhom12-MANH/docs/VO_HUNG_MANH_SEARCH_UI_COMPLAN.md)
+## 12. Limitations
+
+1. **Phân biệt giữa Frontend Unit Tests và PostgreSQL Full-Text Search thật**:
+   - Bộ kiểm thử `SearchUI.test.tsx` là **Frontend Unit Tests** chạy trên môi trường Jest/jsdom, sử dụng mock client để kiểm tra các hành vi tương tác UI, validation, render badges và pagination.
+   - Các hành vi phân tích từ khóa thực tế (`unaccent`, GIN index, `SearchVector`, tính điểm ranking `ts_rank`, và ngưỡng tương đồng Trigram `0.3`) thuộc quyền sở hữu của backend và cơ sở dữ liệu PostgreSQL (đã được kiểm chứng trong branch backend `feat/vohungmanh-full-text-search`).
+   - Tìm kiếm End-to-End từ trình duyệt thật đến CSDL thật đòi hỏi cả hệ thống Web API và PostgreSQL container đang vận hành đồng thời.
+2. **Ranh giới tích hợp vào Navbar toàn cục**:
+   - `SearchBox` hiện tại được gắn mặc định tại trang độc lập `/search` để bảo vệ mã nguồn layout chung của nhóm.
+   - Thành viên phụ trách Layout/Navbar (TV1/TV2) có thể tái sử dụng trực tiếp component `SearchBox` để nhúng lên thanh điều hướng chung khi thực hiện tích hợp toàn hệ thống.
+
+---
+
+## 13. Kết luận
+
+Branch `feat/vohungmanh-search-ui` đã hoàn thiện toàn diện module giao diện tìm kiếm công thức (`SearchBox`, `SearchResultCard`, `SearchContainer`, và trang `/search`):
+- Trải nghiệm tìm kiếm tối ưu cho người dùng Việt Nam (hỗ trợ tiếng Việt không dấu, kích hoạt linh hoạt qua phím `Enter` hoặc click).
+- Trực quan hóa kết quả tìm kiếm với phân loại rõ ràng qua các badge `Khớp toàn văn (FTS)` và `Gợi ý tương đồng (Fuzzy)`.
+- Đầy đủ tính năng bổ trợ: Bộ lọc độ khó, sắp xếp linh hoạt, phân trang an toàn, xử lý đầy đủ các trạng thái Loading Skeleton, Empty và Error.
+- Đạt chất lượng kiểm thử cao với **15/15 unit tests passed** và biên dịch production build thành công 0 lỗi.
