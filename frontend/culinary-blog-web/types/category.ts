@@ -3,9 +3,22 @@ export interface Category {
   name: string;
   slug: string;
   description: string | null;
-  imageUrl: string | null;
-  orderIndex: number;
+  imageUrl?: string | null;
+  orderIndex?: number;
   recipeCount: number;
+}
+
+export interface CategoryStatisticItem {
+  categoryId: string;
+  categoryName: string;
+  recipeCount: number;
+  percentage?: number;
+}
+
+export interface RecipeMonthlyStatistic {
+  year: number;
+  month: number;
+  count: number;
 }
 
 export interface CategoryStatistics {
@@ -13,23 +26,24 @@ export interface CategoryStatistics {
   totalRecipes: number;
   publishedRecipes: number;
   draftRecipes: number;
+  archivedRecipes?: number;
   categories: CategoryStatisticItem[];
-}
-
-export interface CategoryStatisticItem {
-  categoryId: string;
-  categoryName: string;
-  recipeCount: number;
+  topCategories?: CategoryStatisticItem[];
+  recipesByMonth?: RecipeMonthlyStatistic[];
 }
 
 export interface CategoryRecipeItem {
   id: string;
   title: string;
-  slug?: string;
-  description?: string | null;
+  slug: string;
+  description: string | null;
   cookTime?: number;
+  prepTime?: number;
+  servings?: number;
   difficulty?: string;
-  imageUrl?: string | null;
+  primaryImageUrl?: string | null;
+  status?: string;
+  publishedAt?: string | null;
 }
 
 export interface CategoryDetailResponse {
@@ -48,3 +62,12 @@ export interface CategoryDetailResponse {
   };
 }
 
+export interface CreateCategoryRequest {
+  name: string;
+  description?: string | null;
+}
+
+export interface UpdateCategoryRequest {
+  name: string;
+  description?: string | null;
+}

@@ -67,13 +67,11 @@
 - Kiểm thử Filter, Sort, Pagination và các truy vấn đọc sau khi tối ưu.
 ---
 
-# Bữa 4 - Hoàn thiện API Endpoints
+# Bữa 4 - Hoàn thiện API Endpoints và Giao diện
 
-## Mục tiêu
-
-Hoàn thành việc cài đặt tất cả API Endpoints.
-
-Việc triển khai Backend tuân theo tài liệu SRS v1.2.0 của dự án.
+## Mục tiêu: 
+- Hoàn thiện các API Endpoint và giao diện tương ứng theo SRS v1.2.0; 
+- Mỗi thành viên tiếp tục phụ trách đúng module/entity đã được giao, kết nối giao diện với API thật và kiểm thử các luồng chính trước khi tích hợp.
 
 ### Nguyên tắc phân công
 
@@ -92,161 +90,33 @@ Việc triển khai Backend tuân theo tài liệu SRS v1.2.0 của dự án.
 
 # Lê Thị Ánh Nhung - Category / Recipe Read / Dashboard
 
-## Entity phụ trách
-
-- `Category`
-- Được phép đọc `Recipe` phục vụ:
-  - List.
-  - Detail.
-  - Filter.
-  - Sort.
-  - Pagination.
-  - Statistics.
-
-> Thành viên 2 không phụ trách nghiệp vụ tạo/cập nhật trạng thái Recipe.
-
-## API Endpoints
-
-- [ ] `GET /api/v1/categories`
-- [ ] `GET /api/v1/categories/{slug}`
-- [ ] `POST /api/v1/categories`
-- [ ] `PUT /api/v1/categories/{id}`
-- [ ] `DELETE /api/v1/categories/{id}`
-- [ ] `GET /api/v1/recipes`
-- [ ] `GET /api/v1/recipes/{slug}`
-- [ ] `GET /api/v1/admin/recipes/trash`
-- [ ] API Dashboard/Statistics của nhóm.
-
-## Công việc chi tiết
-
-### Category List
-
-- [ ] Query tất cả Category chưa bị xóa.
-- [ ] `AsNoTracking()`.
-- [ ] Sort theo Name.
-- [ ] Tính `recipeCount` chỉ với Recipe Published.
-- [ ] Redis Cache.
-- [ ] Cache key `categories:all`.
-- [ ] TTL 30 phút.
-
-### Category Detail
-
-- [ ] Tìm Category theo Slug.
-- [ ] Không tồn tại → `404`.
-- [ ] Trả Recipe thuộc Category.
-- [ ] Pagination.
-- [ ] Guest chỉ thấy Published.
-- [ ] Author có thể thấy thêm Recipe Draft của chính mình.
-
-### Create Category
-
-- [ ] Chỉ Admin.
-- [ ] Validate Name.
-- [ ] Generate Slug.
-- [ ] Nếu Slug trùng → tự thêm suffix.
-- [ ] Kiểm tra Name duplicate.
-- [ ] Save Database.
-- [ ] Invalidate Redis Cache.
-- [ ] Trả `201 Created`.
-
-### Update Category
-
-- [ ] Chỉ Admin.
-- [ ] Update Name.
-- [ ] Update Description.
-- [ ] Không thay đổi Slug khi đổi Name.
-- [ ] Invalidate Cache.
-
-### Delete Category
-
-- [ ] Chỉ Admin.
-- [ ] Kiểm tra Recipe chưa Soft Delete.
-- [ ] Nếu còn Recipe → `409`.
-- [ ] Nếu không còn → Soft Delete Category.
-
-### Recipe List
-
-- [ ] Public chỉ trả Recipe `Published`.
-- [ ] Hỗ trợ Pagination.
-- [ ] Hỗ trợ Category Filter.
-- [ ] Hỗ trợ Difficulty Filter.
-- [ ] Hỗ trợ các Filter theo SRS.
-- [ ] Hỗ trợ Sort.
-- [ ] Hỗ trợ `mine=true`.
-- [ ] Khi `mine=true`, Author xem Recipe của chính mình.
-- [ ] Hỗ trợ Status Filter khi xem Recipe của mình.
-- [ ] Admin được Filter bằng `authorId`.
-- [ ] Author thường không được dùng `authorId`.
-- [ ] Public List Redis Cache 1 phút.
-- [ ] Private List không dùng Shared Cache.
-
-### Recipe Detail
-
-- [ ] Load Recipe.
-- [ ] Load Category.
-- [ ] Load Author.
-- [ ] Load Ingredients.
-- [ ] Load Steps.
-- [ ] Load Images.
-- [ ] Load Nutrition.
-- [ ] Steps sort theo `StepNumber`.
-- [ ] Ingredients sort theo `OrderIndex`.
-- [ ] Images sort theo `OrderIndex`.
-- [ ] `AsNoTracking()`.
-- [ ] Sử dụng Split Query khi phù hợp.
-- [ ] Kiểm tra không xảy ra N+1 Query.
-- [ ] Published → Public.
-- [ ] Draft/Archived → chỉ Owner/Admin.
-- [ ] Public Recipe Detail Cache 5 phút.
-
-### Admin Trash List
-
-- [ ] Chỉ Admin.
-- [ ] Query Recipe có `IsDeleted = true`.
-- [ ] Ignore Global Query Filter có kiểm soát.
-- [ ] Sort `DeletedAt DESC`.
-- [ ] Pagination.
-- [ ] Không Restore/Purge ở phần TV2.
-
-### Dashboard / Statistics
-
-- [ ] Tổng số Category.
-- [ ] Tổng số Recipe.
-- [ ] Tổng số Published Recipe.
-- [ ] Tổng số Draft Recipe.
-- [ ] Tổng số Archived Recipe.
-- [ ] Số Recipe theo Category.
-- [ ] Top Category có nhiều Recipe.
-- [ ] Tỷ lệ Recipe theo Category.
-- [ ] Recipe mới theo thời gian.
-- [ ] Projection DTO.
-- [ ] `AsNoTracking()`.
-- [ ] Không N+1 Query.
-
-## Kiểm thử bắt buộc
-
-- [ ] Category List.
-- [ ] Category Detail.
-- [ ] Create Category.
-- [ ] Update Category.
-- [ ] Delete Category.
-- [ ] Delete Category còn Recipe → `409`.
-- [ ] Redis Cache Hit/Miss.
-- [ ] Cache Invalidation.
-- [ ] Recipe List.
-- [ ] Pagination.
-- [ ] Filter.
-- [ ] Sort.
-- [ ] `mine=true`.
-- [ ] Admin `authorId`.
-- [ ] Recipe Detail Published.
-- [ ] Recipe Detail Draft.
-- [ ] Recipe Detail Archived.
-- [ ] Admin Trash.
-- [ ] Dashboard Statistics.
-- [ ] Kiểm tra SQL Log / N+1.
-
----
+- Hoàn thiện API danh mục: Lấy danh sách danh mục (GET /api/v1/categories) kèm số lượng công thức (recipeCount) và xem chi tiết danh mục theo slug (GET /api/v1/categories/{slug}).
+- Hoàn thiện các API quản trị danh mục dành cho Admin: Tạo danh mục (POST /api/v1/categories), Cập nhật danh mục (PUT /api/v1/categories/{id}) và Xóa danh mục (DELETE /api/v1/categories/{id}).
+- Xử lý ràng buộc nghiệp vụ xóa danh mục: kiểm tra các công thức trực thuộc chưa bị xóa mềm, chặn xóa và trả về mã lỗi 409 Conflict nếu danh mục còn công thức.
+- Hoàn thiện API danh sách công thức (GET /api/v1/recipes) hỗ trợ phân trang (page, pageSize), bộ lọc (danh mục, độ khó, trạng thái), sắp xếp đa tiêu chí và hỗ trợ cờ mine=true để tác giả xem công thức của chính mình (hoặc Admin lọc theo authorId).
+- Hoàn thiện API xem chi tiết công thức (GET /api/v1/recipes/{slug}): nạp đầy đủ thông tin danh mục, tác giả, nguyên liệu (theo OrderIndex), các bước nấu (theo StepNumber), bộ sưu tập ảnh (theo OrderIndex và đánh dấu IsPrimary) cùng thông tin dinh dưỡng.
+- Bảo đảm quy tắc bảo mật trong API xem chi tiết: công thức Published được xem công khai; công thức Draft hoặc Archived chỉ cho phép tác giả sở hữu hoặc Admin truy cập.
+- Hoàn thiện API thùng rác công thức cho Admin (GET /api/v1/admin/recipes/trash) truy vấn các công thức đã bị xóa mềm (IsDeleted = true), hỗ trợ phân trang và sắp xếp giảm dần theo thời gian xóa.
+- Hoàn thiện API Dashboard/Thống kê (GET /api/v1/dashboard/stats): tổng số Category, tổng số Recipe, thống kê công thức theo trạng thái (Published/Draft/Archived), số lượng công thức theo từng danh mục, Top Category và biểu đồ công thức mới theo thời gian.
+- Tối ưu truy vấn đọc, hạn chế tối đa N+1 Query và áp dụng bộ nhớ đệm phân tán Redis (TTL thích hợp cho danh mục và danh sách công thức public).
+- Xây dựng giao diện Trang chủ và Khám phá công thức (Home/Recipe List UI) với các thẻ Recipe Card trực quan, thanh lọc danh mục, bộ sắp xếp và thanh phân trang.
+- Xây dựng giao diện Chi tiết công thức (Recipe Detail UI) hiển thị đầy đủ thông tin bài viết, ảnh đại diện chính, thư viện ảnh phụ, danh sách nguyên liệu, các bước nấu có thời gian và bảng thông tin dinh dưỡng.
+- Xây dựng giao diện Danh sách danh mục, Chi tiết danh mục và trang Quản lý danh mục dành cho Admin (Admin Category Management UI).
+- Xây dựng giao diện Tổng quan Quản trị (Dashboard) với các thẻ tóm tắt số liệu (Summary Cards) và biểu đồ trực quan hóa dữ liệu thống kê từ API thật.
+- Xây dựng giao diện Thùng rác công thức cho Admin (Admin Trash List UI) hiển thị danh sách bài viết đã xóa mềm (phần hành động Khôi phục/Xóa vĩnh viễn do TV3 phụ trách API).
+- Phân định ranh giới rõ ràng: Giao diện My Recipes (danh sách công thức của tôi) sử dụng API đọc GET /api/v1/recipes?mine=true do Lê Thị Ánh Nhung phụ trách phần nạp dữ liệu đọc; các nút bấm thao tác tạo mới/chỉnh sửa do Phạm Nguyễn Ngọc Phước phụ trách.
+- Xử lý các trạng thái giao diện: Loading skeleton, Empty state khi không có dữ liệu và hiển thị lỗi từ API trên tất cả các màn hình phụ trách.
+- Kiểm thử Category CRUD, Recipe List/Detail, Filter/Sort/Pagination, Dashboard và Trash List.
+------------------------------------------
+### Quy ước tích hợp Bữa 4
+- Mỗi thành viên thực hiện đúng module Backend và component Frontend đã được phân công.
+- Không viết đè hoặc tái triển khai logic nghiệp vụ thuộc sở hữu của thành viên khác.
+- Phân định rõ ràng trách nhiệm bố cục và nghiệp vụ: khi một trang tích hợp component của thành viên khác, người sở hữu trang chịu trách nhiệm Layout bố trí, người sở hữu component chịu trách nhiệm State và Logic bên trong (Ví dụ: StepEditor và ImageManager thuộc Võ Hùng Mạnh, Phạm Nguyễn Ngọc Phước chỉ nhúng vào trang biên tập công thức).
+- Ranh giới giữa TV2 và TV3 tại màn hình My Recipes: Lê Thị Ánh Nhung phụ trách API đọc danh sách công thức của tác giả (mine=true), Phạm Nguyễn Ngọc Phước phụ trách các nút hành động chỉnh sửa/tạo mới công thức.
+- Shared Component và API Client tầng giao tiếp dùng chung chỉ được điều chỉnh khi có sự thống nhất của cả nhóm.
+- Tuyệt đối không hard-code dữ liệu nghiệp vụ hoặc backend URL rải rác trong các component.
+- Các thao tác Create/Update/Delete phải cập nhật State hoặc kích hoạt làm mới (Refresh) để giao diện phản ánh dữ liệu mới nhất từ API.
+- Trước khi tạo Pull Request và Merge vào nhánh chính, phải đảm bảo Build Backend, Build Frontend và toàn bộ kiểm thử hiện có của dự án đều vượt qua thành công.
 
 # Cài đặt PostgreSQL bằng Docker
 
