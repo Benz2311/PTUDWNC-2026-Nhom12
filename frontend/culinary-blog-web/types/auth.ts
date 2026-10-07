@@ -6,6 +6,8 @@ export interface User {
   avatarUrl?: string | null;
   bio?: string | null;
   emailConfirmed?: boolean;
+  roles?: string[];
+  createdAt?: string;
 }
 
 export interface AuthResponse {
