@@ -27,11 +27,24 @@ export default function CategoryStatistics({ data }: CategoryStatisticsProps) {
   // Calculate maximum monthly count for SVG chart scaling
   const maxMonthlyCount =
     recipesByMonth.length > 0
-      ? Math.max(...recipesByMonth.map((m) => m.count), 1)
+      ? Math.max(
+          ...recipesByMonth.map((m) => m.recipeCount ?? m.count ?? 0),
+          1
+        )
       : 1;
 
   return (
     <div className="space-y-8">
+      {/* Empty State Banner if completely empty */}
+      {totalCategories === 0 && totalRecipes === 0 && (
+        <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/60 p-4 text-xs text-amber-800 flex items-center gap-3">
+          <span className="text-lg">ℹ️</span>
+          <div>
+            <p className="font-semibold">Hệ thống chưa có dữ liệu công thức hoặc danh mục</p>
+            <p className="text-amber-600">Dữ liệu phân tích và biểu đồ sẽ được tự động hiển thị khi hệ thống có danh mục và công thức được tạo.</p>
+          </div>
+        </div>
+      )}
       {/* ── 1. SUMMARY CARDS ROW (Screen 14 in Design) ───────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {/* Total Categories */}
@@ -153,8 +166,9 @@ export default function CategoryStatistics({ data }: CategoryStatisticsProps) {
             <div className="space-y-4">
               {/* SVG Line / Bar Chart */}
               <div className="h-60 w-full relative flex items-end gap-3 pt-6 border-b border-gray-100 pb-2">
-                {recipesByMonth.map((item, idx) => {
-                  const heightPercent = Math.max(12, Math.round((item.count / maxMonthlyCount) * 100));
+                {recipesByMonth.map((item) => {
+                  const monthlyCount = item.recipeCount ?? item.count ?? 0;
+                  const heightPercent = Math.max(12, Math.round((monthlyCount / maxMonthlyCount) * 100));
                   return (
                     <div
                       key={`${item.year}-${item.month}`}
@@ -162,7 +176,7 @@ export default function CategoryStatistics({ data }: CategoryStatisticsProps) {
                     >
                       {/* Count tooltip */}
                       <span className="mb-2 text-[11px] font-bold text-[#0d5c3a] opacity-0 group-hover:opacity-100 transition-opacity">
-                        {item.count} món
+                        {monthlyCount} món
                       </span>
                       {/* Bar with gradient */}
                       <div
@@ -197,42 +211,48 @@ export default function CategoryStatistics({ data }: CategoryStatisticsProps) {
           </div>
 
           <div className="space-y-4">
-            {displayTopCategories.map((item, index) => {
-              const pct =
-                item.percentage !== undefined
-                  ? item.percentage
-                  : totalRecipes > 0
-                  ? Math.round((item.recipeCount / totalRecipes) * 100)
-                  : 0;
+            {displayTopCategories.length === 0 ? (
+              <div className="h-40 flex flex-col items-center justify-center text-gray-400 text-xs italic">
+                Chưa có dữ liệu danh mục hàng đầu.
+              </div>
+            ) : (
+              displayTopCategories.map((item, index) => {
+                const pct =
+                  item.percentage !== undefined
+                    ? item.percentage
+                    : totalRecipes > 0
+                    ? Math.round((item.recipeCount / totalRecipes) * 100)
+                    : 0;
 
-              return (
-                <div key={item.categoryId} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                        index === 0
-                          ? "bg-amber-100 text-amber-800"
-                          : index === 1
-                          ? "bg-gray-200 text-gray-700"
-                          : "bg-emerald-50 text-[#0d5c3a]"
-                      }`}>
-                        {index + 1}
-                      </span>
-                      <span className="font-semibold text-gray-800">{item.categoryName}</span>
+                return (
+                  <div key={item.categoryId} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                          index === 0
+                            ? "bg-amber-100 text-amber-800"
+                            : index === 1
+                            ? "bg-gray-200 text-gray-700"
+                            : "bg-emerald-50 text-[#0d5c3a]"
+                        }`}>
+                          {index + 1}
+                        </span>
+                        <span className="font-semibold text-gray-800">{item.categoryName}</span>
+                      </div>
+                      <span className="font-bold text-[#0d5c3a]">{item.recipeCount} món ({pct}%)</span>
                     </div>
-                    <span className="font-bold text-[#0d5c3a]">{item.recipeCount} món ({pct}%)</span>
-                  </div>
 
-                  {/* Progress bar */}
-                  <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
-                    <div
-                      style={{ width: `${Math.min(100, Math.max(5, pct))}%` }}
-                      className="h-full rounded-full bg-[#0d5c3a]"
-                    />
+                    {/* Progress bar */}
+                    <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        style={{ width: `${Math.min(100, Math.max(5, pct))}%` }}
+                        className="h-full rounded-full bg-[#0d5c3a]"
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       </div>
@@ -261,35 +281,43 @@ export default function CategoryStatistics({ data }: CategoryStatisticsProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {categories.map((cat, idx) => {
-                const ratio =
-                  cat.percentage !== undefined
-                    ? cat.percentage
-                    : totalRecipes > 0
-                    ? Math.round((cat.recipeCount / totalRecipes) * 100)
-                    : 0;
+              {categories.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-gray-400 text-xs italic">
+                    Chưa có danh mục nào được khởi tạo trong hệ thống.
+                  </td>
+                </tr>
+              ) : (
+                categories.map((cat, idx) => {
+                  const ratio =
+                    cat.percentage !== undefined
+                      ? cat.percentage
+                      : totalRecipes > 0
+                      ? Math.round((cat.recipeCount / totalRecipes) * 100)
+                      : 0;
 
-                return (
-                  <tr key={cat.categoryId} className="hover:bg-emerald-50/20">
-                    <td className="py-3 px-4 font-mono text-gray-400">{idx + 1}</td>
-                    <td className="py-3 px-6 font-bold text-gray-900">{cat.categoryName}</td>
-                    <td className="py-3 px-4 text-center font-bold text-[#0d5c3a]">
-                      {cat.recipeCount}
-                    </td>
-                    <td className="py-3 px-6">
-                      <div className="flex items-center gap-3">
-                        <div className="h-2 w-36 rounded-full bg-gray-100 overflow-hidden">
-                          <div
-                            style={{ width: `${ratio}%` }}
-                            className="h-full rounded-full bg-[#0d5c3a]"
-                          />
+                  return (
+                    <tr key={cat.categoryId} className="hover:bg-emerald-50/20">
+                      <td className="py-3 px-4 font-mono text-gray-400">{idx + 1}</td>
+                      <td className="py-3 px-6 font-bold text-gray-900">{cat.categoryName}</td>
+                      <td className="py-3 px-4 text-center font-bold text-[#0d5c3a]">
+                        {cat.recipeCount}
+                      </td>
+                      <td className="py-3 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="h-2 w-36 rounded-full bg-gray-100 overflow-hidden">
+                            <div
+                              style={{ width: `${ratio}%` }}
+                              className="h-full rounded-full bg-[#0d5c3a]"
+                            />
+                          </div>
+                          <span className="font-semibold text-gray-700">{ratio}%</span>
                         </div>
-                        <span className="font-semibold text-gray-700">{ratio}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

@@ -20,5 +20,8 @@ public record CategoryStatisticItemDto(
 public record RecipeMonthlyStatisticDto(
     int Year,
     int Month,
-    int RecipeCount);
+    int RecipeCount)
+{
+    public int Count => RecipeCount;
+}
 

@@ -69,19 +69,25 @@ public static class CategoryEndpoints
         // GET /api/v1/categories/statistics
         group.MapGet(
             "/statistics",
-            async (
-                ISender sender,
-                CancellationToken cancellationToken) =>
-            {
-                var result =
-                    await sender.Send(
-                        new GetCategoryStatisticsQuery(),
-                        cancellationToken);
-
-                return Results.Ok(result);
-            })
+            GetStatistics)
             .WithName("GetCategoryStatistics")
             .WithSummary("Lấy thống kê danh mục và công thức món ăn");
+
+        // GET /api/v1/dashboard/stats & /api/dashboard/stats (SRS FR-CAT-005 & README Task 4 - Le Thi Anh Nhung)
+        var dashboardGroup =
+            app.MapGroup("/api/v1/dashboard")
+                .WithTags("Dashboard");
+
+        dashboardGroup.MapGet(
+            "/stats",
+            GetStatistics)
+            .WithName("GetDashboardStats")
+            .WithSummary("Lấy thống kê tổng quan hệ thống (tổng số Category, Recipe, trạng thái, top danh mục, biểu đồ tháng)");
+
+        app.MapGet(
+            "/api/dashboard/stats",
+            GetStatistics)
+            .ExcludeFromDescription();
 
         // GET /api/v1/categories/{slug} (SRS FR-CAT-002 & Table 8.2)
         group.MapGet(
@@ -101,6 +107,18 @@ public static class CategoryEndpoints
             GetRecipesByCategory)
             .WithName("GetCategoryRecipes")
             .WithSummary("Lấy danh sách công thức thuộc danh mục theo slug");
+    }
+
+    private static async Task<IResult> GetStatistics(
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        var result =
+            await sender.Send(
+                new GetCategoryStatisticsQuery(),
+                cancellationToken);
+
+        return Results.Ok(result);
     }
 
     private static async Task<IResult> GetCategories(

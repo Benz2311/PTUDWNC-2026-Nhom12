@@ -544,6 +544,25 @@ public sealed class ChecklistEndpointTests
         }
     }
 
+    [Fact]
+    public async Task DashboardStats_InvokesStatisticsQuery()
+    {
+        var sender = new Mock<ISender>();
+        var cache = new Mock<ICacheService>();
+        sender.Setup(item => item.Send(It.IsAny<GetCategoryStatisticsQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CategoryStatisticsDto(0, 0, 0, 0, 0, [], [], []));
+
+        var (app, client) = await StartApi(sender, cache);
+        await using (app)
+        using (client)
+        {
+            var response = await client.GetAsync("/api/v1/dashboard/stats");
+
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+            sender.Verify(item => item.Send(It.IsAny<GetCategoryStatisticsQuery>(), It.IsAny<CancellationToken>()), Times.Once);
+        }
+    }
+
     private static RecipeDetailApiDto MakeRecipeDetail(RecipeStatus status)
     {
         return new RecipeDetailApiDto

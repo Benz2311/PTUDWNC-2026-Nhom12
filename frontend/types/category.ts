@@ -18,7 +18,8 @@ export interface CategoryStatisticItem {
 export interface RecipeMonthlyStatistic {
   year: number;
   month: number;
-  count: number;
+  count?: number;
+  recipeCount?: number;
 }
 
 export interface CategoryStatistics {

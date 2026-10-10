@@ -57,20 +57,27 @@ export async function deleteCategory(id: string): Promise<void> {
 export async function getCategoryStatistics(): Promise<CategoryStatistics> {
   try {
     const response = await apiClient.get<CategoryStatistics>(
-      "/categories/statistics"
+      "/dashboard/stats"
     );
     return response.data;
-  } catch (err) {
-    console.error("Failed to fetch category statistics:", err);
-    return {
-      totalCategories: 0,
-      totalRecipes: 0,
-      publishedRecipes: 0,
-      draftRecipes: 0,
-      archivedRecipes: 0,
-      categories: [],
-      topCategories: [],
-      recipesByMonth: [],
-    };
+  } catch {
+    try {
+      const fallbackResponse = await apiClient.get<CategoryStatistics>(
+        "/categories/statistics"
+      );
+      return fallbackResponse.data;
+    } catch (err) {
+      console.error("Failed to fetch category statistics:", err);
+      return {
+        totalCategories: 0,
+        totalRecipes: 0,
+        publishedRecipes: 0,
+        draftRecipes: 0,
+        archivedRecipes: 0,
+        categories: [],
+        topCategories: [],
+        recipesByMonth: [],
+      };
+    }
   }
 }

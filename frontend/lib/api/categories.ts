@@ -25,10 +25,17 @@ export async function getCategories(): Promise<Category[]> {
 
 export async function getCategoryStatistics():
   Promise<CategoryStatistics> {
-  const response =
-    await api.get<CategoryStatistics>(
-      "/categories/statistics"
-    );
-
-  return response.data;
+  try {
+    const response =
+      await api.get<CategoryStatistics>(
+        "/dashboard/stats"
+      );
+    return response.data;
+  } catch {
+    const response =
+      await api.get<CategoryStatistics>(
+        "/categories/statistics"
+      );
+    return response.data;
+  }
 }
