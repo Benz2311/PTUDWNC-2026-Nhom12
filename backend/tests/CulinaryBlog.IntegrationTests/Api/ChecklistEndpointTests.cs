@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using CulinaryBlog.API.Endpoints;
+using CulinaryBlog.API.Extensions;
 using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Exceptions;
@@ -597,12 +598,14 @@ public sealed class ChecklistEndpointTests
             })
             .AddScheme<AuthenticationSchemeOptions, HeaderAuthenticationHandler>("Test", _ => { });
         builder.Services.AddAuthorization();
+        builder.Services.AddRateLimitingConfiguration(builder.Configuration);
         builder.Services.AddSingleton<ISender>(sender.Object);
         builder.Services.AddSingleton<ICacheService>(cache.Object);
 
         var app = builder.Build();
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseRateLimiter();
         app.MapCategoryEndpoints();
         app.MapRecipeEndpoints();
         await app.StartAsync();

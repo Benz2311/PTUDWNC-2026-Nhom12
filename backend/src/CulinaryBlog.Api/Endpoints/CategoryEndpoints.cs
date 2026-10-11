@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CulinaryBlog.API.Extensions;
 using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Features.Categories.Commands.CreateCategory;
@@ -20,7 +21,8 @@ public static class CategoryEndpoints
     {
         var group =
             app.MapGroup("/api/v1/categories")
-                .WithTags("Categories");
+                .WithTags("Categories")
+                .RequireRateLimiting(RateLimitingExtensions.PolicyName);
 
         // GET /api/v1/categories & /api/categories
         group.MapGet(

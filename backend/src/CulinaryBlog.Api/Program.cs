@@ -1,4 +1,5 @@
 using CulinaryBlog.API.Endpoints;
+using CulinaryBlog.API.Extensions;
 using CulinaryBlog.Application;
 using CulinaryBlog.Infrastructure;
 using CulinaryBlog.Infrastructure.Persistence;
@@ -33,6 +34,7 @@ try
 
     builder.Services.AddControllers();
     builder.Services.AddOpenApi();
+    builder.Services.AddRateLimitingConfiguration(builder.Configuration);
 
     builder.Services.AddCors(options =>
     {
@@ -78,6 +80,7 @@ try
 
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseRateLimiter();
 
     // Hangfire Dashboard (chỉ môi trường dev)
     if (app.Environment.IsDevelopment())
