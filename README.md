@@ -298,106 +298,110 @@
 
 ---
 
+---
+
 # Bữa 5 - Hoàn thiện bảo mật, tài liệu API và nền tảng Front-end
 
-**Mục tiêu:** Hoàn thành CORS, Rate Limiting, Authentication/Authorization; sinh tài liệu đặc tả API và API Versioning; đồng thời thiết lập môi trường Front-end, thư viện và các TypeScript Types cần thiết theo đúng phạm vi module của từng thành viên.
+**Mục tiêu:** Hoàn thành các cấu hình bảo mật gồm CORS, Rate Limiting và Authentication/Authorization; hoàn thiện tài liệu đặc tả API và API Versioning; đồng thời xây dựng môi trường, cấu trúc dự án Front-end, cài đặt các thư viện cần thiết và các kiểu dữ liệu TypeScript phục vụ ứng dụng.
 
 ---
 
-## Nguyễn Văn Quốc - Auth/User Security & Auth Types
+## Nguyễn Văn Quốc - Authentication / CORS / User Types
 
-- Hoàn thiện JWT Authentication cho Backend.
-- Cấu hình và kiểm tra Issuer, Audience, Signing Key và thời hạn Access Token.
-- Hoàn thiện Authorization cho các vai trò `User`, `Author`, `Admin`.
-- Kiểm tra `401 Unauthorized` và `403 Forbidden`.
-- Hoàn thiện CORS phục vụ các API Auth/User.
-- Kiểm tra các endpoint Auth/User được bảo vệ đúng quyền.
-- Xây dựng TypeScript Types cho module Auth/User:
+- Cấu hình và hoàn thiện JWT Authentication cho Backend.
+- Thiết lập Issuer, Audience, Signing Key và thời hạn Access Token.
+- Hoàn thiện cơ chế Authorization theo các vai trò `User`, `Author` và `Admin`.
+- Kiểm tra các trường hợp `401 Unauthorized` và `403 Forbidden`.
+- Cấu hình CORS cho các API thuộc phạm vi Authentication/User.
+- Kiểm tra Front-end có thể gọi các API đăng ký, đăng nhập và lấy thông tin người dùng.
+- Xây dựng các TypeScript Types phục vụ module người dùng và xác thực gồm:
   - `User`
   - `AuthUser`
   - `LoginRequest`
   - `RegisterRequest`
   - `AuthResponse`
   - `RefreshTokenRequest`
-  - `Profile`
-- Đối chiếu các Types với DTO/Response thật của Backend.
-- Kiểm thử Login, Register, Refresh Token, Logout và Profile.
+- Bảo đảm các Types phía Front-end khớp với DTO/Response của Backend.
+- Kiểm thử toàn bộ phần Authentication/Authorization và kết nối Front-end với Auth API.
 
 ---
 
-## Lê Thị Ánh Nhung - Category / Recipe Read / Rate Limiting / Types
+## Lê Thị Ánh Nhung - Rate Limiting / Front-end Environment / Category Types
 
-- Cấu hình và kiểm tra Rate Limiting cho các API đọc công khai.
-- Kiểm tra request vượt giới hạn trả `429 Too Many Requests`.
-- Kiểm tra Rate Limiting trên các API Category và Recipe Read không làm ảnh hưởng truy cập bình thường.
-- Chuẩn bị cấu hình môi trường Front-end cần thiết cho các trang đọc dữ liệu.
-- Thiết lập `NEXT_PUBLIC_API_URL` để Front-end gọi Backend.
-- Xây dựng TypeScript Types cho phạm vi phụ trách:
+- Cấu hình Rate Limiting bằng cơ chế Rate Limiter của ASP.NET Core.
+- Thiết lập policy giới hạn request cho các API thông thường.
+- Kiểm tra trường hợp vượt giới hạn request trả về `429 Too Many Requests`.
+- Khởi tạo và cấu hình môi trường phát triển Front-end bằng Next.js và TypeScript.
+- Thiết lập các file cấu hình:
+  - `package.json`
+  - `tsconfig.json`
+  - `next.config.*`
+  - ESLint
+  - `.env`
+  - `.env.example`
+- Thiết lập biến `NEXT_PUBLIC_API_URL` để Front-end kết nối Backend.
+- Xây dựng các TypeScript Types thuộc phạm vi Category gồm:
   - `Category`
   - `CategoryDetail`
   - `CategoryListItem`
-  - `RecipeSummary`
-  - `RecipeListResponse`
-  - `Pagination`
-  - `FilterOptions`
-  - `SortOptions`
-  - `DashboardStats`
-- Đối chiếu Types với API Category, Recipe List/Detail, Filter, Sort và Pagination.
-- Kiểm tra các API thuộc phạm vi của mình xuất hiện đúng trong tài liệu API và sử dụng đúng version.
+  - `CategoryRequest`
+- Cài đặt các thư viện cơ bản cần thiết để chạy dự án Front-end.
+- Kiểm tra Front-end khởi động thành công và có thể gọi Backend API.
 
 ---
 
-## Phạm Nguyễn Ngọc Phước - Recipe/Ingredient API Documentation & Types
+## Phạm Nguyễn Ngọc Phước - API Documentation / Recipe Types / Front-end Libraries
 
-- Cấu hình và hoàn thiện OpenAPI/Scalar cho hệ thống.
+- Cấu hình OpenAPI để sinh tài liệu đặc tả API.
+- Cài đặt và cấu hình Scalar hoặc công cụ API Documentation được sử dụng trong dự án.
 - Cấu hình Bearer Authentication trong API Documentation.
-- Kiểm tra HTTP Method, Route, Parameter, Request và Response của các API.
-- Kiểm tra các API Recipe/Ingredient thuộc phạm vi phụ trách xuất hiện đầy đủ trong OpenAPI.
-- Rà soát API Versioning cho các endpoint Recipe/Ingredient theo `/api/v1/...`.
-- Cài đặt các thư viện Front-end cần thiết phục vụ:
+- Kiểm tra tài liệu API hiển thị đầy đủ HTTP Method, Route, Parameter, Request và Response.
+- Thử nghiệm Public API và Protected API trực tiếp từ giao diện API Documentation.
+- Cài đặt các thư viện Front-end cần thiết cho:
   - gọi API;
-  - quản lý form;
   - validation;
+  - quản lý form;
+  - giao diện;
   - kiểm thử.
-- Xây dựng TypeScript Types:
+- Phân loại Dependency và Dev Dependency trong `package.json`.
+- Xây dựng các TypeScript Types thuộc phạm vi Recipe gồm:
   - `Recipe`
+  - `RecipeSummary`
   - `RecipeDetail`
   - `RecipeIngredient`
   - `RecipeNutrition`
   - `RecipeStatus`
   - `DifficultyLevel`
-  - các request Create/Update Recipe.
-- Đối chiếu Types với DTO/Response thật của Backend.
-- Kiểm tra Dependency và Dev Dependency trong `package.json`.
-- Kiểm tra build Front-end sau khi bổ sung thư viện và Types.
+- Bảo đảm các Types Recipe khớp với dữ liệu Backend trả về.
+- Kiểm tra quá trình cài Dependency và build Front-end.
 
 ---
 
-## Võ Hùng Mạnh - Step/Image/Search Infrastructure & Front-end Foundation
+## Võ Hùng Mạnh - API Versioning / Front-end Structure / Step-Image-Search Types
 
-- Kiểm tra và chuẩn hóa API Versioning cho các endpoint Step, Image và Search theo `/api/v1/...`.
-- Kiểm tra các endpoint Step/Image/Search xuất hiện đúng trong OpenAPI.
-- Xây dựng cấu trúc nền Front-end:
+- Thiết lập và hoàn thiện API Versioning cho hệ thống.
+- Chuẩn hóa các Business API theo định dạng `/api/v1/...`.
+- Kiểm tra các endpoint sử dụng version thống nhất.
+- Xây dựng cấu trúc dự án Front-end gồm các thư mục:
   - `app/`
   - `components/`
   - `hooks/`
   - `lib/`
-  - `lib/api/`
   - `types/`
   - `public/`
-- Xây dựng khu vực API Client dùng chung cho Front-end.
-- Kiểm tra cấu hình TypeScript và khả năng import Types dùng chung.
-- Xây dựng TypeScript Types đúng phạm vi phụ trách:
+- Xây dựng khu vực API Client và các thành phần dùng chung phía Front-end.
+- Xây dựng các TypeScript Types thuộc phạm vi Step, Image và Search gồm:
   - `RecipeStep`
   - `RecipeImage`
   - `SearchRequest`
   - `SearchResult`
-  - `SearchResponse`
+  - `Pagination`
   - `ApiResponse`
   - `ApiError`
-- Đối chiếu Step/Image/Search Types với DTO/Response thật của Backend.
-- Kiểm tra các thư viện cần thiết cho upload file, API client và Front-end foundation.
-- Kiểm tra `npm install`, `npm run lint`, `npx tsc --noEmit` và `npm run build`.
+- Đối chiếu các Types với DTO/Response thật của Backend.
+- Kiểm tra việc import và tái sử dụng các Types trong Front-end.
+- Kiểm tra TypeScript compile không phát sinh lỗi.
+- Chạy `npm install`, `npm run lint` và `npm run build` để xác nhận nền tảng Front-end hoạt động.
 
 # Cài đặt PostgreSQL bằng Docker
 
