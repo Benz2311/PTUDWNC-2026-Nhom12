@@ -35,7 +35,7 @@ export default function ConfirmEmailPage() {
       }
 
       try {
-        await authApi.confirmEmail(userId, token);
+        await authApi.confirmEmail(token);
         if (!cancelled) {
           setState("success");
         }

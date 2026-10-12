@@ -58,8 +58,8 @@ export const authApi = {
     await apiClient.post("/auth/email/resend", { email });
   },
 
-  async confirmEmail(userId: string, token: string): Promise<void> {
-    await apiClient.post("/auth/email/confirm", { userId, token });
+  async confirmEmail(token: string): Promise<void> {
+    await apiClient.post("/auth/email/confirm", { token });
   },
 
   async forgotPassword(request: ForgotPasswordRequest): Promise<void> {
