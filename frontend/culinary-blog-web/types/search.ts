@@ -1,28 +1,44 @@
-export interface RecipeSearchResult {
+export interface SearchRequest {
+  q?: string;
+  page?: number;
+  pageSize?: number;
+  categoryId?: string;
+  categorySlug?: string;
+  difficulty?: string;
+  maxCookTimeMinutes?: number;
+  sortBy?: string;
+}
+
+export interface SearchResult {
   id: string;
   title: string;
   slug: string;
-  description?: string | null;
-  prepTimeMinutes?: number | null;
-  cookTimeMinutes?: number | null;
-  servings?: number | null;
-  difficulty?: string | number | null;
+  description: string;
+  prepTimeMinutes: number;
+  cookTimeMinutes: number;
+  servings: number;
+  difficulty: number | string;
   publishedAt?: string | null;
   primaryImageUrl?: string | null;
-  authorName?: string | null;
-  categoryName?: string | null;
-  categorySlug?: string | null;
-  matchType?: 'FullTextSearch' | 'FuzzyTrigram' | string | null;
+  authorName: string;
+  categoryName: string;
+  categorySlug: string;
+  matchType?: string;
 }
 
-export interface SearchResponse {
-  items: RecipeSearchResult[];
+export type RecipeSearchResult = SearchResult;
+
+export interface Pagination {
   page: number;
   pageSize: number;
   totalCount: number;
   totalPages: number;
   hasPreviousPage: boolean;
   hasNextPage: boolean;
+}
+
+export interface SearchResponse extends Pagination {
+  items: SearchResult[];
 }
 
 export interface SearchFilterState {

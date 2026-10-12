@@ -7,6 +7,7 @@ using CulinaryBlog.Application.Features.Recipes.Commands.RecipeImages;
 using CulinaryBlog.Application.Features.Recipes.Commands.RecipeSteps;
 using CulinaryBlog.Application.Features.Recipes.Dtos;
 using RecipeImageDto = CulinaryBlog.Application.Features.Recipes.Dtos.RecipeImageDto;
+using RecipeStepDto = CulinaryBlog.Application.Features.Recipes.Dtos.RecipeStepDto;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipeBySlug;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetDeletedRecipes;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipes;
