@@ -4,7 +4,9 @@ using CulinaryBlog.Infrastructure.Authentication;
 using CulinaryBlog.Infrastructure.BackgroundJobs;
 using CulinaryBlog.Infrastructure.Caching;
 using CulinaryBlog.Infrastructure.Email;
+using CulinaryBlog.Infrastructure.HealthChecks;
 using CulinaryBlog.Infrastructure.Observability;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using CulinaryBlog.Infrastructure.Persistence;
 using CulinaryBlog.Infrastructure.Persistence.Repositories;
 using CulinaryBlog.Infrastructure.Storage;
@@ -45,13 +47,19 @@ public static class DependencyInjection
         services.AddScoped<CulinaryBlog.Application.Repositories.IUserRepository, CulinaryBlog.Infrastructure.Repositories.UserRepository>();
         services.AddScoped<CulinaryBlog.Application.Repositories.IRefreshTokenRepository, CulinaryBlog.Infrastructure.Repositories.RefreshTokenRepository>();
         services.AddScoped<Microsoft.AspNetCore.Identity.IPasswordHasher<CulinaryBlog.Domain.Entities.ApplicationUser>, Microsoft.AspNetCore.Identity.PasswordHasher<CulinaryBlog.Domain.Entities.ApplicationUser>>();
+        services.AddScoped<CulinaryBlog.Application.Interfaces.IJwtTokenGenerator, CulinaryBlog.Infrastructure.Authentication.JwtTokenGenerator>();
         services.AddScoped<CulinaryBlog.Application.Services.IAuthService, CulinaryBlog.Infrastructure.Services.AuthService>();
+        services.AddScoped<IRecipeCacheInvalidator, RecipeCacheInvalidator>();
+        services.AddScoped<IRecipePurgeService, RecipePurgeService>();
+        services.AddScoped<ISitemapGenerator, SitemapGenerator>();
 
         // ── Authentication — ASP.NET Core Identity + JWT ─────────────────────
         var jwtSettings = configuration
             .GetSection(JwtSettings.Section)
             .Get<JwtSettings>()
             ?? throw new InvalidOperationException("Jwt settings not configured.");
+
+        services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.Section));
 
         services
             .AddAuthentication(options =>
@@ -117,12 +125,21 @@ public static class DependencyInjection
 
         services.AddHangfireServer();
         services.AddScoped<IBackgroundJobService, HangfireJobService>();
+        services.AddHttpClient();
+        services.AddScoped<IImageResizeJob, ImageResizeJob>();
 
         // ── Email — MailKit ───────────────────────────────────────────────────
         services.AddSingleton<IEmailService, MailKitEmailService>();
 
         // ── Observability — OpenTelemetry ─────────────────────────────────────
         services.AddObservability(configuration);
+
+        // ── Health Checks — ASP.NET Core Health Checks ────────────────────────
+        services.AddHealthChecks()
+            .AddCheck("self", () => HealthCheckResult.Healthy("Application is running."), tags: new[] { "live" })
+            .AddCheck<PostgresHealthCheck>("postgresql", tags: new[] { "ready", "db" })
+            .AddCheck<RedisHealthCheck>("redis", tags: new[] { "ready", "redis" })
+            .AddCheck<MinioHealthCheck>("minio", tags: new[] { "storage", "minio" });
 
         return services;
     }

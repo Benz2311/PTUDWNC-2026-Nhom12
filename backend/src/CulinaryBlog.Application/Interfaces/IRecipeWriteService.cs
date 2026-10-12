@@ -5,6 +5,7 @@ namespace CulinaryBlog.Application.Interfaces;
 public interface IRecipeWriteService
 {
     Task CreateAsync(Recipe recipe, CancellationToken cancellationToken = default);
+    Task PublishAsync(Recipe recipe, CancellationToken cancellationToken = default);
     Task UpdateAsync(Recipe recipe, CancellationToken cancellationToken = default);
     Task ReplaceContentsAsync(Recipe recipe, ICollection<RecipeIngredient> ingredients, ICollection<RecipeStep> steps, ICollection<RecipeImage> images, CancellationToken cancellationToken = default);
     Task DeleteAsync(Recipe recipe, CancellationToken cancellationToken = default);

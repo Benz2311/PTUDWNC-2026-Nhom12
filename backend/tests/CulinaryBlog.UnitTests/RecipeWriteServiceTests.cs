@@ -1,7 +1,6 @@
 using CulinaryBlog.Application.Features.Recipes;
 using CulinaryBlog.Application.Interfaces;
 using CulinaryBlog.Domain.Entities;
-using Xunit;
 
 namespace CulinaryBlog.UnitTests;
 

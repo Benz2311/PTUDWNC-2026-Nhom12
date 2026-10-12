@@ -1,3 +1,9 @@
+using System.Security.Claims;
+using CulinaryBlog.Application.Common.Interfaces;
+using CulinaryBlog.Application.DTOs;
+using CulinaryBlog.Application.Features.Categories.Commands.CreateCategory;
+using CulinaryBlog.Application.Features.Categories.Commands.DeleteCategory;
+using CulinaryBlog.Application.Features.Categories.Commands.UpdateCategory;
 using CulinaryBlog.Application.Features.Categories.Queries.GetCategories;
 using CulinaryBlog.Application.Features.Categories.Queries.GetCategoryStatistics;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipesByCategory;
@@ -7,6 +13,8 @@ namespace CulinaryBlog.API.Endpoints;
 
 public static class CategoryEndpoints
 {
+    private const string CategoryListCacheKey = "categories:all";
+
     public static void MapCategoryEndpoints(
         this WebApplication app)
     {
@@ -17,34 +25,46 @@ public static class CategoryEndpoints
         // GET /api/v1/categories & /api/categories
         group.MapGet(
             "/",
-            async (
-                ISender sender,
-                CancellationToken cancellationToken) =>
-            {
-                var result =
-                    await sender.Send(
-                        new GetCategoriesQuery(),
-                        cancellationToken);
-
-                return Results.Ok(result);
-            })
+            GetCategories)
             .WithName("GetCategories")
             .WithSummary("Lấy danh sách tất cả các danh mục");
 
         app.MapGet(
             "/api/categories",
-            async (
-                ISender sender,
-                CancellationToken cancellationToken) =>
-            {
-                var result =
-                    await sender.Send(
-                        new GetCategoriesQuery(),
-                        cancellationToken);
-
-                return Results.Ok(result);
-            })
+            GetCategories)
             .ExcludeFromDescription();
+
+        group.MapPost(
+            "/",
+            CreateCategory)
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithName("CreateCategory")
+            .WithSummary("Tạo danh mục mới")
+            .Produces<CategoryDto>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPut(
+            "/{id:guid}",
+            UpdateCategory)
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithName("UpdateCategory")
+            .WithSummary("Cập nhật danh mục")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapDelete(
+            "/{id:guid}",
+            DeleteCategory)
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithName("DeleteCategory")
+            .WithSummary("Xóa mềm danh mục")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         // GET /api/v1/categories/statistics
         group.MapGet(
@@ -66,65 +86,186 @@ public static class CategoryEndpoints
         // GET /api/v1/categories/{slug} (SRS FR-CAT-002 & Table 8.2)
         group.MapGet(
             "/{slug}",
-            async (
-                string slug,
-                int? page,
-                int? pageSize,
-                ISender sender,
-                CancellationToken cancellationToken) =>
-            {
-                var result =
-                    await sender.Send(
-                        new GetRecipesByCategoryQuery(slug, page ?? 1, pageSize ?? 12),
-                        cancellationToken);
-
-                return result is null
-                    ? Results.NotFound()
-                    : Results.Ok(result);
-            })
+            GetRecipesByCategory)
             .WithName("GetCategoryBySlug")
             .WithSummary("Lấy chi tiết danh mục và danh sách công thức thuộc danh mục");
 
         app.MapGet(
             "/api/categories/{slug}",
-            async (
-                string slug,
-                int? page,
-                int? pageSize,
-                ISender sender,
-                CancellationToken cancellationToken) =>
-            {
-                var result =
-                    await sender.Send(
-                        new GetRecipesByCategoryQuery(slug, page ?? 1, pageSize ?? 12),
-                        cancellationToken);
-
-                return result is null
-                    ? Results.NotFound()
-                    : Results.Ok(result);
-            })
+            GetRecipesByCategory)
             .ExcludeFromDescription();
 
         // GET /api/v1/categories/{slug}/recipes (Backward compatibility)
         group.MapGet(
             "/{slug}/recipes",
-            async (
-                string slug,
-                int? page,
-                int? pageSize,
-                ISender sender,
-                CancellationToken cancellationToken) =>
-            {
-                var result =
-                    await sender.Send(
-                        new GetRecipesByCategoryQuery(slug, page ?? 1, pageSize ?? 12),
-                        cancellationToken);
-
-                return result is null
-                    ? Results.NotFound()
-                    : Results.Ok(result);
-            })
+            GetRecipesByCategory)
             .WithName("GetCategoryRecipes")
             .WithSummary("Lấy danh sách công thức thuộc danh mục theo slug");
+    }
+
+    private static async Task<IResult> GetCategories(
+        ISender sender,
+        ICacheService cache,
+        CancellationToken cancellationToken)
+    {
+        var cachedCategories = await cache.GetAsync<IReadOnlyList<CategoryDto>>(
+            CategoryListCacheKey,
+            cancellationToken);
+        if (cachedCategories is not null)
+        {
+            return Results.Ok(cachedCategories);
+        }
+
+        var categories = await sender.Send(
+            new GetCategoriesQuery(),
+            cancellationToken);
+        await cache.SetAsync(
+            CategoryListCacheKey,
+            categories,
+            TimeSpan.FromMinutes(30),
+            cancellationToken);
+
+        return Results.Ok(categories);
+    }
+
+    private static async Task<IResult> GetRecipesByCategory(
+        string slug,
+        int? page,
+        int? pageSize,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        Guid? authorId = null;
+        if (user.IsInRole("Author"))
+        {
+            var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? user.FindFirst("sub")?.Value;
+            if (Guid.TryParse(userIdClaim, out var parsedUserId))
+            {
+                authorId = parsedUserId;
+            }
+        }
+
+        var result = await sender.Send(
+            new GetRecipesByCategoryQuery(
+                slug,
+                page ?? 1,
+                pageSize ?? 12,
+                authorId),
+            cancellationToken);
+
+        return result is null
+            ? Results.Problem(
+                title: "Category not found",
+                detail: $"Category with slug '{slug}' was not found.",
+                statusCode: StatusCodes.Status404NotFound,
+                type: "CATEGORY_NOT_FOUND")
+            : Results.Ok(result);
+    }
+
+    private static async Task<IResult> CreateCategory(
+        CreateCategoryCommand command,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var category = await sender.Send(command, cancellationToken);
+            if (category is null)
+            {
+                return Results.Problem(
+                    title: "Category name already exists",
+                    detail: "A category with this name already exists.",
+                    statusCode: StatusCodes.Status409Conflict,
+                    type: "CATEGORY_NAME_EXISTS");
+            }
+
+            return Results.Created($"/api/v1/categories/{category.Slug}", category);
+        }
+        catch (FluentValidation.ValidationException exception)
+        {
+            var errors = exception.Errors
+                .GroupBy(error => error.PropertyName)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(error => error.ErrorMessage).ToArray());
+
+            return Results.ValidationProblem(
+                errors,
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
+        }
+    }
+
+    private static async Task<IResult> UpdateCategory(
+        Guid id,
+        UpdateCategoryRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await sender.Send(
+                new UpdateCategoryCommand(id, request.Name, request.Description),
+                cancellationToken);
+
+            return result switch
+            {
+                UpdateCategoryResult.Updated => Results.NoContent(),
+                UpdateCategoryResult.NotFound => Results.Problem(
+                    title: "Category not found",
+                    detail: $"Category with id '{id}' was not found.",
+                    statusCode: StatusCodes.Status404NotFound,
+                    type: "CATEGORY_NOT_FOUND"),
+                UpdateCategoryResult.NameAlreadyExists => Results.Problem(
+                    title: "Category name already exists",
+                    detail: "A category with this name already exists.",
+                    statusCode: StatusCodes.Status409Conflict,
+                    type: "CATEGORY_NAME_EXISTS"),
+                _ => throw new InvalidOperationException(
+                    $"Unsupported category update result: {result}."),
+            };
+        }
+        catch (FluentValidation.ValidationException exception)
+        {
+            var errors = exception.Errors
+                .GroupBy(error => error.PropertyName)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(error => error.ErrorMessage).ToArray());
+
+            return Results.ValidationProblem(
+                errors,
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
+        }
+    }
+
+    private static async Task<IResult> DeleteCategory(
+        Guid id,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new DeleteCategoryCommand(id),
+            cancellationToken);
+
+        return result switch
+        {
+            DeleteCategoryResult.Deleted => Results.NoContent(),
+            DeleteCategoryResult.NotFound => Results.Problem(
+                title: "Category not found",
+                detail: $"Category with id '{id}' was not found.",
+                statusCode: StatusCodes.Status404NotFound,
+                type: "CATEGORY_NOT_FOUND"),
+            DeleteCategoryResult.HasRecipes => Results.Problem(
+                title: "Category still contains active recipes",
+                detail: "Cannot delete category that still contains active recipes.",
+                statusCode: StatusCodes.Status409Conflict,
+                type: "CATEGORY_DELETE_HAS_RECIPES"),
+            _ => throw new InvalidOperationException(
+                $"Unsupported category delete result: {result}."),
+        };
     }
 }

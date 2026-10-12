@@ -39,7 +39,8 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
             {
                 r.Id,
                 r.AuthorId,
-                r.Status
+                r.Status,
+                r.xmin
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -61,6 +62,7 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
         // 2. Query chi tiết với AsNoTracking và Projection tối ưu, triệt tiêu hoàn toàn N+1
         var recipeDto = await _context.Recipes
             .AsNoTracking()
+            .AsSplitQuery()
             .Where(r => r.Id == recipeHeader.Id)
             .Select(r => new RecipeDetailDto
             {
@@ -69,6 +71,9 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
                 Slug = r.Slug,
                 Description = r.Description,
                 Content = r.Content,
+                CoverImageUrl = r.CoverImageUrl 
+                    ?? r.Images.Where(img => !img.IsDeleted && img.IsPrimary).Select(img => img.MediumUrl ?? img.OriginalUrl).FirstOrDefault()
+                    ?? r.Images.Where(img => !img.IsDeleted).OrderBy(img => img.OrderIndex).Select(img => img.MediumUrl ?? img.OriginalUrl).FirstOrDefault(),
                 PrepTimeMinutes = r.PrepTimeMinutes,
                 CookTimeMinutes = r.CookTimeMinutes,
                 Servings = r.Servings,
@@ -101,6 +106,7 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
                 Steps = r.Steps
                     .Where(s => !s.IsDeleted)
                     .OrderBy(s => s.StepNumber)
+                    .ThenBy(s => s.Id)
                     .Select(s => new RecipeStepDto
                     {
                         Id = s.Id,
@@ -114,6 +120,7 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
                 Ingredients = r.Ingredients
                     .Where(i => !i.IsDeleted)
                     .OrderBy(i => i.SortOrder)
+                    .ThenBy(i => i.Id)
                     .Select(i => new RecipeIngredientDto
                     {
                         Id = i.Id,
@@ -127,6 +134,7 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
                 Images = r.Images
                     .Where(img => !img.IsDeleted)
                     .OrderBy(img => img.OrderIndex)
+                    .ThenBy(img => img.Id)
                     .Select(img => new RecipeImageDto
                     {
                         Id = img.Id,
@@ -145,6 +153,8 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
         {
             throw new NotFoundException($"Recipe with slug '{request.Slug}' was not found.");
         }
+
+        recipeDto.Version = recipeHeader.xmin.ToString();
 
         return recipeDto;
     }

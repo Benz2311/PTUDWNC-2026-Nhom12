@@ -1,7 +1,10 @@
+using CulinaryBlog.Domain.Enums;
+
 namespace CulinaryBlog.Domain.Entities;
 
 public class RecipeNutrition
 {
+    public NutritionSource Source { get; set; } = NutritionSource.Manual;
     public decimal? Calories { get; set; }
     public decimal? Protein { get; set; }
     public decimal? Carbohydrates { get; set; }

@@ -1,11 +1,15 @@
 using CulinaryBlog.Application.DTOs.Auth;
 using CulinaryBlog.Application.Interfaces;
 using CulinaryBlog.Application.Repositories;
+using CulinaryBlog.Application.Services;
 using CulinaryBlog.Domain.Entities;
+using CulinaryBlog.Domain.Exceptions;
 using CulinaryBlog.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
@@ -16,31 +20,64 @@ public class AuthServiceTests
     private readonly Mock<IUserRepository> _userRepoMock = new();
     private readonly Mock<IRefreshTokenRepository> _tokenRepoMock = new();
     private readonly Mock<IUnitOfWork> _uowMock = new();
+    private readonly Mock<IJwtTokenGenerator> _jwtTokenGeneratorMock = new();
     private readonly Mock<IPasswordHasher<ApplicationUser>> _hasherMock = new();
+    private readonly Mock<IEmailService> _emailServiceMock = new();
     private readonly IConfiguration _configuration;
+    private readonly Mock<ILogger<AuthService>> _loggerMock = new();
+    private readonly Mock<IHostEnvironment> _environmentMock = new();
     private readonly AuthService _sut;
 
-    public AuthServiceTests()
+public AuthServiceTests()
     {
-        var configValues = new Dictionary<string, string?>
+        _environmentMock.SetupGet(x => x.EnvironmentName).Returns(Environments.Development);
+        
+        var jwtSettings = new JwtSettings
         {
-            ["Jwt:Key"] = "this_is_a_very_secure_test_key_for_jwt_auth_testing_12345!",
-            ["Jwt:Issuer"] = "CulinaryBlogTest",
-            ["Jwt:Audience"] = "CulinaryBlogClientTest",
-            ["Jwt:AccessTokenMinutes"] = "15",
-            ["Jwt:RefreshTokenDays"] = "7"
+            SecretKey = "test-secret-key-that-is-very-long-enough-for-testing",
+            Issuer = "test-issuer",
+            Audience = "test-audience",
+            AccessTokenMinutes = 15,
+            RefreshTokenDays = 7
         };
+        
+        var googleAuthSettings = new GoogleAuthSettings
+        {
+            ClientId = "test-client-id",
+            ClientSecret = "test-client-secret"
+        };
+        
+        var configBuilder = new ConfigurationBuilder();
+        configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [$"{JwtSettings.Section}:SecretKey"] = jwtSettings.SecretKey,
+            [$"{JwtSettings.Section}:Issuer"] = jwtSettings.Issuer,
+            [$"{JwtSettings.Section}:Audience"] = jwtSettings.Audience,
+            [$"{JwtSettings.Section}:AccessTokenMinutes"] = jwtSettings.AccessTokenMinutes.ToString(),
+            [$"{JwtSettings.Section}:RefreshTokenDays"] = jwtSettings.RefreshTokenDays.ToString(),
+            [$"{GoogleAuthSettings.Section}:ClientId"] = googleAuthSettings.ClientId,
+            [$"{GoogleAuthSettings.Section}:ClientSecret"] = googleAuthSettings.ClientSecret,
+        });
+        
+        _configuration = configBuilder.Build();
 
-        _configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(configValues)
-            .Build();
+        _jwtTokenGeneratorMock.Setup(x => x.GenerateAccessToken(It.IsAny<ApplicationUser>(), It.IsAny<IEnumerable<string>>(), It.IsAny<TimeSpan>()))
+            .Returns("test_access_token");
+        _jwtTokenGeneratorMock.Setup(x => x.GenerateRefreshToken())
+            .Returns("test_refresh_token");
+        _jwtTokenGeneratorMock.Setup(x => x.HashToken(It.IsAny<string>()))
+            .Returns("hashed_token");
 
         _sut = new AuthService(
             _userRepoMock.Object,
             _tokenRepoMock.Object,
             _uowMock.Object,
+            _jwtTokenGeneratorMock.Object,
+            _hasherMock.Object,
+            _emailServiceMock.Object,
             _configuration,
-            _hasherMock.Object);
+            _loggerMock.Object,
+            _environmentMock.Object);
     }
 
     [Fact]
@@ -75,7 +112,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task RegisterAsync_DuplicateUserName_ThrowsInvalidOperationException()
+    public async Task RegisterAsync_DuplicateUserName_ThrowsConflictException()
     {
         // Arrange
         var request = new RegisterRequest { UserName = "existing_user", Email = "test@example.com", Password = "pwd" };
@@ -83,11 +120,11 @@ public class AuthServiceTests
 
         // Act & Assert
         var act = () => _sut.RegisterAsync(request);
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Username already exists*");
+        await act.Should().ThrowAsync<ConflictException>().WithMessage("*Username*already exists*");
     }
 
     [Fact]
-    public async Task RegisterAsync_DuplicateEmail_ThrowsInvalidOperationException()
+    public async Task RegisterAsync_DuplicateEmail_ThrowsConflictException()
     {
         // Arrange
         var request = new RegisterRequest { UserName = "new_user", Email = "existing@example.com", Password = "pwd" };
@@ -96,7 +133,7 @@ public class AuthServiceTests
 
         // Act & Assert
         var act = () => _sut.RegisterAsync(request);
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Email already exists*");
+        await act.Should().ThrowAsync<ConflictException>().WithMessage("*Email*already exists*");
     }
 
     [Fact]
@@ -131,7 +168,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task LoginAsync_UserNotFound_ThrowsUnauthorizedAccessException()
+    public async Task LoginAsync_UserNotFound_ThrowsUnauthorizedAuthException()
     {
         // Arrange
         _userRepoMock.Setup(x => x.GetByEmailOrUserNameAsync("nonexistent", default))
@@ -141,11 +178,11 @@ public class AuthServiceTests
 
         // Act & Assert
         var act = () => _sut.LoginAsync(request);
-        await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("*Invalid username/email or password*");
+        await act.Should().ThrowAsync<UnauthorizedAuthException>().WithMessage("*Invalid username/email or password*");
     }
 
     [Fact]
-    public async Task LoginAsync_InactiveUser_ThrowsUnauthorizedAccessException()
+    public async Task LoginAsync_InactiveUser_ThrowsUnauthorizedAuthException()
     {
         // Arrange
         var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = "banned", IsActive = false };
@@ -155,11 +192,11 @@ public class AuthServiceTests
 
         // Act & Assert
         var act = () => _sut.LoginAsync(request);
-        await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("*Account is inactive*");
+        await act.Should().ThrowAsync<UnauthorizedAuthException>().WithMessage("*Account is inactive*");
     }
 
     [Fact]
-    public async Task LoginAsync_WrongPassword_ThrowsUnauthorizedAccessException()
+    public async Task LoginAsync_WrongPassword_ThrowsUnauthorizedAuthException()
     {
         // Arrange
         var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = "john", PasswordHash = "hashed", IsActive = true };
@@ -171,7 +208,7 @@ public class AuthServiceTests
 
         // Act & Assert
         var act = () => _sut.LoginAsync(request);
-        await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("*Invalid username/email or password*");
+        await act.Should().ThrowAsync<UnauthorizedAuthException>().WithMessage("*Invalid username/email or password*");
     }
 
     [Fact]
@@ -214,7 +251,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task RefreshAsync_RevokedToken_ThrowsUnauthorizedAccessException()
+    public async Task RefreshAsync_RevokedToken_ThrowsUnauthorizedAuthException()
     {
         // Arrange
         var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = "john" };
@@ -235,11 +272,11 @@ public class AuthServiceTests
 
         // Act & Assert
         var act = () => _sut.RefreshAsync(request);
-        await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("*revoked*");
+        await act.Should().ThrowAsync<UnauthorizedAuthException>().WithMessage("*revoked*");
     }
 
     [Fact]
-    public async Task RefreshAsync_ExpiredToken_ThrowsUnauthorizedAccessException()
+    public async Task RefreshAsync_ExpiredToken_ThrowsUnauthorizedAuthException()
     {
         // Arrange
         var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = "john" };
@@ -260,7 +297,7 @@ public class AuthServiceTests
 
         // Act & Assert
         var act = () => _sut.RefreshAsync(request);
-        await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("*expired*");
+        await act.Should().ThrowAsync<UnauthorizedAuthException>().WithMessage("*expired*");
     }
 
     [Fact]

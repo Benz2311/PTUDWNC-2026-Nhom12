@@ -43,6 +43,7 @@ try
             {
                 Id = demoUserId,
                 UserName = "demo_user",
+                DisplayName = "Bếp Trưởng Hà Nội",
                 Email = "demo@culinary.local",
                 PasswordHash = "demo"
             };
@@ -51,6 +52,10 @@ try
         else
         {
             demoUserId = demoUser.Id;
+            if (string.IsNullOrWhiteSpace(demoUser.DisplayName))
+            {
+                demoUser.DisplayName = "Bếp Trưởng Hà Nội";
+            }
         }
 
         var demoCategory = await db.Categories.FirstOrDefaultAsync(c => c.Slug == "mon-an-mau");

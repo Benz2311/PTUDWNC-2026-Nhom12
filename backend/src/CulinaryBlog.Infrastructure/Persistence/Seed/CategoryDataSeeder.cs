@@ -298,12 +298,18 @@ public static class CategoryDataSeeder
             {
                 Id = DemoUserId,
                 UserName = "culinary-demo",
+                DisplayName = "Bếp Trưởng Culinary",
                 Email = "demo@culinaryblog.local",
                 PasswordHash = "seeded-demo-password"
             };
 
             context.Users.Add(author);
 
+            await context.SaveChangesAsync();
+        }
+        else if (string.IsNullOrWhiteSpace(author.DisplayName))
+        {
+            author.DisplayName = "Bếp Trưởng Culinary";
             await context.SaveChangesAsync();
         }
 

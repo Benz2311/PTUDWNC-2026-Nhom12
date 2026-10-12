@@ -6,6 +6,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Google Auth -->
+    <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
+
     <!-- Seed -->
     <PackageReference Include="Bogus" Version="35.6.5" />
 
@@ -24,6 +31,7 @@
 
     <!-- JWT -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="4.1.2" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.19.2" />
 
     <!-- Redis -->
