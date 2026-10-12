@@ -8,6 +8,7 @@ using CulinaryBlog.Infrastructure.Email;
 using CulinaryBlog.Infrastructure.Observability;
 using CulinaryBlog.Infrastructure.Persistence;
 using CulinaryBlog.Infrastructure.Persistence.Repositories;
+using CulinaryBlog.Infrastructure.Persistence.Seed;
 using CulinaryBlog.Infrastructure.Storage;
 using Hangfire;
 using Hangfire.PostgreSql;
@@ -20,6 +21,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Threading.RateLimiting;
 
 namespace CulinaryBlog.Infrastructure;
 
@@ -108,6 +110,47 @@ public static class DependencyInjection
             });
 
         services.AddAuthorization();
+
+        // ── Rate Limiting — ASP.NET Core built-in ────────────────────────────────
+        // services.AddRateLimiter(options =>
+        // {
+        //     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        //         RateLimitPartition.GetFixedWindowLimiter(
+        //             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        //             factory: _ => new FixedWindowRateLimiterOptions
+        //             {
+        //                 PermitLimit = 100,
+        //                 Window = TimeSpan.FromMinutes(1),
+        //                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+        //                 QueueLimit = 5
+        //             }));
+        //
+        //     // Stricter limits for auth endpoints
+        //     options.AddPolicy("AuthStrict", httpContext =>
+        //         RateLimitPartition.GetFixedWindowLimiter(
+        //             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        //             factory: _ => new FixedWindowRateLimiterOptions
+        //             {
+        //                 PermitLimit = 10,
+        //                 Window = TimeSpan.FromMinutes(1),
+        //                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+        //                 QueueLimit = 2
+        //             }));
+        //
+        //     options.AddPolicy("AuthRefresh", httpContext =>
+        //         RateLimitPartition.GetFixedWindowLimiter(
+        //             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        //             factory: _ => new FixedWindowRateLimiterOptions
+        //             {
+        //                 PermitLimit = 5,
+        //                 Window = TimeSpan.FromMinutes(1),
+        //                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+        //                 QueueLimit = 1
+        //             }));
+        //
+        //     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        // });
+
         services.AddSingleton<JwtService>();
 
         // ── Redis Cache — StackExchange.Redis / Resilient Cache ──────────────
@@ -125,6 +168,7 @@ public static class DependencyInjection
             services.AddDistributedMemoryCache();
         }
 
+        services.AddMemoryCache();
         services.AddSingleton<ResilientCacheService>();
         services.AddSingleton<CulinaryBlog.Application.Common.Interfaces.ICacheService>(sp => sp.GetRequiredService<ResilientCacheService>());
         services.AddSingleton<CulinaryBlog.Application.Interfaces.ICacheService>(sp => sp.GetRequiredService<ResilientCacheService>());
@@ -144,6 +188,10 @@ public static class DependencyInjection
             services.AddHangfireServer();
             services.AddScoped<IBackgroundJobService, HangfireJobService>();
         }
+
+        // ── Database Initializer — runs after host is built ──────────────
+        // Always register; the hosted service checks environment at runtime
+        services.AddHostedService<DatabaseInitializerHostedService>();
 
         // ── Email — MailKit ───────────────────────────────────────────────────
         services.AddSingleton<IEmailService, MailKitEmailService>();

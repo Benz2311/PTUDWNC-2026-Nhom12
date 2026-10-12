@@ -6,6 +6,7 @@ using CulinaryBlog.Application.DTOs.Auth;
 using CulinaryBlog.Application.Interfaces;
 using CulinaryBlog.Application.Repositories;
 using CulinaryBlog.Application.Services;
+using ApplicationValidationException = CulinaryBlog.Application.Exceptions.ValidationException;
 using CulinaryBlog.Domain.Entities;
 using CulinaryBlog.Domain.Exceptions;
 using Google.Apis.Auth;
@@ -65,6 +66,14 @@ public class AuthService : IAuthService
     {
         var userName = request.UserName.Trim();
         var email = request.Email.Trim().ToLowerInvariant();
+
+        // NFR-SEC-001: Enforce password policy at the backend
+        var passwordErrors = ValidatePassword(request.Password);
+        if (passwordErrors.Count > 0)
+        {
+            _logger.LogWarning("Registration failed: Password does not meet policy for {UserName}", userName);
+            throw new ApplicationValidationException(passwordErrors);
+        }
 
         _logger.LogInformation("Registering new user: {UserName} ({Email})", userName, email);
 
@@ -132,8 +141,10 @@ public class AuthService : IAuthService
             throw new UnauthorizedAuthException("Account is inactive.");
         }
 
-        // Skip email confirmation check in Development environment for testing
-        if (!string.Equals(_environment.EnvironmentName, Environments.Development, StringComparison.OrdinalIgnoreCase) && !user.EmailConfirmed)
+        // Skip email confirmation check in Development or Testing environment for testing
+        if (!string.Equals(_environment.EnvironmentName, Environments.Development, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(_environment.EnvironmentName, "Testing", StringComparison.OrdinalIgnoreCase) &&
+            !user.EmailConfirmed)
         {
             _logger.LogWarning("Login failed: Email not confirmed for user {UserId}", user.Id);
             throw new UnauthorizedAuthException("Email not confirmed. Please check your email to confirm your account.");
@@ -268,15 +279,7 @@ public class AuthService : IAuthService
             return null;
         }
 
-        return new UserResponse
-        {
-            Id = profile.Id,
-            UserName = profile.UserName,
-            Email = profile.Email,
-            DisplayName = profile.DisplayName,
-            AvatarUrl = profile.AvatarUrl,
-            Bio = profile.Bio
-        };
+        return ToUserResponse(profile);
     }
 
     public async Task ConfirmEmailAsync(ConfirmEmailRequest request)
@@ -392,6 +395,97 @@ public class AuthService : IAuthService
         return true;
     }
 
+    public async Task<(IReadOnlyList<UserResponse> Items, int TotalCount)> GetUsersAsync(
+        int page, int pageSize, string? keyword, bool? isActive)
+    {
+        var (items, totalCount) = await _userRepository.GetUsersAsync(page, pageSize, keyword, isActive);
+
+        var userResponses = items.Select(ToUserResponse).ToList();
+        return (userResponses, totalCount);
+    }
+
+    private static UserResponse ToUserResponse(UserProfileDto profile)
+    {
+        return new UserResponse
+        {
+            Id = profile.Id,
+            UserName = profile.UserName,
+            Email = profile.Email,
+            DisplayName = profile.DisplayName,
+            AvatarUrl = profile.AvatarUrl,
+            Bio = profile.Bio,
+            EmailConfirmed = profile.EmailConfirmed,
+            Roles = profile.Roles,
+            IsActive = profile.IsActive,
+            CreatedAt = profile.CreatedAt
+        };
+    }
+
+    private static UserResponse ToUserResponse(ApplicationUser user)
+    {
+        return new UserResponse
+        {
+            Id = user.Id.ToString(),
+            UserName = user.UserName,
+            Email = user.Email,
+            DisplayName = user.DisplayName,
+            AvatarUrl = user.AvatarUrl,
+            Bio = user.Bio,
+            EmailConfirmed = user.EmailConfirmed,
+            Roles = user.Roles ?? Array.Empty<string>(),
+            IsActive = user.IsActive,
+            CreatedAt = user.CreatedAt
+        };
+    }
+
+    private static IDictionary<string, string[]> ValidatePassword(string password)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
+        {
+            errors["Password"] = new[]
+            {
+                "Mật khẩu phải có ít nhất 8 ký tự."
+            };
+            return errors;
+        }
+
+        if (!password.Any(char.IsUpper))
+        {
+            errors["Password"] = new[]
+            {
+                "Mật khẩu phải có ít nhất một chữ hoa."
+            };
+        }
+
+        if (!password.Any(char.IsLower))
+        {
+            errors["Password"] = new[]
+            {
+                "Mật khẩu phải có ít nhất một chữ thường."
+            };
+        }
+
+        if (!password.Any(char.IsDigit))
+        {
+            errors["Password"] = new[]
+            {
+                "Mật khẩu phải có ít nhất một chữ số."
+            };
+        }
+
+        if (!password.Any(ch => !char.IsLetterOrDigit(ch)))
+        {
+            errors["Password"] = new[]
+            {
+                "Mật khẩu phải có ít nhất một ký tự đặc biệt."
+            };
+        }
+
+        return errors;
+    }
+
     private async Task SendWelcomeEmailAsync(ApplicationUser user)
     {
         try
@@ -464,19 +558,6 @@ public class AuthService : IAuthService
             RefreshToken = rawRefreshToken,
             ExpiresAt = expiresAt,
             User = ToUserResponse(user)
-        };
-    }
-
-    private static UserResponse ToUserResponse(ApplicationUser user)
-    {
-        return new UserResponse
-        {
-            Id = user.Id.ToString(),
-            UserName = user.UserName,
-            Email = user.Email,
-            DisplayName = user.DisplayName,
-            AvatarUrl = user.AvatarUrl,
-            Bio = user.Bio
         };
     }
 }

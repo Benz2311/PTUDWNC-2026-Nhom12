@@ -12,10 +12,17 @@ public class CategoriesEndpointTests : IClassFixture<TestWebApplicationFactory>
 {
     private readonly HttpClient _client;
 
+    static CategoriesEndpointTests()
+    {
+        // Set environment variable before factory is created so Program.Main() picks it up
+        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Testing");
+    }
+
     public CategoriesEndpointTests(TestWebApplicationFactory factory)
     {
         _client = factory.CreateClient();
     }
+
     [Fact]
     public async Task GetCategories_ReturnsSuccessStatusCode()
     {

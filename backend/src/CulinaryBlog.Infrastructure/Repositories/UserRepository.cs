@@ -93,17 +93,62 @@ public class UserRepository : IUserRepository
                 x.Email,
                 x.DisplayName,
                 x.AvatarUrl,
-                x.Bio))
+                x.Bio,
+                x.EmailConfirmed,
+                x.Roles ?? Array.Empty<string>(),
+                x.IsActive,
+                x.CreatedAt))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task<UserProfileDto?> GetProfileAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<UserProfileDto?> GetProfileAsync(string userId, CancellationToken cancellationToken = default)
     {
         if (Guid.TryParse(userId, out var guid))
         {
-            return GetProfileAsync(guid, cancellationToken);
+            return await GetProfileAsync(guid, cancellationToken);
         }
 
-        return Task.FromResult<UserProfileDto?>(null);
+        return null;
+    }
+
+    public async Task<(IReadOnlyList<UserProfileDto> Items, int TotalCount)> GetUsersAsync(
+        int page, int pageSize, string? keyword, bool? isActive, CancellationToken cancellationToken = default)
+    {
+        var query = _db.Users.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var lowerKeyword = keyword.Trim().ToLowerInvariant();
+            query = query.Where(x =>
+                x.UserName.ToLower().Contains(lowerKeyword) ||
+                x.Email.ToLower().Contains(lowerKeyword) ||
+                x.DisplayName.ToLower().Contains(lowerKeyword));
+        }
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(x => x.IsActive == isActive.Value);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(x => x.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new UserProfileDto(
+                x.Id.ToString(),
+                x.UserName,
+                x.Email,
+                x.DisplayName,
+                x.AvatarUrl,
+                x.Bio,
+                x.EmailConfirmed,
+                x.Roles ?? Array.Empty<string>(),
+                x.IsActive,
+                x.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
     }
 }
