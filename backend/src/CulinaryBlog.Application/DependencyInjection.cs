@@ -17,7 +17,8 @@ public static class DependencyInjection
         {
             cfg.RegisterServicesFromAssembly(assembly);
 
-            // Pipeline: ValidationBehavior chạy trước mọi handler
+            // Pipeline: LoggingBehavior bọc ngoài ghi nhận thời gian/lỗi, sau đó đến ValidationBehavior
+            cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
             cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         });
 

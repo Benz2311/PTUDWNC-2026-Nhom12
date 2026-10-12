@@ -9,6 +9,7 @@ public class RecipeDetailDto
     public string Slug { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
+    public string? CoverImageUrl { get; set; }
     public int PrepTimeMinutes { get; set; }
     public int CookTimeMinutes { get; set; }
     public int Servings { get; set; }
@@ -17,6 +18,7 @@ public class RecipeDetailDto
     public DateTime? PublishedAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public string Version { get; set; } = string.Empty;
 
     public AuthorSummaryDto Author { get; set; } = null!;
     public CategorySummaryDto Category { get; set; } = null!;

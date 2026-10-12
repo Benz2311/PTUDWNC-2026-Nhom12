@@ -20,4 +20,20 @@ public interface IStorageService
         string objectKey,
         TimeSpan expiry,
         CancellationToken ct = default);
+
+    /// <summary>Upload file sử dụng bucket mặc định được cấu hình.</summary>
+    Task<string> UploadAsync(
+        string objectKey,
+        Stream content,
+        string contentType,
+        CancellationToken ct = default);
+
+    /// <summary>Xóa file sử dụng bucket mặc định được cấu hình (Idempotent).</summary>
+    Task DeleteAsync(string objectKey, CancellationToken ct = default);
+
+    /// <summary>Tải luồng dữ liệu file từ Object Storage.</summary>
+    Task<Stream> DownloadAsync(
+        string bucketName,
+        string objectKey,
+        CancellationToken ct = default);
 }

@@ -47,7 +47,7 @@ public sealed class JwtService
             issuer: _settings.Issuer,
             audience: _settings.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(_settings.ExpiryMinutes),
+            expires: DateTime.UtcNow.AddMinutes(_settings.AccessTokenMinutes),
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
@@ -79,14 +79,4 @@ public sealed class JwtService
             return null;
         }
     }
-}
-
-public sealed class JwtSettings
-{
-    public const string Section = "Jwt";
-
-    public string SecretKey { get; init; } = string.Empty;
-    public string Issuer { get; init; } = string.Empty;
-    public string Audience { get; init; } = string.Empty;
-    public int ExpiryMinutes { get; init; } = 60;
 }
