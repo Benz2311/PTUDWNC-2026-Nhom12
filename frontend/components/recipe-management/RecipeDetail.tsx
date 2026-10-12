@@ -2,30 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
-
-type Recipe = {
-  id: string;
-  title: string;
-  slug: string;
-  description: string;
-  content: string;
-  category: string;
-  author: string;
-  cookTimeMinutes: number;
-  difficulty: string;
-  status: string;
-  ingredients: { id: string; name: string; quantity: string | number | null; unit: string | null; sortOrder: number }[];
-  nutrition: { calories: number; protein: number; carbohydrates: number; fat: number; fiber: number } | null;
-  images: { id: string; url: string; altText: string | null; sortOrder: number }[];
-};
+import type { RecipeDetail as RecipeDetailData } from '@/types/recipe';
 
 export default function RecipeDetail({ slug }: { slug: string }) {
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [recipe, setRecipe] = useState<RecipeDetailData | null>(null);
   const [error, setError] = useState('');
   const [slide, setSlide] = useState(0);
 
   useEffect(() => {
-    apiFetch<Recipe>(`/api/v1/recipes/${slug}`)
+    apiFetch<RecipeDetailData>(`/api/v1/recipes/${encodeURIComponent(slug)}`)
       .then(setRecipe)
       .catch((reason: Error) => setError(reason.message || 'Không tìm thấy công thức.'));
   }, [slug]);
@@ -147,6 +132,10 @@ export default function RecipeDetail({ slug }: { slug: string }) {
               <div>
                 <strong>{recipe.nutrition.fiber ?? 0}g</strong>
                 <span>Fiber</span>
+              </div>
+              <div>
+                <strong>{recipe.nutrition.sodium ?? 0}mg</strong>
+                <span>Sodium</span>
               </div>
             </div>
           )}

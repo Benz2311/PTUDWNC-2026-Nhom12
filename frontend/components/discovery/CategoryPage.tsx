@@ -2,21 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import type { RecipePage, RecipeSummary } from '@/types/recipe';
 
 type Category = { id: string; name: string; slug: string; description: string | null; recipeCount: number };
-type Recipe = { id: string; title: string; slug: string; description: string | null; category: string; author: string; prepTimeMinutes: number; cookTimeMinutes: number; servings: number; difficulty: string; status: string; createdAt: string; primaryImageUrl: string | null };
-type PageResponse<T> = { items: T[]; page: number; pageSize: number; totalCount: number };
 
 export default function CategoryPage({ slug }: { slug: string }) {
   const [category, setCategory] = useState<Category | null>(null);
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [recipes, setRecipes] = useState<RecipeSummary[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     apiFetch<Category>(`/api/v1/categories/${encodeURIComponent(slug)}`, {}, false)
       .then(async (result) => {
-        const page = await apiFetch<PageResponse<Recipe>>(`/api/v1/recipes?categoryId=${encodeURIComponent(result.id)}&pageSize=50`, {}, false);
+        const page = await apiFetch<RecipePage>(`/api/v1/recipes?categoryId=${encodeURIComponent(result.id)}&pageSize=50`, {}, false);
         if (!cancelled) {
           setCategory(result);
           setRecipes(page.items.filter((recipe) => recipe.status === 'Published'));

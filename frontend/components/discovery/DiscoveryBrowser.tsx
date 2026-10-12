@@ -3,23 +3,10 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
+import type { RecipePage, RecipeSummary } from '@/types/recipe';
 
 type DiscoveryBrowserProps = { mode?: 'explore' | 'search' };
-type Recipe = {
-  id: string;
-  title: string;
-  slug: string;
-  description: string | null;
-  category: string;
-  author: string;
-  prepTimeMinutes: number;
-  cookTimeMinutes: number;
-  servings: number;
-  difficulty: string;
-  primaryImageUrl: string | null;
-};
 type Category = { id: string; name: string; slug: string; recipeCount: number };
-type PageResponse = { items: Recipe[]; page: number; pageSize: number; totalCount: number };
 const fallbackImages = ['/sample-images/food-01.svg', '/sample-images/food-02.svg', '/sample-images/food-03.svg'];
 
 export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserProps) {
@@ -28,7 +15,7 @@ export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserP
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState('');
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [recipes, setRecipes] = useState<RecipeSummary[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -59,8 +46,8 @@ export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserP
     setError('');
     const category = categoryId ? `&categoryId=${encodeURIComponent(categoryId)}` : '';
     const request = mode === 'search'
-      ? apiFetch<PageResponse>(`/api/v1/recipes/search?query=${encodeURIComponent(submittedQuery.trim())}&page=${page}&pageSize=12${category}`, {}, false)
-      : apiFetch<PageResponse>(`/api/v1/recipes?page=${page}&pageSize=12${category}`, {}, false);
+      ? apiFetch<RecipePage>(`/api/v1/recipes/search?query=${encodeURIComponent(submittedQuery.trim())}&page=${page}&pageSize=12${category}`, {}, false)
+      : apiFetch<RecipePage>(`/api/v1/recipes?page=${page}&pageSize=12${category}`, {}, false);
     request.then((result) => {
       if (cancelled) return;
       setRecipes(result.items);

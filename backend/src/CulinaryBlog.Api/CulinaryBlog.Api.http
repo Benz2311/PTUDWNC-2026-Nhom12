@@ -1,6 +1,68 @@
-@CulinaryBlog.Api_HostAddress = http://localhost:5108
+@baseUrl = http://localhost:5000
+@accessToken = paste-access-token-here
 
-GET {{CulinaryBlog.Api_HostAddress}}/weatherforecast/
+### Public: list published recipes
+GET {{baseUrl}}/api/v1/recipes?page=1&pageSize=12
 Accept: application/json
 
-###
+### Public: search recipes
+GET {{baseUrl}}/api/v1/recipes/search?query=soup&page=1&pageSize=12
+Accept: application/json
+
+### Public: get a published recipe by slug
+GET {{baseUrl}}/api/v1/recipes/recipe-100
+Accept: application/json
+
+### Public: login to obtain a bearer token
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "userNameOrEmail": "your-account",
+  "password": "your-password"
+}
+
+### Protected: get the current account
+GET {{baseUrl}}/api/v1/auth/me
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Protected: create a recipe draft
+POST {{baseUrl}}/api/v1/recipes
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "categoryId": "22222222-2222-4222-8222-222222222222",
+  "title": "Example vegetable soup",
+  "description": "A simple example recipe.",
+  "content": "Simmer the vegetables until tender.",
+  "prepTimeMinutes": 10,
+  "cookTimeMinutes": 20,
+  "servings": 2,
+  "difficulty": "Easy",
+  "nutrition": {
+    "calories": 100,
+    "protein": 4,
+    "carbohydrates": 18,
+    "fat": 2,
+    "fiber": 3,
+    "sodium": 250
+  },
+  "ingredients": [
+    {
+      "name": "Carrot",
+      "quantity": 1,
+      "unit": "piece",
+      "notes": null,
+      "orderIndex": 0
+    }
+  ],
+  "images": [],
+  "steps": [
+    {
+      "title": "Simmer",
+      "description": "Cook the vegetables until tender."
+    }
+  ]
+}

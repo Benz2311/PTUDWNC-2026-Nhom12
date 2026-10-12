@@ -2,18 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/api';
-
-type Recipe = {
-  id: string;
-  title: string;
-  slug: string;
-  description: string | null;
-  category: string;
-  cookTimeMinutes: number;
-  primaryImageUrl: string | null;
-};
-
-type RecipePage = { items: Recipe[] };
+import type { RecipePage, RecipeSummary } from '@/types/recipe';
 
 const tabs = ['Tất cả', 'Món Việt', 'Món Âu', 'Món Chay', 'Tráng Miệng', 'Đồ uống'];
 const fallbackImages = [
@@ -23,7 +12,7 @@ const fallbackImages = [
 ];
 
 export default function FeaturedRecipes() {
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [recipes, setRecipes] = useState<RecipeSummary[]>([]);
   const [activeTab, setActiveTab] = useState('Tất cả');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
