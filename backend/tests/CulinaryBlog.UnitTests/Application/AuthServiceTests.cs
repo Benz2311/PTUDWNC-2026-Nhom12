@@ -115,7 +115,7 @@ public AuthServiceTests()
     public async Task RegisterAsync_DuplicateUserName_ThrowsConflictException()
     {
         // Arrange
-        var request = new RegisterRequest { UserName = "existing_user", Email = "test@example.com", Password = "pwd" };
+        var request = new RegisterRequest { UserName = "existing_user", Email = "test@example.com", Password = "Password123!" };
         _userRepoMock.Setup(x => x.ExistsByUserNameAsync("existing_user", default)).ReturnsAsync(true);
 
         // Act & Assert
@@ -127,13 +127,65 @@ public AuthServiceTests()
     public async Task RegisterAsync_DuplicateEmail_ThrowsConflictException()
     {
         // Arrange
-        var request = new RegisterRequest { UserName = "new_user", Email = "existing@example.com", Password = "pwd" };
+        var request = new RegisterRequest { UserName = "new_user", Email = "existing@example.com", Password = "Password123!" };
         _userRepoMock.Setup(x => x.ExistsByUserNameAsync("new_user", default)).ReturnsAsync(false);
         _userRepoMock.Setup(x => x.ExistsByEmailAsync("existing@example.com", default)).ReturnsAsync(true);
 
         // Act & Assert
         var act = () => _sut.RegisterAsync(request);
         await act.Should().ThrowAsync<ConflictException>().WithMessage("*Email*already exists*");
+    }
+
+    // ── Bữa 5: Password policy (NFR-SEC-001) ──────────────────────────
+
+    [Theory]
+    [InlineData("short")]              // < 8 ký tự
+    [InlineData("alllowercase1!")]     // thiếu chữ hoa
+    [InlineData("ALLUPPERCASE1!")]     // thiếu chữ thường
+    [InlineData("NoDigitsHere!")]       // thiếu chữ số
+    [InlineData("NoSpecialChar1")]     // thiếu ký tự đặc biệt
+    public async Task RegisterAsync_WeakPassword_ThrowsValidationException(string password)
+    {
+        // Arrange
+        var request = new RegisterRequest
+        {
+            UserName = "new_user",
+            Email = "new@example.com",
+            Password = password,
+            DisplayName = "New User"
+        };
+        _userRepoMock.Setup(x => x.ExistsByUserNameAsync(It.IsAny<string>(), default)).ReturnsAsync(false);
+        _userRepoMock.Setup(x => x.ExistsByEmailAsync(It.IsAny<string>(), default)).ReturnsAsync(false);
+
+        // Act & Assert
+        var act = () => _sut.RegisterAsync(request);
+        await act.Should().ThrowAsync<CulinaryBlog.Application.Exceptions.ValidationException>();
+
+        // Password validation happens before any repository write
+        _userRepoMock.Verify(x => x.AddAsync(It.IsAny<ApplicationUser>(), default), Times.Never);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_StrongPassword_PassesValidation()
+    {
+        // Arrange
+        var request = new RegisterRequest
+        {
+            UserName = "strong_user",
+            Email = "strong@example.com",
+            Password = "Password123!",
+            DisplayName = "Strong User"
+        };
+        _userRepoMock.Setup(x => x.ExistsByUserNameAsync("strong_user", default)).ReturnsAsync(false);
+        _userRepoMock.Setup(x => x.ExistsByEmailAsync("strong@example.com", default)).ReturnsAsync(false);
+        _hasherMock.Setup(x => x.HashPassword(It.IsAny<ApplicationUser>(), "Password123!")).Returns("hashed_pwd");
+
+        // Act
+        var result = await _sut.RegisterAsync(request, "127.0.0.1");
+
+        // Assert — reaches user creation (no validation exception)
+        result.Should().NotBeNull();
+        _userRepoMock.Verify(x => x.AddAsync(It.IsAny<ApplicationUser>(), default), Times.Once);
     }
 
     [Fact]
@@ -319,7 +371,7 @@ public AuthServiceTests()
     {
         // Arrange
         var userId = Guid.NewGuid().ToString();
-        var profile = new UserProfileDto(userId, "john", "john@example.com", "John Chef", null, "Bio text");
+        var profile = new UserProfileDto(userId, "john", "john@example.com", "John Chef", null, "Bio text", true, ["User"], true, DateTime.UtcNow);
         _userRepoMock.Setup(x => x.GetProfileAsync(userId, default)).ReturnsAsync(profile);
 
         // Act

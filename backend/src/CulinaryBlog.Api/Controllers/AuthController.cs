@@ -112,6 +112,21 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("revoke")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> RevokeToken(
+        [FromBody] RefreshRequest request,
+        CancellationToken cancellationToken)
+    {
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        _logger.LogInformation("Token revoke attempt from IP: {IP}", ipAddress);
+
+        await _authService.LogoutAsync(request.RefreshToken);
+        _logger.LogInformation("Token revoked successfully");
+        return NoContent();
+    }
+
     [HttpPost("email/confirm")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

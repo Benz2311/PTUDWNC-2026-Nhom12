@@ -1,19 +1,36 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using CulinaryBlog.Domain.Entities;
+using CulinaryBlog.Application;
+using CulinaryBlog.Infrastructure;
 using CulinaryBlog.Infrastructure.Persistence;
 using CulinaryBlog.Infrastructure.Persistence.Seed;
 
 namespace CulinaryBlog.IntegrationTests;
 
-public class TestWebApplicationFactory : WebApplicationFactory<global::Program>
+public class TestWebApplicationFactory : WebApplicationFactory<CulinaryBlog.Api.Program>
 {
+    public TestWebApplicationFactory()
+    {
+        // Set environment variable BEFORE Program.Main() creates its builder
+        // Use "Testing" so AddInfrastructure skips Hangfire and PostgreSQL
+        Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Testing");
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseContentRoot(GetProjectPath("CulinaryBlog.Api"));
+
+        builder.ConfigureAppConfiguration((context, config) =>
+        {
+            config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+            config.AddJsonFile("appsettings.Testing.json", optional: true, reloadOnChange: true);
+            config.AddEnvironmentVariables();
+        });
+
         builder.ConfigureServices(services =>
         {
             // Remove the existing DbContext registration
@@ -24,20 +41,22 @@ public class TestWebApplicationFactory : WebApplicationFactory<global::Program>
                 services.Remove(descriptor);
             }
 
-            // Remove any existing IHostedService for DbInitializer
-            var hostedServices = services.Where(
-                d => d.ServiceType == typeof(IHostedService) && 
-                     d.ImplementationType?.Name.Contains("DbInitializer") == true).ToList();
-            foreach (var hostedService in hostedServices)
-            {
-                services.Remove(hostedService);
-            }
-
             // Add in-memory database for testing
             services.AddDbContext<ApplicationDbContext>(options =>
             {
                 options.UseInMemoryDatabase("TestDb");
             });
+
+            // Remove DatabaseInitializerHostedService to prevent it from running in tests
+            var hostedServiceDescriptor = services.SingleOrDefault(
+                d => d.ImplementationType == typeof(DatabaseInitializerHostedService));
+            if (hostedServiceDescriptor != null)
+            {
+                services.Remove(hostedServiceDescriptor);
+            }
+
+            // Add MemoryCache for RateLimitingMiddleware
+            services.AddMemoryCache();
         });
 
         builder.UseEnvironment("Testing");
@@ -45,47 +64,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<global::Program>
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
-        // Ensure the host is built with the test configuration
-        builder.ConfigureServices(services =>
-        {
-            // Remove any DbInitializer hosted service that might have been added
-            var hostedServices = services.Where(
-                d => d.ServiceType == typeof(IHostedService) && 
-                     d.ImplementationType?.Name.Contains("DbInitializer") == true).ToList();
-            foreach (var hostedService in hostedServices)
-            {
-                services.Remove(hostedService);
-            }
-        });
-        
-        var host = base.CreateHost(builder);
-        
-        // Seed the in-memory database with test data
-        using (var scope = host.Services.CreateScope())
-        {
-            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            context.Database.EnsureCreated();
-            SeedTestData(context);
-        }
-        
-        return host;
-    }
-
-    private static void SeedTestData(ApplicationDbContext context)
-    {
-        // Seed Categories
-        if (!context.Categories.Any())
-        {
-            var categories = new List<Category>
-            {
-                Category.Create("Món Việt", "mon-viet", "Các món ăn truyền thống Việt Nam", null, 1),
-                Category.Create("Món Á", "mon-a", "Các món ăn châu Á", null, 2),
-                Category.Create("Món Âu", "mon-au", "Các món ăn châu Âu", null, 3),
-                Category.Create("Đồ Uống", "do-uong", "Các loại đồ uống giải khát, đồ uống có cồn", null, 4)
-            };
-            context.Categories.AddRange(categories);
-            context.SaveChanges();
-        }
+        builder.UseEnvironment("Testing");
+        return base.CreateHost(builder);
     }
 
     private static string GetProjectPath(string projectName)
@@ -95,7 +75,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<global::Program>
         {
             currentDir = currentDir.Parent;
         }
-        
+
         if (currentDir == null)
         {
             throw new InvalidOperationException("Solution root not found");
@@ -106,7 +86,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<global::Program>
         {
             throw new InvalidOperationException($"Project path not found: {projectPath}");
         }
-        
+
         return projectPath;
     }
 }
