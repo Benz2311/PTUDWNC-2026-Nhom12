@@ -2,18 +2,23 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
 using FluentAssertions;
 using Xunit;
 using CulinaryBlog.Application.DTOs.Auth;
+using CulinaryBlog.Domain.Entities;
 
 namespace CulinaryBlog.IntegrationTests.Api;
 
 public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
 {
     private readonly HttpClient _client;
+    private readonly TestWebApplicationFactory _factory;
 
     public AuthEndpointTests(TestWebApplicationFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -414,5 +419,50 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task AdminUsers_AdminUser_ReturnsOk()
+    {
+        // Arrange — create admin user directly via UserManager using factory services
+        using var scope = _factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        
+        var adminEmail = "admin_test_" + Guid.NewGuid().ToString("N")[..8] + "@example.com";
+        var adminUser = new ApplicationUser
+        {
+            Id = Guid.NewGuid(),
+            UserName = "admin_" + Guid.NewGuid().ToString("N")[..8],
+            Email = adminEmail,
+            DisplayName = "Test Admin",
+            EmailConfirmed = true,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            Roles = ["Admin", "Author"]
+        };
+        
+        var createResult = await userManager.CreateAsync(adminUser, "Admin@123!");
+        createResult.Succeeded.Should().BeTrue();
+        
+        // Login as admin
+        var loginRequest = new LoginRequest
+        {
+            UserNameOrEmail = adminUser.UserName,
+            Password = "Admin@123!"
+        };
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", loginRequest);
+        loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var authResponse = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        
+        _client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authResponse!.AccessToken);
+
+        // Act — call admin endpoint with admin token
+        var response = await _client.GetAsync("/api/v1/admin/users");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var pagedResponse = await response.Content.ReadFromJsonAsync<JsonElement>();
+        pagedResponse.GetProperty("items").GetArrayLength().Should().BeGreaterThanOrEqualTo(1);
     }
 }
