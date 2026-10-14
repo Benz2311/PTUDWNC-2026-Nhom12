@@ -16,6 +16,7 @@ public sealed record RecipeDetailResponse(
     string Difficulty,
     string Status,
     DateTime CreatedAt,
+    DateTimeOffset? PublishedAt,
     IEnumerable<IngredientResponse> Ingredients,
     IEnumerable<StepResponse> Steps,
     NutritionResponse? Nutrition,

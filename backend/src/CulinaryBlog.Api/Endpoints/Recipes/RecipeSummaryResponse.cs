@@ -14,4 +14,5 @@ public sealed record RecipeSummaryResponse(
     string Difficulty,
     string Status,
     DateTime CreatedAt,
+    DateTimeOffset? PublishedAt,
     string? PrimaryImageUrl);

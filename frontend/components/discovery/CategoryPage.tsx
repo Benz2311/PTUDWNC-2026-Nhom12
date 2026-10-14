@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
-import type { RecipePage, RecipeSummary } from '@/types/recipe';
+import { getRecipes } from '@/lib/api/recipes';
+import type { RecipeSummary } from '@/types/recipe';
+import RecipeList from '@/components/recipes/RecipeList';
 
 type Category = { id: string; name: string; slug: string; description: string | null; recipeCount: number };
 
@@ -15,7 +17,7 @@ export default function CategoryPage({ slug }: { slug: string }) {
     let cancelled = false;
     apiFetch<Category>(`/api/v1/categories/${encodeURIComponent(slug)}`, {}, false)
       .then(async (result) => {
-        const page = await apiFetch<RecipePage>(`/api/v1/recipes?categoryId=${encodeURIComponent(result.id)}&pageSize=50`, {}, false);
+        const page = await getRecipes({ categoryId: result.id, pageSize: 50 }, false);
         if (!cancelled) {
           setCategory(result);
           setRecipes(page.items.filter((recipe) => recipe.status === 'Published'));
@@ -38,16 +40,7 @@ export default function CategoryPage({ slug }: { slug: string }) {
       {category.description && <p className="flow-description">{category.description}</p>}
       <section className="flow-panel">
         <div className="section-heading"><div><h2>{recipes.length} công thức đã xuất bản</h2><p>Khám phá món ngon trong danh mục {category.name}.</p></div></div>
-        {recipes.length === 0 ? <p>Chưa có công thức nào trong danh mục này.</p> : (
-          <div className="recipe-card-grid">
-            {recipes.map((recipe) => (
-              <a className="recipe-card" key={recipe.id} href={`/recipes/${encodeURIComponent(recipe.slug)}`}>
-                <div className="recipe-image" role={recipe.primaryImageUrl ? 'img' : undefined} aria-label={recipe.primaryImageUrl ? `Ảnh món ${recipe.title}` : undefined} style={recipe.primaryImageUrl ? { backgroundImage: `url("${recipe.primaryImageUrl}")` } : undefined}><span className="recipe-tag">{category.name}</span></div>
-                <div className="recipe-body"><h3>{recipe.title}</h3><p>{recipe.description || 'Món ăn hấp dẫn được cộng đồng chia sẻ.'}</p><div className="recipe-meta"><span>◷ {recipe.prepTimeMinutes + recipe.cookTimeMinutes} phút</span><span>{recipe.difficulty}</span></div><span className="recipe-card-link">Xem công thức →</span></div>
-              </a>
-            ))}
-          </div>
-        )}
+        <RecipeList recipes={recipes} emptyMessage="Chưa có công thức nào trong danh mục này." />
       </section>
     </>
   );

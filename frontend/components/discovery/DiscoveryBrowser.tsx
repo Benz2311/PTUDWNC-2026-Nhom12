@@ -3,11 +3,12 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import type { RecipePage, RecipeSummary } from '@/types/recipe';
+import { getRecipes, searchRecipes } from '@/lib/api/recipes';
+import type { RecipeSummary } from '@/types/recipe';
+import RecipeList from '@/components/recipes/RecipeList';
 
 type DiscoveryBrowserProps = { mode?: 'explore' | 'search' };
 type Category = { id: string; name: string; slug: string; recipeCount: number };
-const fallbackImages = ['/sample-images/food-01.svg', '/sample-images/food-02.svg', '/sample-images/food-03.svg'];
 
 export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserProps) {
   const router = useRouter();
@@ -44,10 +45,10 @@ export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserP
 
     setLoading(true);
     setError('');
-    const category = categoryId ? `&categoryId=${encodeURIComponent(categoryId)}` : '';
+    const filters = { page, pageSize: 12, categoryId: categoryId || undefined };
     const request = mode === 'search'
-      ? apiFetch<RecipePage>(`/api/v1/recipes/search?query=${encodeURIComponent(submittedQuery.trim())}&page=${page}&pageSize=12${category}`, {}, false)
-      : apiFetch<RecipePage>(`/api/v1/recipes?page=${page}&pageSize=12${category}`, {}, false);
+      ? searchRecipes(submittedQuery, filters, false)
+      : getRecipes(filters, false);
     request.then((result) => {
       if (cancelled) return;
       setRecipes(result.items);
@@ -109,23 +110,7 @@ export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserP
         {error && <p className="form-error" role="alert">{error}</p>}
         {loading ? <div className="loading-state">Đang tìm công thức phù hợp...</div> : recipes.length === 0 ? (
           <div className="empty-state"><strong>{mode === 'search' && submittedQuery.length < 2 ? 'Nhập từ khóa để tìm kiếm' : 'Chưa có công thức phù hợp'}</strong><span>Thử từ khóa khác hoặc bỏ bớt bộ lọc.</span></div>
-        ) : (
-          <div className="recipe-card-grid">
-            {recipes.map((recipe, index) => (
-              <a className="recipe-card" href={`/recipes/${encodeURIComponent(recipe.slug)}`} key={recipe.id}>
-                <div className="recipe-image" role="img" aria-label={`Ảnh món ${recipe.title}`} style={{ backgroundImage: `url("${recipe.primaryImageUrl || fallbackImages[index % fallbackImages.length]}")` }}>
-                  <span className="recipe-tag">{recipe.category}</span>
-                </div>
-                <div className="recipe-body">
-                  <h3>{recipe.title}</h3>
-                  <p>{recipe.description || 'Một công thức ngon đang chờ bạn khám phá.'}</p>
-                  <div className="recipe-meta"><span>◷ {recipe.prepTimeMinutes + recipe.cookTimeMinutes} phút</span><span>{recipe.difficulty}</span></div>
-                  <span className="recipe-card-link">Xem công thức →</span>
-                </div>
-              </a>
-            ))}
-          </div>
-        )}
+        ) : <RecipeList recipes={recipes} />}
         {totalPages > 1 && (
           <div className="pagination">
             <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1}>← Trước</button>

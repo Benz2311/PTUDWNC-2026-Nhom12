@@ -14,6 +14,7 @@ const recipeSummary = {
   difficulty: 'Easy',
   status: 'Published',
   createdAt: '2026-10-12T00:00:00Z',
+  publishedAt: '2026-10-12T00:00:00Z',
   primaryImageUrl: null,
 };
 

@@ -1,15 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { apiFetch } from '@/lib/api';
-import type { RecipePage, RecipeSummary } from '@/types/recipe';
+import { getRecipes } from '@/lib/api/recipes';
+import type { RecipeSummary } from '@/types/recipe';
+import RecipeList from '@/components/recipes/RecipeList';
 
 const tabs = ['Tất cả', 'Món Việt', 'Món Âu', 'Món Chay', 'Tráng Miệng', 'Đồ uống'];
-const fallbackImages = [
-  '/sample-images/food-01.svg',
-  '/sample-images/food-02.svg',
-  '/sample-images/food-03.svg',
-];
 
 export default function FeaturedRecipes() {
   const [recipes, setRecipes] = useState<RecipeSummary[]>([]);
@@ -19,7 +15,7 @@ export default function FeaturedRecipes() {
 
   useEffect(() => {
     let cancelled = false;
-    apiFetch<RecipePage>('/api/v1/recipes?page=1&pageSize=50&sort=newest', {}, false)
+    getRecipes({ page: 1, pageSize: 50, sort: 'newest' }, false)
       .then((page) => {
         if (!cancelled) setRecipes(page.items);
       })
@@ -60,32 +56,7 @@ export default function FeaturedRecipes() {
       ) : visibleRecipes.length === 0 ? (
         <div className="featured-message" role="status">Chưa có công thức trong chủ đề này.</div>
       ) : (
-        <div className="recipe-grid">
-          {visibleRecipes.map((recipe, index) => {
-            const imageUrl = recipe.primaryImageUrl || fallbackImages[index % fallbackImages.length];
-            return (
-              <a className="recipe-card" href={`/recipes/${encodeURIComponent(recipe.slug)}`} key={recipe.id}>
-                <div
-                  className="recipe-image"
-                  role="img"
-                  aria-label={`Ảnh món ${recipe.title}`}
-                  style={{ backgroundImage: `url("${imageUrl}")` }}
-                >
-                  <span className="recipe-tag">{recipe.category}</span>
-                  <span className="recipe-image-icon" aria-hidden="true">↗</span>
-                </div>
-                <div className="recipe-body">
-                  <h3>{recipe.title}</h3>
-                  <p>{recipe.description || 'Khám phá hương vị hấp dẫn trong công thức này.'}</p>
-                  <div className="recipe-meta">
-                    <span>◷ {recipe.cookTimeMinutes} phút</span>
-                    <span className="recipe-card-link">Xem công thức <span aria-hidden="true">→</span></span>
-                  </div>
-                </div>
-              </a>
-            );
-          })}
-        </div>
+        <RecipeList recipes={visibleRecipes} className="recipe-grid" />
       )}
     </>
   );

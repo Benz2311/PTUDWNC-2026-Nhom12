@@ -213,6 +213,7 @@ public static class RecipeEndpoints
                     recipe.Difficulty,
                     recipe.Status,
                     recipe.CreatedAt,
+                    recipe.PublishedAt,
                     PrimaryImageUrl = recipe.Images
                         .OrderBy(image => image.OrderIndex)
                         .Select(image => image.OriginalUrl)
@@ -232,6 +233,7 @@ public static class RecipeEndpoints
                 recipe.Difficulty.ToString(),
                 recipe.Status.ToString(),
                 recipe.CreatedAt,
+                recipe.PublishedAt,
                 recipe.PrimaryImageUrl)).ToList();
 
             return Results.Ok(new PagedResponse<RecipeSummaryResponse>(items, page, pageSize, total));
@@ -293,6 +295,7 @@ public static class RecipeEndpoints
                     recipe.Difficulty,
                     recipe.Status,
                     recipe.CreatedAt,
+                    recipe.PublishedAt,
                     PrimaryImageUrl = recipe.Images
                         .OrderBy(image => image.OrderIndex)
                         .Select(image => image.OriginalUrl)
@@ -312,6 +315,7 @@ public static class RecipeEndpoints
                 recipe.Difficulty.ToString(),
                 recipe.Status.ToString(),
                 recipe.CreatedAt,
+                recipe.PublishedAt,
                 recipe.PrimaryImageUrl)).ToList();
 
             var response = new PagedResponse<RecipeSummaryResponse>(items, page, pageSize, total);
@@ -1213,7 +1217,7 @@ public static class RecipeEndpoints
             .ToList();
 
     private static RecipeDetailResponse ToDetail(Recipe recipe) =>
-        new(recipe.Id, recipe.Title, recipe.Slug, recipe.Description, recipe.Content, recipe.CategoryId, recipe.Category.Name, recipe.Author.FullName, recipe.PrepTimeMinutes, recipe.CookTimeMinutes, recipe.Servings, recipe.Difficulty.ToString(), recipe.Status.ToString(), recipe.CreatedAt, recipe.Ingredients.Select(ingredient => new IngredientResponse(ingredient.Id, ingredient.Name, ingredient.Quantity, ingredient.Unit, ingredient.SortOrder, ingredient.Notes)), recipe.Steps.OrderBy(step => step.StepNumber).Select(step => new StepResponse(step.Id, step.StepNumber, step.Title, step.Description)), recipe.Nutrition is null ? null : new NutritionResponse(recipe.Nutrition.Calories, recipe.Nutrition.Protein, recipe.Nutrition.Carbohydrates, recipe.Nutrition.Fat, recipe.Nutrition.Fiber, recipe.Nutrition.Sodium), recipe.Images.OrderBy(image => image.SortOrder).Select(image => new ImageResponse(image.Id, image.Url, image.AltText, image.IsPrimary, image.SortOrder)));
+        new(recipe.Id, recipe.Title, recipe.Slug, recipe.Description, recipe.Content, recipe.CategoryId, recipe.Category.Name, recipe.Author.FullName, recipe.PrepTimeMinutes, recipe.CookTimeMinutes, recipe.Servings, recipe.Difficulty.ToString(), recipe.Status.ToString(), recipe.CreatedAt, recipe.PublishedAt, recipe.Ingredients.Select(ingredient => new IngredientResponse(ingredient.Id, ingredient.Name, ingredient.Quantity, ingredient.Unit, ingredient.SortOrder, ingredient.Notes)), recipe.Steps.OrderBy(step => step.StepNumber).Select(step => new StepResponse(step.Id, step.StepNumber, step.Title, step.Description)), recipe.Nutrition is null ? null : new NutritionResponse(recipe.Nutrition.Calories, recipe.Nutrition.Protein, recipe.Nutrition.Carbohydrates, recipe.Nutrition.Fat, recipe.Nutrition.Fiber, recipe.Nutrition.Sodium), recipe.Images.OrderBy(image => image.SortOrder).Select(image => new ImageResponse(image.Id, image.Url, image.AltText, image.IsPrimary, image.SortOrder)));
 
     private static string Slugify(string value) => SlugHelper.Generate(value);
 

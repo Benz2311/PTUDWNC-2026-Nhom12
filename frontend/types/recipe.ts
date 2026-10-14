@@ -56,6 +56,7 @@ export const recipeSummarySchema = z.object({
   difficulty: difficultyLevelSchema,
   status: recipeStatusSchema,
   createdAt: z.string(),
+  publishedAt: z.string().nullable(),
   primaryImageUrl: z.string().nullable(),
 });
 export type RecipeSummary = z.infer<typeof recipeSummarySchema>;
@@ -75,6 +76,7 @@ export const recipeDetailSchema = z.object({
   difficulty: difficultyLevelSchema,
   status: recipeStatusSchema,
   createdAt: z.string(),
+  publishedAt: z.string().nullable(),
   ingredients: z.array(recipeIngredientSchema),
   steps: z.array(recipeStepSchema),
   nutrition: recipeNutritionSchema.nullable(),

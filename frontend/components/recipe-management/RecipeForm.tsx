@@ -2,7 +2,8 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch, apiFetchWithResponse, apiJson } from '@/lib/api';
+import { apiFetch, apiJson } from '@/lib/api';
+import { changeRecipeStatus, createRecipe, deleteRecipe as deleteRecipeRequest, updateRecipe } from '@/lib/api/recipes';
 import ImageManager, { RecipeImageDraft } from './ImageManager';
 import IngredientEditor, { IngredientDraft } from './IngredientEditor';
 import RecipeActions, { RecipeLifecycleAction } from './RecipeActions';
@@ -14,6 +15,7 @@ import {
   type RecipeDetail,
   type RecipeStatus,
 } from '@/types/recipe';
+import RecipeFormLayout from '@/components/recipes/RecipeFormLayout';
 
 type Category = { id: string; name: string };
 type UploadedImage = { url: string; originalName: string };
@@ -117,8 +119,6 @@ export default function RecipeForm({ recipeId, initialRecipe, initialEtag = '' }
         uploadedImages = uploaded.map((image) => ({ url: image.url, altText: title }));
       }
 
-      const METHOD = recipeId ? 'PUT' : 'POST';
-      const endpoint = recipeId ? `/api/v1/recipes/${recipeId}` : '/api/v1/recipes';
       if (recipeId && !etag) {
         throw new Error('Không nhận được phiên bản công thức. Hãy tải lại trang trước khi lưu.');
       }
@@ -148,14 +148,9 @@ export default function RecipeForm({ recipeId, initialRecipe, initialEtag = '' }
         throw new Error('Dữ liệu công thức chưa hợp lệ. Vui lòng kiểm tra các trường và thử lại.');
       }
 
-      const response = await apiFetchWithResponse<{ id: string; slug: string }>(endpoint, {
-        method: METHOD,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(recipeId ? { 'If-Match': etag } : {}),
-        },
-        body: JSON.stringify(validation.data),
-      });
+      const response = recipeId
+        ? await updateRecipe(recipeId, validation.data, etag)
+        : await createRecipe(validation.data);
 
       setEtag(response.headers.get('ETag') ?? etag);
       router.push(`/recipes/${response.data.slug}`);
@@ -177,10 +172,7 @@ export default function RecipeForm({ recipeId, initialRecipe, initialEtag = '' }
     setSaving(true);
     setMessage('');
     try {
-      const { data, headers } = await apiFetchWithResponse<{ id: string; status: RecipeStatus }>(
-        `/api/v1/recipes/${recipeId}/${action}`,
-        { method: 'POST', headers: { 'If-Match': etag } },
-      );
+      const { data, headers } = await changeRecipeStatus(recipeId, action, etag);
       setStatus(data.status);
       setEtag(headers.get('ETag') ?? etag);
       setMessage(`Đã cập nhật trạng thái: ${data.status}.`);
@@ -198,10 +190,7 @@ export default function RecipeForm({ recipeId, initialRecipe, initialEtag = '' }
     setSaving(true);
     setMessage('');
     try {
-      await apiFetch(`/api/v1/recipes/${recipeId}`, {
-        method: 'DELETE',
-        headers: { 'If-Match': etag },
-      });
+      await deleteRecipeRequest(recipeId, etag);
       router.replace('/recipes');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Không thể xóa công thức.');
@@ -211,6 +200,7 @@ export default function RecipeForm({ recipeId, initialRecipe, initialEtag = '' }
 
   return (
     <form className="recipe-form" onSubmit={submit}>
+      <RecipeFormLayout status={status}>
       <div className="form-section">
         <div className="form-section-heading">
           <span className="step-number">01</span>
@@ -300,6 +290,7 @@ export default function RecipeForm({ recipeId, initialRecipe, initialEtag = '' }
         <div className="form-section-heading"><span className="step-number">05</span><div><h2>Ảnh món ăn</h2><p>Chọn nhiều ảnh, tối đa 5 MB mỗi ảnh.</p></div></div>
         <ImageManager images={images} onImagesChange={setImages} onFilesChange={setImageFiles} />
       </div>
+      </RecipeFormLayout>
 
       {message && <p className="form-error" role="alert">{message}</p>}
       {recipeId && <RecipeActions status={status} disabled={saving} onAction={changeStatus} onDelete={deleteRecipe} />}
