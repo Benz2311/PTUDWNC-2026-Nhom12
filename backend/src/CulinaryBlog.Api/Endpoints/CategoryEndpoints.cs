@@ -1,3 +1,5 @@
+using CulinaryBlog.Application.Common.Models;
+using CulinaryBlog.API.Extensions;
 using System.Security.Claims;
 using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Application.DTOs;
@@ -20,7 +22,8 @@ public static class CategoryEndpoints
     {
         var group =
             app.MapGroup("/api/v1/categories")
-                .WithTags("Categories");
+                .WithTags("Categories")
+                .RequireRateLimiting(RateLimitingExtensions.GeneralPolicy);
 
         // GET /api/v1/categories & /api/categories
         group.MapGet(
@@ -78,7 +81,7 @@ public static class CategoryEndpoints
                         new GetCategoryStatisticsQuery(),
                         cancellationToken);
 
-                return Results.Ok(result);
+                return Results.Ok(ApiResponse.Success(result));
             })
             .WithName("GetCategoryStatistics")
             .WithSummary("Lấy thống kê danh mục và công thức món ăn");
@@ -113,7 +116,7 @@ public static class CategoryEndpoints
             cancellationToken);
         if (cachedCategories is not null)
         {
-            return Results.Ok(cachedCategories);
+            return Results.Ok(ApiResponse.Success(cachedCategories));
         }
 
         var categories = await sender.Send(
@@ -125,7 +128,7 @@ public static class CategoryEndpoints
             TimeSpan.FromMinutes(30),
             cancellationToken);
 
-        return Results.Ok(categories);
+        return Results.Ok(ApiResponse.Success(categories));
     }
 
     private static async Task<IResult> GetRecipesByCategory(
@@ -161,7 +164,7 @@ public static class CategoryEndpoints
                 detail: $"Category with slug '{slug}' was not found.",
                 statusCode: StatusCodes.Status404NotFound,
                 type: "CATEGORY_NOT_FOUND")
-            : Results.Ok(result);
+            : Results.Ok(ApiResponse.Success(result));
     }
 
     private static async Task<IResult> CreateCategory(
@@ -181,7 +184,7 @@ public static class CategoryEndpoints
                     type: "CATEGORY_NAME_EXISTS");
             }
 
-            return Results.Created($"/api/v1/categories/{category.Slug}", category);
+            return Results.Created($"/api/v1/categories/{category.Slug}", ApiResponse.Success(category));
         }
         catch (FluentValidation.ValidationException exception)
         {

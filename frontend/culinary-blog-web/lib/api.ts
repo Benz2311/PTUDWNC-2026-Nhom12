@@ -202,8 +202,11 @@ export async function apiFetch<T = unknown>(
   options: RequestInit = {},
   withAuth = true
 ): Promise<T> {
-  const response = await apiFetchWithResponse<T>(url, options, withAuth);
-  return response.data;
+  const response = await apiFetchWithResponse<any>(url, options, withAuth);
+  if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+    return response.data.data as T;
+  }
+  return response.data as T;
 }
 
 export async function apiJson<T = unknown>(

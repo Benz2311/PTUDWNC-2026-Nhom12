@@ -1,3 +1,5 @@
+using CulinaryBlog.API.Extensions;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using CulinaryBlog.Application.DTOs.Auth;
 using CulinaryBlog.Application.Services;
@@ -9,6 +11,7 @@ namespace CulinaryBlog.API.Controllers;
 [ApiController]
 [Route("api/v1/admin/users")]
 [Authorize(Roles = "Admin")]
+[EnableRateLimiting(RateLimitingExtensions.GeneralPolicy)]
 public class AdminUsersController : ControllerBase
 {
     private readonly IAuthService _authService;

@@ -1,3 +1,4 @@
+using CulinaryBlog.API.Extensions;
 using System.Security.Claims;
 using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Application.Common.Models;
@@ -7,6 +8,7 @@ using CulinaryBlog.Application.Features.Recipes.Commands.RecipeImages;
 using CulinaryBlog.Application.Features.Recipes.Commands.RecipeSteps;
 using CulinaryBlog.Application.Features.Recipes.Dtos;
 using RecipeImageDto = CulinaryBlog.Application.Features.Recipes.Dtos.RecipeImageDto;
+using RecipeStepDto = CulinaryBlog.Application.Features.Recipes.Dtos.RecipeStepDto;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipeBySlug;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetDeletedRecipes;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipes;
@@ -31,7 +33,8 @@ public static class RecipeEndpoints
     public static void MapRecipeEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/recipes")
-            .WithTags("Recipes");
+            .WithTags("Recipes")
+            .RequireRateLimiting(RateLimitingExtensions.GeneralPolicy);
 
         // TV2: Danh sách công thức đã xuất bản
         group.MapGet("/", GetRecipes)
@@ -39,6 +42,7 @@ public static class RecipeEndpoints
             .WithSummary("Lấy danh sách công thức đã xuất bản");
 
         app.MapGet("/api/v1/admin/recipes/trash", GetDeletedRecipes)
+            .RequireRateLimiting(RateLimitingExtensions.GeneralPolicy)
             .RequireAuthorization(policy => policy.RequireRole("Admin"))
             .WithName("GetDeletedRecipes")
             .WithSummary("Lấy danh sách công thức đã xóa mềm")
@@ -63,6 +67,7 @@ public static class RecipeEndpoints
 
         // TV4: Thêm ảnh cho công thức (Multipart Form Upload / JSON URL)
         group.MapPost("/{recipeId:guid}/images", AddRecipeImage)
+            .RequireRateLimiting(RateLimitingExtensions.UploadPolicy)
             .WithName("AddRecipeImage")
             .WithSummary("Tải lên ảnh cho công thức (Multipart Form hoặc JSON)")
             .Produces<RecipeImageDto>(StatusCodes.Status201Created)
@@ -135,11 +140,13 @@ public static class RecipeEndpoints
 
         // Phước: Admin khôi phục & xóa vĩnh viễn (purge)
         app.MapPost("/api/v1/admin/recipes/{id:guid}/restore", RestoreRecipe)
+            .RequireRateLimiting(RateLimitingExtensions.GeneralPolicy)
             .RequireAuthorization(policy => policy.RequireRole("Admin"))
             .WithName("RestoreRecipe")
             .WithSummary("Khôi phục công thức đã xóa mềm");
 
         app.MapDelete("/api/v1/admin/recipes/{id:guid}/purge", PurgeRecipe)
+            .RequireRateLimiting(RateLimitingExtensions.GeneralPolicy)
             .RequireAuthorization(policy => policy.RequireRole("Admin"))
             .WithName("PurgeRecipe")
             .WithSummary("Xóa vĩnh viễn công thức khỏi hệ thống");
@@ -151,6 +158,7 @@ public static class RecipeEndpoints
 
         // Tải lên ảnh cho bước thực hiện (Multipart Form -> MinIO)
         group.MapPost("/{id:guid}/steps/images", UploadStepImage)
+            .RequireRateLimiting(RateLimitingExtensions.UploadPolicy)
             .WithName("UploadStepImage")
             .WithSummary("Tải lên ảnh cho bước thực hiện (Multipart Form)")
             .Accepts<IFormFile>("multipart/form-data")
@@ -314,7 +322,7 @@ public static class RecipeEndpoints
             cancellationToken);
         if (cachedResult is not null)
         {
-            return Results.Ok(cachedResult);
+            return Results.Ok(ApiResponse.FromPaged(cachedResult));
         }
 
         var result = await sender.Send(
@@ -382,7 +390,7 @@ public static class RecipeEndpoints
             new GetDeletedRecipesQuery(page ?? 1, pageSize ?? 12),
             cancellationToken);
 
-        return Results.Ok(result);
+        return Results.Ok(ApiResponse.Success(result));
     }
 
     private static async Task<IResult> SearchRecipes(
@@ -419,7 +427,7 @@ public static class RecipeEndpoints
         var cachedResult = await cache.GetAsync<PagedResult<RecipeSearchResultDto>>(cacheKey, ct);
         if (cachedResult != null)
         {
-            return Results.Ok(cachedResult);
+            return Results.Ok(ApiResponse.FromPaged(cachedResult));
         }
 
         var query = new SearchRecipesQuery(
@@ -437,7 +445,7 @@ public static class RecipeEndpoints
         // Lưu cache 1 phút (tự động fail-safe nếu Redis offline)
         await cache.SetAsync(cacheKey, result, TimeSpan.FromMinutes(1), ct);
 
-        return Results.Ok(result);
+        return Results.Ok(ApiResponse.FromPaged(result));
     }
 
     private static async Task<IResult> GetRecipeBySlug(
@@ -491,7 +499,7 @@ public static class RecipeEndpoints
                 httpContext.Response.Headers.ETag = $"\"{recipe.Version}\"";
             }
 
-            return Results.Ok(recipe);
+            return Results.Ok(ApiResponse.Success(recipe));
         }
         catch (NotFoundException ex)
         {
@@ -557,7 +565,7 @@ public static class RecipeEndpoints
                     isAdmin);
 
                 var image = await sender.Send(command, ct);
-                return Results.Created($"/api/v1/recipes/{recipeId}/images/{image.Id}", image);
+                return Results.Created($"/api/v1/recipes/{recipeId}/images/{image.Id}", ApiResponse.Success(image));
             }
             else
             {
@@ -581,7 +589,7 @@ public static class RecipeEndpoints
                     isAdmin);
 
                 var image = await sender.Send(command, ct);
-                return Results.Created($"/api/v1/recipes/{recipeId}/images/{image.Id}", image);
+                return Results.Created($"/api/v1/recipes/{recipeId}/images/{image.Id}", ApiResponse.Success(image));
             }
         }
         catch (NotFoundException ex)
@@ -636,7 +644,7 @@ public static class RecipeEndpoints
                 isAdmin);
 
             var updated = await sender.Send(command, ct);
-            return Results.Ok(updated);
+            return Results.Ok(ApiResponse.Success(updated));
         }
         catch (NotFoundException ex)
         {
@@ -675,7 +683,7 @@ public static class RecipeEndpoints
             var command = new SetPrimaryRecipeImageCommand(recipeId, imageId, currentUserId, isAdmin);
             var updated = await sender.Send(command, ct);
 
-            return Results.Ok(updated);
+            return Results.Ok(ApiResponse.Success(updated));
         }
         catch (NotFoundException ex)
         {
@@ -749,7 +757,7 @@ public static class RecipeEndpoints
 
             var step = await sender.Send(command, ct);
 
-            return Results.Created($"/api/v1/recipes/{id}/steps/{step.Id}", step);
+            return Results.Created($"/api/v1/recipes/{id}/steps/{step.Id}", ApiResponse.Success(step));
         }
         catch (NotFoundException ex)
         {
@@ -798,7 +806,7 @@ public static class RecipeEndpoints
 
             var step = await sender.Send(command, ct);
 
-            return Results.Ok(step);
+            return Results.Ok(ApiResponse.Success(step));
         }
         catch (NotFoundException ex)
         {
@@ -842,7 +850,7 @@ public static class RecipeEndpoints
 
             var steps = await sender.Send(command, ct);
 
-            return Results.Ok(steps);
+            return Results.Ok(ApiResponse.Success(steps));
         }
         catch (NotFoundException ex)
         {
@@ -905,7 +913,7 @@ public static class RecipeEndpoints
                 isAdmin);
 
             var result = await sender.Send(command, ct);
-            return Results.Ok(new { url = result.Url });
+            return Results.Ok(ApiResponse.Success(new { url = result.Url }));
         }
         catch (NotFoundException ex)
         {
@@ -1166,7 +1174,7 @@ public static class RecipeEndpoints
         await recipeWriteService.CreateAsync(recipe, cancellationToken);
 
         SetRecipeEtag(httpContext, recipe);
-        return Results.Created($"/api/v1/recipes/{recipe.Slug}", new { recipe.Id, recipe.Slug, version = recipe.xmin.ToString() });
+        return Results.Created($"/api/v1/recipes/{recipe.Slug}", ApiResponse.Success(new { recipe.Id, recipe.Slug, version = recipe.xmin.ToString() }));
     }
 
     private static async Task<IResult> UpdateRecipe(
@@ -1234,7 +1242,7 @@ public static class RecipeEndpoints
             cancellationToken);
 
         SetRecipeEtag(httpContext, recipe);
-        return Results.Ok(new { recipe.Id, recipe.Slug, version = recipe.xmin.ToString() });
+        return Results.Ok(ApiResponse.Success(new { recipe.Id, recipe.Slug, version = recipe.xmin.ToString() }));
     }
 
     private static async Task<IResult> DeleteRecipe(
@@ -1313,7 +1321,7 @@ public static class RecipeEndpoints
             if (recipe.Status == status)
             {
                 SetRecipeEtag(httpContext, recipe);
-                return Results.Ok(new { recipe.Id, status = recipe.Status.ToString(), version = recipe.xmin.ToString() });
+                return Results.Ok(ApiResponse.Success(new { recipe.Id, status = recipe.Status.ToString(), version = recipe.xmin.ToString() }));
             }
 
             if ((action == "unpublish" && recipe.Status != RecipeStatus.Published) ||
@@ -1340,7 +1348,7 @@ public static class RecipeEndpoints
             var categorySlug = recipe.Category?.Slug;
             await invalidator.InvalidateAsync(recipe.Id, recipe.Slug, recipe.CategoryId, categorySlug, cancellationToken);
             SetRecipeEtag(httpContext, recipe);
-            return Results.Ok(new { recipe.Id, status = recipe.Status.ToString(), version = recipe.xmin.ToString() });
+            return Results.Ok(ApiResponse.Success(new { recipe.Id, status = recipe.Status.ToString(), version = recipe.xmin.ToString() }));
         }
 
         group.MapPost("/{id:guid}/" + action, UpdateStatus).RequireAuthorization();
@@ -1388,7 +1396,7 @@ public static class RecipeEndpoints
         };
         await recipeWriteService.AddIngredientAsync(ingredient, cancellationToken);
         await TouchRecipeAsync(recipe, db, httpContext, cancellationToken);
-        return Results.Created($"/api/v1/recipes/{id}/ingredients/{ingredient.Id}", ingredient);
+        return Results.Created($"/api/v1/recipes/{id}/ingredients/{ingredient.Id}", ApiResponse.Success(ingredient));
     }
 
     private static async Task<IResult> UpdateIngredient(
@@ -1436,7 +1444,7 @@ public static class RecipeEndpoints
         ingredient.SortOrder = request.OrderIndex ?? request.SortOrder;
         await recipeWriteService.UpdateIngredientAsync(ingredient, cancellationToken);
         await TouchRecipeAsync(recipe, db, httpContext, cancellationToken);
-        return Results.Ok(ingredient);
+        return Results.Ok(ApiResponse.Success(ingredient));
     }
 
     private static async Task<IResult> DeleteIngredient(
