@@ -1,3 +1,6 @@
+using CulinaryBlog.API.Extensions;
+using CulinaryBlog.Application.Common.Models;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using CulinaryBlog.Application.DTOs.Auth;
 using CulinaryBlog.Application.Services;
@@ -9,6 +12,7 @@ namespace CulinaryBlog.API.Controllers;
 
 [ApiController]
 [Route("api/v1/auth")]
+[EnableRateLimiting(RateLimitingExtensions.AuthPolicy)]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
@@ -32,7 +36,7 @@ public class AuthController : ControllerBase
         
         var result = await _authService.RegisterAsync(request, ipAddress);
         _logger.LogInformation("Registration successful for: {UserName}", request.UserName);
-        return CreatedAtAction(nameof(Register), result);
+        return CreatedAtAction(nameof(Register), ApiResponse.Success(result));
     }
 
     [HttpPost("login")]
@@ -48,7 +52,7 @@ public class AuthController : ControllerBase
         
         var result = await _authService.LoginAsync(request, ipAddress);
         _logger.LogInformation("Login successful for: {Login}", request.UserNameOrEmail);
-        return Ok(result);
+        return Ok(ApiResponse.Success(result));
     }
 
     [HttpPost("google")]
@@ -63,7 +67,7 @@ public class AuthController : ControllerBase
         
         var result = await _authService.GoogleLoginAsync(request, ipAddress);
         _logger.LogInformation("Google login successful");
-        return Ok(result);
+        return Ok(ApiResponse.Success(result));
     }
 
     [HttpPost("refresh")]
@@ -78,7 +82,7 @@ public class AuthController : ControllerBase
         
         var result = await _authService.RefreshAsync(request, ipAddress);
         _logger.LogDebug("Token refresh successful");
-        return Ok(result);
+        return Ok(ApiResponse.Success(result));
     }
 
     [HttpPost("refresh-token")]
@@ -94,7 +98,7 @@ public class AuthController : ControllerBase
         
         var result = await _authService.RefreshAsync(request, ipAddress);
         _logger.LogDebug("Token refresh (legacy) successful");
-        return Ok(result);
+        return Ok(ApiResponse.Success(result));
     }
 
     [HttpPost("logout")]
@@ -160,7 +164,7 @@ public class AuthController : ControllerBase
         var user = await _authService.GetMeAsync(userIdClaim);
         return user is null
             ? NotFound()
-            : Ok(user);
+            : Ok(ApiResponse.Success(user));
     }
 
     [Authorize]
@@ -186,6 +190,6 @@ public class AuthController : ControllerBase
         
         var result = await _authService.UpdateProfileAsync(userIdClaim, request);
         _logger.LogInformation("UpdateProfile successful for user: {UserId}", userIdClaim);
-        return Ok(result);
+        return Ok(ApiResponse.Success(result));
     }
 }

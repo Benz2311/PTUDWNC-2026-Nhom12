@@ -1,3 +1,5 @@
+import type { PagedResult } from "./api";
+
 export interface AdminUserDto {
   id: string;
   userName: string;
@@ -17,13 +19,7 @@ export interface AdminUserQuery {
   isActive?: boolean;
 }
 
-export interface PagedUsersResponse {
-  items: AdminUserDto[];
-  page: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
-}
+export type PagedUsersResponse = PagedResult<AdminUserDto>;
 
 export interface UpdateUserStatusRequest {
   isActive: boolean;

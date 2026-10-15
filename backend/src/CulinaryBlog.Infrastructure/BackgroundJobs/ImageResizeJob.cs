@@ -1,15 +1,24 @@
+using System.Reflection;
 using CulinaryBlog.Application.Interfaces;
+using HeyRed.ImageSharp.Heif.Formats.Avif;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.Processing;
 
 namespace CulinaryBlog.Infrastructure.BackgroundJobs;
 
 /// <summary>
-/// Background Job xử lý tạo ảnh Medium và Thumbnail (JOB-002 Image Resize / Thumbnail).
-/// Chạy bất đồng bộ qua Hangfire worker, tự động thử lại tối đa 3 lần khi xảy ra lỗi.
+/// Background Job chạy ngầm thông qua Hangfire để tự động resize ảnh công thức nấu ăn:
+/// - Tạo ảnh Medium (chiều rộng tối đa 800px).
+/// - Tạo ảnh Thumbnail (chiều rộng tối đa 300px).
+/// - Hỗ trợ cả 4 định dạng: JPEG, PNG, WebP, AVIF.
+/// - Lưu trữ tệp sau resize lên Object Storage (MinIO).
+/// - Cập nhật trực tiếp URL vào RecipeImage trong CSDL.
+/// - Đảm bảo tính lũy đẳng (Idempotency): nếu ảnh đã xử lý thì bỏ qua.
 /// </summary>
 public class ImageResizeJob : IImageResizeJob
 {
@@ -21,6 +30,11 @@ public class ImageResizeJob : IImageResizeJob
     private readonly IStorageService _storageService;
     private readonly ILogger<ImageResizeJob> _logger;
     private readonly HttpClient _httpClient;
+
+    static ImageResizeJob()
+    {
+        Configuration.Default.Configure(new AvifConfigurationModule());
+    }
 
     public ImageResizeJob(
         IApplicationDbContext dbContext,
@@ -78,7 +92,7 @@ public class ImageResizeJob : IImageResizeJob
         // 4. Lấy luồng dữ liệu ảnh gốc từ MinIO hoặc URL bên ngoài
         using var originalStream = await GetOriginalImageStreamAsync(image.OriginalUrl, ct);
 
-        // 5. Decode ảnh thật bằng SixLabors.ImageSharp
+        // 5. Decode ảnh thật bằng SixLabors.ImageSharp (kèm AVIF decoder module)
         using var imageSharp = await Image.LoadAsync(originalStream, ct);
         var detectedFormat = imageSharp.Metadata.DecodedImageFormat;
         if (detectedFormat == null)
@@ -110,28 +124,40 @@ public class ImageResizeJob : IImageResizeJob
         };
         using var thumbImage = imageSharp.Clone(ctx => ctx.Resize(thumbOptions));
 
-        // 8. Encode sang Stream tương ứng với định dạng gốc
-        using var mediumMs = new MemoryStream();
-        await mediumImage.SaveAsync(mediumMs, detectedFormat, ct);
-        mediumMs.Position = 0;
+        // 8. Xác định định dạng xuất cho Thumbnail và Medium
+        IImageFormat outputFormat = detectedFormat;
+        string outputMime = detectedFormat.DefaultMimeType;
+        string ext = detectedFormat.FileExtensions.FirstOrDefault() ?? "jpg";
 
-        using var thumbMs = new MemoryStream();
-        await thumbImage.SaveAsync(thumbMs, detectedFormat, ct);
-        thumbMs.Position = 0;
+        // Với đầu vào AVIF, do decoder HeyRed chưa hỗ trợ encode AVIF,
+        // các phiên bản phái sinh (Medium, Thumbnail) được mã hóa định dạng WebP hiện đại
+        if (string.Equals(detectedFormat.Name, "AVIF", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(detectedFormat.DefaultMimeType, "image/avif", StringComparison.OrdinalIgnoreCase))
+        {
+            outputFormat = WebpFormat.Instance;
+            outputMime = "image/webp";
+            ext = "webp";
+        }
 
-        // 9. Sinh Object Key và tải lên Object Storage (MinIO)
-        var contentType = detectedFormat.DefaultMimeType;
-        var ext = detectedFormat.FileExtensions.FirstOrDefault() ?? "jpg";
         if (!ext.StartsWith('.'))
         {
             ext = $".{ext}";
         }
 
+        using var mediumMs = new MemoryStream();
+        await mediumImage.SaveAsync(mediumMs, outputFormat, ct);
+        mediumMs.Position = 0;
+
+        using var thumbMs = new MemoryStream();
+        await thumbImage.SaveAsync(thumbMs, outputFormat, ct);
+        thumbMs.Position = 0;
+
+        // 9. Sinh Object Key và tải lên Object Storage (MinIO)
         var mediumKey = $"recipes/{image.RecipeId}/images/{image.Id}_medium{ext}";
         var thumbKey = $"recipes/{image.RecipeId}/images/{image.Id}_thumb{ext}";
 
-        var mediumUrl = await _storageService.UploadAsync(DefaultBucket, mediumKey, mediumMs, contentType, ct);
-        var thumbUrl = await _storageService.UploadAsync(DefaultBucket, thumbKey, thumbMs, contentType, ct);
+        var mediumUrl = await _storageService.UploadAsync(DefaultBucket, mediumKey, mediumMs, outputMime, ct);
+        var thumbUrl = await _storageService.UploadAsync(DefaultBucket, thumbKey, thumbMs, outputMime, ct);
 
         // 10. Cập nhật Database chỉ khi đã upload thành công cả 2 ảnh
         image.MediumUrl = mediumUrl;

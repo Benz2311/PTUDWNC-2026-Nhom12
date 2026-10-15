@@ -468,4 +468,80 @@ public class ImageResizeJobTests : IDisposable
         // Assert
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
+
+    [Fact]
+    public async Task ProcessAsync_WithValidAvifImage_DecodesAndResizesToWebpVariantsAndUpdatesDatabase()
+    {
+        // Arrange: Dữ liệu ảnh AVIF thật hợp lệ
+        var validAvifBytes = Convert.FromBase64String(
+            "AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADybWV0YQAAAAAAAAAoaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAGxpYmF2aWYAAAAADnBpdG0AAAAAAAEAAAAeaWxvYwAAAABEAAABAAEAAAABAAABGgAAAB0AAAAoaWluZgAAAAAAAQAAABppbmZlAgAAAAABAABhdjAxQ29sb3IAAAAAamlwcnAAAABLaXBjbwAAABRpc3BlAAAAAAAAAAIAAAACAAAAEHBpeGkAAAAAAwgICAAAAAxhdjFDgQ0MAAAAABNjb2xybmNseAACAAIAAYAAAAAXaXBtYQAAAAAAAAABAAEEAQKDBAAAACVtZGF0EgAKCBgANogQEAwgMg8f8D///8WfhwB8+ErK42A=");
+
+        var recipeId = Guid.NewGuid();
+        var imageId = Guid.NewGuid();
+        var rawKey = $"recipes/{recipeId}/images/{imageId}.avif";
+        var originalUrl = $"http://localhost:9000/culinaryblog/{rawKey}";
+
+        var recipeImage = new RecipeImage
+        {
+            Id = imageId,
+            RecipeId = recipeId,
+            OriginalUrl = originalUrl,
+            MediumUrl = null,
+            ThumbnailUrl = null,
+            IsDeleted = false,
+        };
+
+        _dbContext.RecipeImages.Add(recipeImage);
+        await _dbContext.SaveChangesAsync();
+
+        _storageServiceMock
+            .Setup(x => x.DownloadAsync("culinaryblog", rawKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MemoryStream(validAvifBytes));
+
+        var expectedMediumUrl = $"http://localhost:9000/culinaryblog/recipes/{recipeId}/images/{imageId}_medium.webp";
+        var expectedThumbUrl = $"http://localhost:9000/culinaryblog/recipes/{recipeId}/images/{imageId}_thumb.webp";
+
+        _storageServiceMock
+            .Setup(x => x.UploadAsync(
+                "culinaryblog",
+                $"recipes/{recipeId}/images/{imageId}_medium.webp",
+                It.IsAny<Stream>(),
+                "image/webp",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedMediumUrl);
+
+        _storageServiceMock
+            .Setup(x => x.UploadAsync(
+                "culinaryblog",
+                $"recipes/{recipeId}/images/{imageId}_thumb.webp",
+                It.IsAny<Stream>(),
+                "image/webp",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expectedThumbUrl);
+
+        // Act
+        await _job.ProcessAsync(imageId);
+
+        // Assert
+        var updatedImage = await _dbContext.RecipeImages.FindAsync(imageId);
+        updatedImage.Should().NotBeNull();
+        updatedImage!.OriginalUrl.Should().Be(originalUrl, "OriginalUrl phải trỏ đúng file AVIF gốc đã upload");
+        updatedImage.MediumUrl.Should().Be(expectedMediumUrl);
+        updatedImage.ThumbnailUrl.Should().Be(expectedThumbUrl);
+        updatedImage.UpdatedAt.Should().NotBeNull();
+
+        _storageServiceMock.Verify(x => x.UploadAsync(
+            "culinaryblog",
+            $"recipes/{recipeId}/images/{imageId}_medium.webp",
+            It.IsAny<Stream>(),
+            "image/webp",
+            It.IsAny<CancellationToken>()), Times.Once);
+
+        _storageServiceMock.Verify(x => x.UploadAsync(
+            "culinaryblog",
+            $"recipes/{recipeId}/images/{imageId}_thumb.webp",
+            It.IsAny<Stream>(),
+            "image/webp",
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
