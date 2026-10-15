@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { apiClient, unwrapData } from "./client";
 import type {
   Category,
   CategoryDetailResponse,
@@ -6,11 +6,12 @@ import type {
   CreateCategoryRequest,
   UpdateCategoryRequest,
 } from "@/types/category";
+import type { ApiResponse } from "@/types/api";
 
 export async function getCategories(): Promise<Category[]> {
   try {
-    const response = await apiClient.get<Category[]>("/categories");
-    return response.data;
+    const response = await apiClient.get<ApiResponse<Category[]>>("/categories");
+    return unwrapData(response);
   } catch (err) {
     console.error("Failed to fetch categories:", err);
     return [];
@@ -23,13 +24,13 @@ export async function getCategoryBySlug(
   pageSize = 12
 ): Promise<CategoryDetailResponse | null> {
   try {
-    const response = await apiClient.get<CategoryDetailResponse>(
+    const response = await apiClient.get<ApiResponse<CategoryDetailResponse>>(
       `/categories/${encodeURIComponent(slug)}`,
       {
         params: { page, pageSize },
       }
     );
-    return response.data;
+    return unwrapData(response);
   } catch (err) {
     console.error(`Failed to fetch category with slug ${slug}:`, err);
     return null;
@@ -39,8 +40,8 @@ export async function getCategoryBySlug(
 export async function createCategory(
   data: CreateCategoryRequest
 ): Promise<Category> {
-  const response = await apiClient.post<Category>("/categories", data);
-  return response.data;
+  const response = await apiClient.post<ApiResponse<Category>>("/categories", data);
+  return unwrapData(response);
 }
 
 export async function updateCategory(
@@ -56,10 +57,10 @@ export async function deleteCategory(id: string): Promise<void> {
 
 export async function getCategoryStatistics(): Promise<CategoryStatistics> {
   try {
-    const response = await apiClient.get<CategoryStatistics>(
+    const response = await apiClient.get<ApiResponse<CategoryStatistics>>(
       "/categories/statistics"
     );
-    return response.data;
+    return unwrapData(response);
   } catch (err) {
     console.error("Failed to fetch category statistics:", err);
     return {

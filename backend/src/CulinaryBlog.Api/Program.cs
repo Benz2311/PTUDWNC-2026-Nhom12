@@ -1,3 +1,4 @@
+using CulinaryBlog.API.Extensions;
 using System.Diagnostics;
 using System.Security.Claims;
 using CulinaryBlog.API.Endpoints;
@@ -55,26 +56,42 @@ try
         options.AddDocumentTransformer(new CulinaryBlog.Api.OpenApi.BearerSecuritySchemeTransformer());
     });
 
+    builder.Services.AddRateLimitingConfiguration(builder.Configuration);
+
+    builder.Services.AddAuthorizationBuilder()
+        .AddPolicy("RequireUser", policy => policy.RequireAuthenticatedUser())
+        .AddPolicy("RequireAuthor", policy => policy.RequireRole("Author"))
+        .AddPolicy("RequireAdmin", policy => policy.RequireRole("Admin"))
+        .AddPolicy("RequireAuthorOrAdmin", policy => policy.RequireRole("Author", "Admin"));
+
     builder.Services.AddCors(options =>
     {
+        var allowedOrigins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? Array.Empty<string>();
+
+        if (builder.Environment.IsDevelopment())
+        {
+            var devOrigins = new[] { "http://localhost:3000", "http://localhost:5000", "http://127.0.0.1:3000" };
+            allowedOrigins = allowedOrigins.Union(devOrigins, StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+
         options.AddPolicy("Frontend", policy =>
         {
-            policy
-                .SetIsOriginAllowed(origin => 
-                {
-                    if (builder.Environment.IsDevelopment())
-                    {
-                        return origin.StartsWith("http://localhost:") || 
-                               origin.StartsWith("http://127.0.0.1:") ||
-                               origin.StartsWith("https://localhost:") ||
-                               origin.StartsWith("https://127.0.0.1:");
-                    }
-                    return origin == "http://localhost:5000" || 
-                           origin == "http://localhost:3000";
-                })
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                .AllowCredentials();
+            if (allowedOrigins.Length > 0)
+            {
+                policy.WithOrigins(allowedOrigins)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+            }
+            else
+            {
+                policy.SetIsOriginAllowed(_ => false)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+            }
         });
     });
 
@@ -160,6 +177,7 @@ try
 
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseRateLimiter();
 
     // Hangfire Dashboard (chỉ môi trường dev)
     if (app.Environment.IsDevelopment())

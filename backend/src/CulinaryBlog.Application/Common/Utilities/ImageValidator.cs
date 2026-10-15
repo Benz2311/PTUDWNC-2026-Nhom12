@@ -1,4 +1,10 @@
+using System;
+using System.IO;
+using System.Collections.Generic;
 using CulinaryBlog.Application.Exceptions;
+using HeyRed.ImageSharp.Heif.Formats.Avif;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace CulinaryBlog.Application.Common.Utilities;
 
@@ -11,9 +17,9 @@ public record ImageValidationResult(
 /// <summary>
 /// Trình kiểm tra an toàn và hợp lệ cho tệp hình ảnh:
 /// - Giới hạn kích thước (tối đa 5 MB).
-/// - Định dạng cho phép: JPEG, PNG, WebP.
-/// - Kiểm tra MIME type, Magic bytes (chữ ký số tệp) và phân tích cấu trúc header.
-/// - Ngăn chặn tấn công ngụy tạo đuôi file (ví dụ virus.exe đổi tên thành anh.jpg).
+/// - Định dạng cho phép: JPEG, PNG, WebP, AVIF.
+/// - Kiểm tra MIME type, Magic bytes (chữ ký số tệp ISO BMFF cho AVIF, header signature cho JPEG/PNG/WebP).
+/// - Giải mã thực tế (decode) toàn bộ cấu trúc hình ảnh nhằm ngăn chặn payload giả mạo / file hỏng.
 /// </summary>
 public static class ImageValidator
 {
@@ -24,7 +30,8 @@ public static class ImageValidator
         "image/jpeg",
         "image/jpg",
         "image/png",
-        "image/webp"
+        "image/webp",
+        "image/avif"
     };
 
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -32,8 +39,14 @@ public static class ImageValidator
         ".jpg",
         ".jpeg",
         ".png",
-        ".webp"
+        ".webp",
+        ".avif"
     };
+
+    static ImageValidator()
+    {
+        Configuration.Default.Configure(new AvifConfigurationModule());
+    }
 
     public static ImageValidationResult Validate(
         Stream stream,
@@ -62,7 +75,7 @@ public static class ImageValidator
         {
             return new ImageValidationResult(
                 false,
-                $"Định dạng MIME '{declaredContentType}' không được hỗ trợ. Hệ thống chỉ chấp nhận: JPEG, PNG, WebP.",
+                $"Định dạng MIME '{declaredContentType}' không được hỗ trợ. Hệ thống chỉ chấp nhận: JPEG, PNG, WebP, AVIF.",
                 string.Empty,
                 string.Empty);
         }
@@ -106,7 +119,7 @@ public static class ImageValidator
         {
             return new ImageValidationResult(
                 false,
-                "Nội dung tệp (magic bytes) không khớp với bất kỳ định dạng ảnh hợp lệ nào (JPEG, PNG, WebP). Tệp có thể đã bị làm giả hoặc bị hỏng.",
+                "Nội dung tệp (magic bytes) không khớp với bất kỳ định dạng ảnh hợp lệ nào (JPEG, PNG, WebP, AVIF). Tệp có thể đã bị làm giả hoặc bị hỏng.",
                 string.Empty,
                 string.Empty);
         }
@@ -120,6 +133,40 @@ public static class ImageValidator
                 $"Định dạng tệp không khớp: Khách hàng khai báo '{declaredContentType}' nhưng nội dung thực tế là '{detectedMime}'.",
                 string.Empty,
                 string.Empty);
+        }
+
+        // 6. Decode nội dung ảnh thực tế để đảm bảo file không bị hỏng hoặc chứa payload giả mạo
+        try
+        {
+            if (canSeek)
+            {
+                stream.Position = originalPosition;
+            }
+
+            using var image = Image.Load<Rgba32>(stream);
+            if (image.Width <= 0 || image.Height <= 0)
+            {
+                return new ImageValidationResult(
+                    false,
+                    "Tệp hình ảnh có kích thước không hợp lệ (Width/Height <= 0).",
+                    string.Empty,
+                    string.Empty);
+            }
+        }
+        catch (Exception)
+        {
+            return new ImageValidationResult(
+                false,
+                "Dữ liệu hình ảnh bị hỏng hoặc không thể giải mã (Corrupted or invalid image payload).",
+                string.Empty,
+                string.Empty);
+        }
+        finally
+        {
+            if (canSeek)
+            {
+                stream.Position = originalPosition;
+            }
         }
 
         return new ImageValidationResult(true, null, detectedMime, extension);
@@ -159,21 +206,7 @@ public static class ImageValidator
             header[6] == 0x1A &&
             header[7] == 0x0A)
         {
-            // Kiểm tra chunk đầu tiên phải là IHDR (nếu đủ >= 16 bytes)
-            if (length >= 16)
-            {
-                if (header[12] == 0x49 && // I
-                    header[13] == 0x48 && // H
-                    header[14] == 0x44 && // D
-                    header[15] == 0x52)   // R
-                {
-                    return ("image/png", ".png");
-                }
-            }
-            else
-            {
-                return ("image/png", ".png");
-            }
+            return ("image/png", ".png");
         }
 
         // WebP: RIFF .... WEBP
@@ -183,21 +216,32 @@ public static class ImageValidator
             header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46 &&
             header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50)
         {
-            // Kiểm tra chunk VP8, VP8L hoặc VP8X nếu có >= 16 bytes
-            if (length >= 16)
-            {
-                bool isVp8 = (header[12] == 0x56 && header[13] == 0x50 && header[14] == 0x38 && header[15] == 0x20) || // VP8
-                             (header[12] == 0x56 && header[13] == 0x50 && header[14] == 0x38 && header[15] == 0x4C) || // VP8L
-                             (header[12] == 0x56 && header[13] == 0x50 && header[14] == 0x38 && header[15] == 0x58);   // VP8X
-                if (isVp8)
-                {
-                    return ("image/webp", ".webp");
-                }
-            }
             return ("image/webp", ".webp");
         }
 
+        // AVIF: ISO BMFF box with 'ftyp' (offset 4..7) and major or compatible brand 'avif' or 'avis'
+        if (length >= 12 &&
+            header[4] == 0x66 && header[5] == 0x74 && header[6] == 0x79 && header[7] == 0x70) // ftyp
+        {
+            // Kiểm tra major brand tại offset 8..11
+            bool isAvifBrand = (header[8] == 0x61 && header[9] == 0x76 && header[10] == 0x69 && header[11] == 0x66) || // avif
+                               (header[8] == 0x61 && header[9] == 0x76 && header[10] == 0x69 && header[11] == 0x73);   // avis
 
+            if (isAvifBrand)
+            {
+                return ("image/avif", ".avif");
+            }
+
+            // Kiểm tra compatible brands tại offset 16 trở đi
+            for (int i = 16; i + 4 <= length; i += 4)
+            {
+                if ((header[i] == 0x61 && header[i + 1] == 0x76 && header[i + 2] == 0x69 && header[i + 3] == 0x66) ||
+                    (header[i] == 0x61 && header[i + 1] == 0x76 && header[i + 2] == 0x69 && header[i + 3] == 0x73))
+                {
+                    return ("image/avif", ".avif");
+                }
+            }
+        }
 
         return (string.Empty, string.Empty);
     }
@@ -213,4 +257,3 @@ public static class ImageValidator
         return parts[0].Trim().ToLowerInvariant();
     }
 }
-
