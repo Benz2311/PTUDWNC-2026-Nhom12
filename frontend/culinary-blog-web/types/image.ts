@@ -1,6 +1,6 @@
 export interface RecipeImage {
   id: string;
-  recipeId: string;
+  recipeId?: string;
   originalUrl: string;
   mediumUrl?: string | null;
   thumbnailUrl?: string | null;
@@ -10,7 +10,7 @@ export interface RecipeImage {
   createdAt?: string | null;
 }
 
-export interface AddRecipeImageInput {
+export interface AddRecipeImageRequest {
   originalUrl: string;
   mediumUrl?: string | null;
   thumbnailUrl?: string | null;
@@ -18,6 +18,19 @@ export interface AddRecipeImageInput {
   isPrimary?: boolean | null;
   orderIndex?: number | null;
 }
+
+export interface UpdateRecipeImageRequest {
+  altText?: string | null;
+  orderIndex?: number | null;
+  isPrimary?: boolean | null;
+}
+
+/** PATCH /api/v1/recipes/{recipeId}/images/{imageId}/primary has no body payload. */
+export type SetPrimaryImageRequest = Record<string, never>;
+
+// Aliases for backwards compatibility across existing UI components
+export type AddRecipeImageInput = AddRecipeImageRequest;
+export type UpdateRecipeImageInput = UpdateRecipeImageRequest;
 
 export interface ImageFormValues {
   imageUrl: string;

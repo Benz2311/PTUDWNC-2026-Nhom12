@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { apiClient, unwrapData, unwrapPaged } from "./client";
 import {
   type PagedResult,
   type RecipeDetail,
@@ -7,6 +7,7 @@ import {
   type RecipeTrashItem,
   DIFFICULTY_MAP,
 } from "@/types/recipe";
+import type { ApiResponse, PaginationMeta } from "@/types/api";
 
 export async function getRecipes(
   params?: RecipeFilterParams
@@ -27,10 +28,10 @@ export async function getRecipes(
     if (params?.status) queryParams.status = params.status;
     if (params?.authorId?.trim()) queryParams.authorId = params.authorId.trim();
 
-    const response = await apiClient.get<PagedResult<RecipeListItem>>("/recipes", {
+    const response = await apiClient.get<ApiResponse<RecipeListItem[], PaginationMeta>>("/recipes", {
       params: queryParams,
     });
-    return response.data;
+    return unwrapPaged<RecipeListItem>(response);
   } catch (err) {
     console.error("Failed to fetch recipes:", err);
     return {
@@ -39,6 +40,8 @@ export async function getRecipes(
       page: params?.page ?? 1,
       pageSize: params?.pageSize ?? 12,
       totalPages: 0,
+      hasNextPage: false,
+      hasPreviousPage: false,
     };
   }
 }
@@ -47,10 +50,10 @@ export async function getRecipeBySlug(
   slug: string
 ): Promise<RecipeDetail | null> {
   try {
-    const response = await apiClient.get<RecipeDetail>(
+    const response = await apiClient.get<ApiResponse<RecipeDetail>>(
       `/recipes/${encodeURIComponent(slug)}`
     );
-    return response.data;
+    return unwrapData(response);
   } catch (err) {
     console.error(`Failed to fetch recipe with slug ${slug}:`, err);
     throw err;
@@ -62,13 +65,13 @@ export async function getTrashRecipes(
   pageSize = 12
 ): Promise<PagedResult<RecipeTrashItem>> {
   try {
-    const response = await apiClient.get<PagedResult<RecipeTrashItem>>(
+    const response = await apiClient.get<ApiResponse<RecipeTrashItem[], PaginationMeta>>(
       "/admin/recipes/trash",
       {
         params: { page, pageSize },
       }
     );
-    return response.data;
+    return unwrapPaged<RecipeTrashItem>(response);
   } catch (err) {
     console.error("Failed to fetch trash recipes:", err);
     throw err;
@@ -80,8 +83,8 @@ export async function createRecipe(data: Record<string, unknown>): Promise<{ id:
   if (typeof payload.difficulty === "string" && payload.difficulty in DIFFICULTY_MAP) {
     payload.difficulty = DIFFICULTY_MAP[payload.difficulty as keyof typeof DIFFICULTY_MAP];
   }
-  const response = await apiClient.post<{ id: string; slug: string }>("/recipes", payload);
-  return response.data;
+  const response = await apiClient.post<ApiResponse<{ id: string; slug: string }>>("/recipes", payload);
+  return unwrapData(response);
 }
 
 export async function updateRecipe(
@@ -95,12 +98,12 @@ export async function updateRecipe(
   }
   const cleanEtag = etag?.replace(/^"+|"+$/g, '').trim();
   const formattedEtag = cleanEtag ? `"${cleanEtag}"` : undefined;
-  const response = await apiClient.put<{ id: string; slug: string; version?: string }>(
+  const response = await apiClient.put<ApiResponse<{ id: string; slug: string; version?: string }>>(
     `/recipes/${id}`,
     payload,
     formattedEtag ? { headers: { "If-Match": formattedEtag } } : undefined
   );
-  return response.data;
+  return unwrapData(response);
 }
 
 export async function deleteRecipe(id: string, etag?: string): Promise<void> {
@@ -112,23 +115,22 @@ export async function changeRecipeStatus(
   action: "publish" | "unpublish" | "archive" | "unarchive",
   etag?: string
 ): Promise<{ id: string; status: string }> {
-  const response = await apiClient.post<{ id: string; status: string }>(
+  const response = await apiClient.post<ApiResponse<{ id: string; status: string }>>(
     `/recipes/${id}/${action}`,
     {},
     etag ? { headers: { "If-Match": etag } } : undefined
   );
-  return response.data;
+  return unwrapData(response);
 }
 
 export async function restoreRecipe(id: string): Promise<{ id: string; status: string }> {
-  const response = await apiClient.post<{ id: string; status: string }>(
+  const response = await apiClient.post<ApiResponse<{ id: string; status: string }>>(
     `/admin/recipes/${id}/restore`,
     {}
   );
-  return response.data;
+  return unwrapData(response);
 }
 
 export async function purgeRecipe(id: string): Promise<void> {
   await apiClient.delete(`/admin/recipes/${id}/purge`);
 }
-

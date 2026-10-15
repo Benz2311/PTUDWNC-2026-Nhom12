@@ -1,16 +1,12 @@
-import { apiClient } from "./client";
+import { apiClient, unwrapPaged } from "./client";
 import type {
   AdminUserDto,
   AdminUserQuery,
   PagedUsersResponse,
   UpdateUserStatusRequest,
 } from "@/types/admin";
+import type { ApiResponse, PaginationMeta } from "@/types/api";
 
-/**
- * Admin API — tương ứng với AdminController (Backend):
- * GET   /api/v1/admin/users            Danh sách user (phân trang, lọc)
- * PATCH /api/v1/admin/users/{id}/status  Đổi trạng thái tài khoản
- */
 export const adminApi = {
   async getUsers(query: AdminUserQuery): Promise<PagedUsersResponse> {
     const params = new URLSearchParams();
@@ -23,20 +19,19 @@ export const adminApi = {
       params.set("isActive", String(query.isActive));
     }
 
-    const { data } = await apiClient.get<PagedUsersResponse>(
+    const response = await apiClient.get<ApiResponse<AdminUserDto[], PaginationMeta>>(
       `/admin/users?${params.toString()}`
     );
-    return data;
+    return unwrapPaged<AdminUserDto>(response);
   },
 
   async updateUserStatus(
     id: string,
     isActive: boolean
-  ): Promise<AdminUserDto> {
-    const { data } = await apiClient.patch<AdminUserDto>(
+  ): Promise<void> {
+    await apiClient.patch(
       `/admin/users/${id}/status`,
       { isActive } satisfies UpdateUserStatusRequest
     );
-    return data;
   },
 };

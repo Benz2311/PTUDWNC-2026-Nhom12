@@ -1,29 +1,45 @@
+using System;
+using System.IO;
 using System.Text;
 using CulinaryBlog.Application.Common.Utilities;
 using CulinaryBlog.Application.Exceptions;
 using FluentAssertions;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Webp;
+using SixLabors.ImageSharp.PixelFormats;
 using Xunit;
 
 namespace CulinaryBlog.UnitTests.Application.Common;
 
 /// <summary>
 /// Unit tests cho ImageValidator:
-/// - Kiểm tra MIME type, Magic bytes (chữ ký số tệp) cho JPEG, PNG, WebP (từ chối AVIF).
+/// - Kiểm tra MIME type, Magic bytes (chữ ký số tệp) và Decode thực tế cho JPEG, PNG, WebP, AVIF.
+/// - Kiểm tra từ chối các file giả mạo định dạng (fake header, corrupt payload, disguised exe/html).
 /// - Kiểm tra giới hạn dung lượng tệp tối đa 5 MB.
-/// - Kiểm tra phát hiện và ngăn chặn giả mạo định dạng (disguised files: exe, html, txt).
 /// </summary>
 public class RecipeImageValidationTests
 {
-    // Mẫu Header JPEG hợp lệ: SOI (FF D8) + APP0 marker (FF E0) + JFIF identifier
-    private static readonly byte[] ValidJpegBytes =
+    // Ảnh thật hợp lệ được tạo động bằng ImageSharp hoặc base64 chuẩn
+    private static readonly byte[] ValidJpegBytes = CreateValidImageBytes(JpegFormat.Instance);
+    private static readonly byte[] ValidPngBytes = CreateValidImageBytes(PngFormat.Instance);
+    private static readonly byte[] ValidWebpBytes = CreateValidImageBytes(WebpFormat.Instance);
+
+    // Mẫu nhị phân AVIF 1x1 thật hợp lệ (311 bytes)
+    private static readonly byte[] ValidAvifBytes = Convert.FromBase64String(
+        "AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADybWV0YQAAAAAAAAAoaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAGxpYmF2aWYAAAAADnBpdG0AAAAAAAEAAAAeaWxvYwAAAABEAAABAAEAAAABAAABGgAAAB0AAAAoaWluZgAAAAAAAQAAABppbmZlAgAAAAABAABhdjAxQ29sb3IAAAAAamlwcnAAAABLaXBjbwAAABRpc3BlAAAAAAAAAAIAAAACAAAAEHBpeGkAAAAAAwgICAAAAAxhdjFDgQ0MAAAAABNjb2xybmNseAACAAIAAYAAAAAXaXBtYQAAAAAAAAABAAEEAQKDBAAAACVtZGF0EgAKCBgANogQEAwgMg8f8D///8WfhwB8+ErK42A=");
+
+    // File giả mạo: Header đúng magic bytes nhưng payload rác/hỏng khiến decoder thất bại
+    private static readonly byte[] FakeJpegBytes =
     [
         0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46,
         0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01,
         0x00, 0x01, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43
     ];
 
-    // Mẫu Header PNG hợp lệ: 8-byte signature + IHDR chunk
-    private static readonly byte[] ValidPngBytes =
+    private static readonly byte[] FakePngBytes =
     [
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
         0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
@@ -31,29 +47,36 @@ public class RecipeImageValidationTests
         0x08, 0x06, 0x00, 0x00, 0x00, 0x5C, 0x72, 0xA8
     ];
 
-    // Mẫu Header WebP hợp lệ: RIFF .... WEBP + VP8 chunk
-    private static readonly byte[] ValidWebpBytes =
+    private static readonly byte[] FakeWebpBytes =
     [
         0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00,
         0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x20,
         0x18, 0x00, 0x00, 0x00, 0x30, 0x01, 0x00, 0x9D
     ];
 
-    // Mẫu Header AVIF hợp lệ: ftyp box với major brand avif
-    private static readonly byte[] ValidAvifBytes =
+    private static readonly byte[] FakeAvifBytes =
     [
         0x00, 0x00, 0x00, 0x1C, 0x66, 0x74, 0x79, 0x70,
         0x61, 0x76, 0x69, 0x66, 0x00, 0x00, 0x00, 0x00,
-        0x61, 0x76, 0x69, 0x66, 0x6D, 0x69, 0x66, 0x31
+        0x61, 0x76, 0x69, 0x66, 0x6D, 0x69, 0x66, 0x31,
+        0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE
     ];
 
-    // Mẫu Header PE Windows Executable (virus.exe / application)
+    // Mẫu Header PE Windows Executable (virus.exe)
     private static readonly byte[] FakeExeBytes =
     [
         0x4D, 0x5A, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00,
         0x04, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00,
         0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
     ];
+
+    private static byte[] CreateValidImageBytes(IImageFormat format)
+    {
+        using var image = new Image<Rgba32>(2, 2);
+        using var ms = new MemoryStream();
+        image.Save(ms, format);
+        return ms.ToArray();
+    }
 
     [Fact]
     public void Validate_ValidJpeg_ReturnsSuccess()
@@ -95,26 +118,60 @@ public class RecipeImageValidationTests
     }
 
     [Fact]
-    public void Validate_AvifFormat_ReturnsUnsupportedMimeTypeError()
+    public void Validate_ValidAvif_ReturnsSuccess()
     {
         using var stream = new MemoryStream(ValidAvifBytes);
 
         var result = ImageValidator.Validate(stream, "image/avif", "banner.avif", ValidAvifBytes.Length);
 
-        result.IsValid.Should().BeFalse();
-        result.ErrorMessage.Should().Contain("không được hỗ trợ");
-        result.ErrorMessage.Should().Contain("JPEG, PNG, WebP");
+        result.IsValid.Should().BeTrue();
+        result.DetectedMimeType.Should().Be("image/avif");
+        result.Extension.Should().Be(".avif");
+        result.ErrorMessage.Should().BeNull();
     }
 
     [Fact]
-    public void Validate_DisguisedAvifAsJpeg_ReturnsMagicBytesError()
+    public void Validate_FakeJpeg_ReturnsDecodeError()
     {
-        using var stream = new MemoryStream(ValidAvifBytes);
+        using var stream = new MemoryStream(FakeJpegBytes);
 
-        var result = ImageValidator.Validate(stream, "image/jpeg", "fake.jpg", ValidAvifBytes.Length);
+        var result = ImageValidator.Validate(stream, "image/jpeg", "fake.jpg", FakeJpegBytes.Length);
 
         result.IsValid.Should().BeFalse();
-        result.ErrorMessage.Should().Contain("magic bytes");
+        result.ErrorMessage.Should().Contain("không thể giải mã");
+    }
+
+    [Fact]
+    public void Validate_FakePng_ReturnsDecodeError()
+    {
+        using var stream = new MemoryStream(FakePngBytes);
+
+        var result = ImageValidator.Validate(stream, "image/png", "fake.png", FakePngBytes.Length);
+
+        result.IsValid.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("không thể giải mã");
+    }
+
+    [Fact]
+    public void Validate_FakeWebp_ReturnsDecodeError()
+    {
+        using var stream = new MemoryStream(FakeWebpBytes);
+
+        var result = ImageValidator.Validate(stream, "image/webp", "fake.webp", FakeWebpBytes.Length);
+
+        result.IsValid.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("không thể giải mã");
+    }
+
+    [Fact]
+    public void Validate_FakeAvif_ReturnsDecodeError()
+    {
+        using var stream = new MemoryStream(FakeAvifBytes);
+
+        var result = ImageValidator.Validate(stream, "image/avif", "fake.avif", FakeAvifBytes.Length);
+
+        result.IsValid.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("không thể giải mã");
     }
 
     [Fact]
@@ -166,7 +223,6 @@ public class RecipeImageValidationTests
     [Fact]
     public void Validate_MimeMismatch_DeclaredJpeg_ActualPng_ReturnsError()
     {
-        // Client khai báo image/jpeg nhưng gửi nội dung file PNG
         using var stream = new MemoryStream(ValidPngBytes);
 
         var result = ImageValidator.Validate(stream, "image/jpeg", "fake.jpg", ValidPngBytes.Length);
@@ -176,9 +232,30 @@ public class RecipeImageValidationTests
     }
 
     [Fact]
+    public void Validate_MimeMismatch_DeclaredAvif_ActualPng_ReturnsError()
+    {
+        using var stream = new MemoryStream(ValidPngBytes);
+
+        var result = ImageValidator.Validate(stream, "image/avif", "fake.avif", ValidPngBytes.Length);
+
+        result.IsValid.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("không khớp");
+    }
+
+    [Fact]
+    public void Validate_MimeMismatch_DeclaredPng_ActualAvif_ReturnsError()
+    {
+        using var stream = new MemoryStream(ValidAvifBytes);
+
+        var result = ImageValidator.Validate(stream, "image/png", "fake.png", ValidAvifBytes.Length);
+
+        result.IsValid.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("không khớp");
+    }
+
+    [Fact]
     public void Validate_DisguisedExeFile_RenamedToJpg_ReturnsError()
     {
-        // Kịch bản tấn công: Đổi tên virus.exe -> avatar.jpg và khai báo MIME image/jpeg
         using var stream = new MemoryStream(FakeExeBytes);
 
         var result = ImageValidator.Validate(stream, "image/jpeg", "avatar.jpg", FakeExeBytes.Length);
@@ -190,7 +267,6 @@ public class RecipeImageValidationTests
     [Fact]
     public void Validate_DisguisedHtmlFile_RenamedToPng_ReturnsError()
     {
-        // Kịch bản tấn công: File text HTML đổi tên thành anh.png
         var htmlBytes = Encoding.UTF8.GetBytes("<!DOCTYPE html><html><body><script>alert('XSS')</script></body></html>");
         using var stream = new MemoryStream(htmlBytes);
 
@@ -212,7 +288,7 @@ public class RecipeImageValidationTests
     }
 
     [Fact]
-    public void EnsureValid_DoesNotThrow_WhenFileValid()
+    public void EnsureValid_DoesNotThrow_WhenValidJpeg()
     {
         using var stream = new MemoryStream(ValidJpegBytes);
 
@@ -220,5 +296,14 @@ public class RecipeImageValidationTests
 
         action.Should().NotThrow();
     }
-}
 
+    [Fact]
+    public void EnsureValid_DoesNotThrow_WhenValidAvif()
+    {
+        using var stream = new MemoryStream(ValidAvifBytes);
+
+        var action = () => ImageValidator.EnsureValid(stream, "image/avif", "valid.avif", ValidAvifBytes.Length);
+
+        action.Should().NotThrow();
+    }
+}

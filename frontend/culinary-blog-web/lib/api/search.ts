@@ -1,5 +1,6 @@
-import { apiJson, ApiError } from '@/lib/api';
-import type { SearchResponse } from '@/types/search';
+import { apiFetchWithResponse, ApiError } from '@/lib/api';
+import type { SearchResponse, SearchResult } from '@/types/search';
+import type { ApiResponse, PaginationMeta } from '@/types/api';
 
 export class SearchApiError extends Error {
   status: number;
@@ -42,7 +43,19 @@ export async function searchRecipes(
   });
 
   try {
-    return await apiJson<SearchResponse>(`/api/v1/recipes/search?${queryParams.toString()}`);
+    const res = await apiFetchWithResponse<ApiResponse<SearchResult[], PaginationMeta>>(`/api/v1/recipes/search?${queryParams.toString()}`);
+    const payload = res.data;
+    const items = payload.data ?? [];
+    const meta = payload.meta;
+    return {
+      items,
+      page: meta?.page ?? page,
+      pageSize: meta?.pageSize ?? pageSize,
+      totalCount: meta?.total ?? items.length,
+      totalPages: meta?.totalPages ?? 1,
+      hasPreviousPage: meta?.hasPreviousPage ?? false,
+      hasNextPage: meta?.hasNextPage ?? false,
+    };
   } catch (error) {
     if (error && typeof error === 'object' && 'status' in error) {
       const apiErr = error as ApiError;
