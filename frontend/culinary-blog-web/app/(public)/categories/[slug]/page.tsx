@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { ArrowLeft, Clock, ChefHat, Sparkles } from "lucide-react";
+import { Clock, ChefHat } from "lucide-react";
 import { getCategoryBySlug } from "@/lib/api/categories";
 import type { CategoryRecipeItem } from "@/types/category";
 import { Card } from "@/components/ui/Card";

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, ChefHat, Sparkles, Filter } from "lucide-react";
+import { Search, ChefHat, Sparkles } from "lucide-react";
 import { getCategories } from "@/lib/api/categories";
 import { getRecipes } from "@/lib/api/recipes";
 import { getStoredToken } from "@/lib/api/client";

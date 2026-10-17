@@ -51,12 +51,10 @@ export function DropdownMenu({ children }: { children: React.ReactNode }) {
 }
 
 export function DropdownMenuTrigger({
-  asChild = false,
   children,
   className,
   ...props
 }: {
-  asChild?: boolean;
   children: React.ReactNode;
   className?: string;
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
