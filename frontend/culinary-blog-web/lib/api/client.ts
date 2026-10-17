@@ -1,4 +1,5 @@
 import axios, { AxiosError } from "axios";
+import type { ApiResponse, PagedResult, PaginationMeta } from "@/types/api";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api/v1";
@@ -64,4 +65,42 @@ export function extractErrorMessage(error: unknown, fallback = "Đã có lỗi x
   }
   if (error instanceof Error) return error.message;
   return fallback;
+}
+
+export function unwrapData<T>(response: { data: ApiResponse<T> | T }): T {
+  const data = response.data;
+  if (data && typeof data === "object" && "data" in data) {
+    return (data as ApiResponse<T>).data;
+  }
+  return data as T;
+}
+
+export function unwrapPaged<T>(
+  response: { data: ApiResponse<T[], PaginationMeta> | PagedResult<T> }
+): PagedResult<T> {
+  const raw: any = response.data;
+  if (raw && typeof raw === "object" && "data" in raw && "meta" in raw && raw.meta) {
+    const meta = raw.meta as PaginationMeta;
+    return {
+      items: raw.data as T[],
+      page: meta.page,
+      pageSize: meta.pageSize,
+      totalCount: meta.total,
+      totalPages: meta.totalPages,
+      hasPreviousPage: meta.hasPreviousPage,
+      hasNextPage: meta.hasNextPage,
+    };
+  }
+  if (raw && typeof raw === "object" && "items" in raw) {
+    return raw as PagedResult<T>;
+  }
+  return {
+    items: [],
+    page: 1,
+    pageSize: 10,
+    totalCount: 0,
+    totalPages: 0,
+    hasPreviousPage: false,
+    hasNextPage: false,
+  };
 }
