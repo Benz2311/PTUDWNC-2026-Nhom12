@@ -7,7 +7,6 @@ import {
   Search,
   Menu,
   X,
-  User,
   LogOut,
   PlusCircle,
   LayoutDashboard,

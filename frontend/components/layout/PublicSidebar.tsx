@@ -11,10 +11,8 @@ import {
   ArrowRight,
   BookmarkCheck,
   ChefHat,
-  Search,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 
 export interface SidebarCategoryItem {
