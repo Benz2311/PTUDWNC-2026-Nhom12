@@ -3,3 +3,4 @@ export * from "./LoadingSkeleton";
 export * from "./ErrorState";
 export * from "./EmptyState";
 export * from "./ConfirmDialog";
+export * from "./Pagination";
