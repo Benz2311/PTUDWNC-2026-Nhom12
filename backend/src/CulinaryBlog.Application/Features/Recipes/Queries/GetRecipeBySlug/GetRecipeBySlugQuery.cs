@@ -39,7 +39,8 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
             {
                 r.Id,
                 r.AuthorId,
-                r.Status
+                r.Status,
+                r.xmin
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -70,6 +71,9 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
                 Slug = r.Slug,
                 Description = r.Description,
                 Content = r.Content,
+                CoverImageUrl = r.CoverImageUrl 
+                    ?? r.Images.Where(img => !img.IsDeleted && img.IsPrimary).Select(img => img.MediumUrl ?? img.OriginalUrl).FirstOrDefault()
+                    ?? r.Images.Where(img => !img.IsDeleted).OrderBy(img => img.OrderIndex).Select(img => img.MediumUrl ?? img.OriginalUrl).FirstOrDefault(),
                 PrepTimeMinutes = r.PrepTimeMinutes,
                 CookTimeMinutes = r.CookTimeMinutes,
                 Servings = r.Servings,
@@ -149,6 +153,8 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
         {
             throw new NotFoundException($"Recipe with slug '{request.Slug}' was not found.");
         }
+
+        recipeDto.Version = recipeHeader.xmin.ToString();
 
         return recipeDto;
     }

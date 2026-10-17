@@ -44,8 +44,6 @@
 
 **Mục tiêu:** Hoàn thiện Entity, Configuration và dữ liệu ngẫu nhiên cho từng chức năng; tích hợp vào DbContext và Migration để tạo cơ sở dữ liệu phục vụ kiểm thử.
 
-
-
 ## Lê Thị Ánh Nhung - Category & Statistics
 
 - Hoàn thiện entity `Category` và cấu hình `CategoryConfiguration` ánh xạ bảng `Categories`.
@@ -57,15 +55,11 @@
 - Xây dựng dữ liệu mẫu ngẫu nhiên cho danh mục.
 - Đảm bảo cơ sở dữ liệu sau khi tích hợp có ít nhất **20 Categories** hoàn chỉnh phục vụ truy vấn và thống kê.
 
-
-
 ---
 
 # Bữa 3 - Thiết kế dữ liệu và tối ưu truy vấn
 
 **Mục tiêu:** Hoàn thiện Repository, Unit of Work, tối ưu các truy vấn dữ liệu, kiểm tra Index và triển khai Full-Text Search theo nội dung Chương 3; đảm bảo từng thành viên tiếp tục xử lý đúng nhóm Entity đã được phân công.
-
-
 
 ## Lê Thị Ánh Nhung - Category & Recipe Read
 
@@ -82,17 +76,11 @@
 - Viết tài liệu phân tích hiệu năng truy vấn trong `docs/database/explain-analyze-category-recipe.md`.
 - Kiểm thử Filter, Sort, Pagination và các truy vấn đọc sau khi tối ưu.
 
-
-
 ---
 
 # Bữa 4 - Hoàn thiện API Endpoints và Giao diện
 
 **Mục tiêu:** Hoàn thiện các API Endpoint và giao diện tương ứng theo SRS v1.2.0; mỗi thành viên tiếp tục phụ trách đúng module/entity đã được giao, kết nối giao diện với API thật và kiểm thử các luồng chính trước khi tích hợp.
-
----
-
-
 
 ## Lê Thị Ánh Nhung - Category / Recipe Read / Dashboard
 
@@ -116,18 +104,9 @@
 
 ---
 
-
----
-
----
-
 # Bữa 5 - Hoàn thiện bảo mật, tài liệu API và nền tảng Front-end
 
 **Mục tiêu:** Hoàn thành các cấu hình bảo mật gồm CORS, Rate Limiting và Authentication/Authorization; hoàn thiện tài liệu đặc tả API và API Versioning; đồng thời xây dựng môi trường, cấu trúc dự án Front-end, cài đặt các thư viện cần thiết và các kiểu dữ liệu TypeScript phục vụ ứng dụng.
-
----
-
-
 
 ## Lê Thị Ánh Nhung - Rate Limiting / Front-end Environment / Category Types
 
@@ -153,7 +132,68 @@
 
 ---
 
+# Bữa 6 - Hoàn thiện nền tảng Front-end, tiện ích dùng chung và giao diện tĩnh
 
+**Mục tiêu:** Hoàn thiện các lớp tiện ích phục vụ xử lý lỗi và gọi API; cài đặt thư viện hỗ trợ thiết kế giao diện; xây dựng store quản lý trạng thái; hoàn thiện giao diện tĩnh, các component dùng chung và bố cục tổng thể cho Blog App nhằm chuẩn bị nền tảng cho các chức năng nghiệp vụ ở Bữa 7 và Bữa 8.
+
+## Lê Thị Ánh Nhung - UI Library / Shared Components / Global Layout
+
+- Cài đặt và cấu hình thư viện hỗ trợ thiết kế giao diện cho Front-end, ưu tiên `shadcn/ui` hoặc thư viện UI được nhóm thống nhất sử dụng trong toàn bộ Blog App.
+- Thiết lập các component giao diện cơ bản như Button, Input, Textarea, Select, Dialog, Alert, Badge, Card, Skeleton và Dropdown Menu phục vụ các màn hình nghiệp vụ ở những bữa tiếp theo.
+- Xây dựng các component dùng chung gồm `Header`, `Footer`, `Sidebar`, `Pagination`, `LoadingSpinner`, `LoadingSkeleton`, `ErrorState`, `EmptyState` và `ConfirmDialog`.
+- Thiết kế `Header` hiển thị Logo/Tên Blog, liên kết Trang chủ, danh mục, khu vực tìm kiếm, các nút đăng nhập/đăng ký hoặc menu người dùng tùy theo trạng thái Authentication.
+- Thiết kế `Footer` hiển thị thông tin dự án, liên kết điều hướng chính, thông tin nhóm và nội dung bản quyền cần thiết.
+- Xây dựng `Sidebar` dùng chung cho các trang Public, chuẩn bị khu vực hiển thị danh sách Category và các liên kết điều hướng liên quan.
+- Hoàn thiện component `Pagination` có khả năng nhận trang hiện tại, tổng số trang và callback hoặc URL chuyển trang để tái sử dụng cho Recipe List, Category, Search và Admin List.
+- Hoàn thiện bố cục tổng thể của Blog App bằng Next.js Layout với Header phía trên, vùng nội dung chính, Sidebar ở các trang cần thiết và Footer phía dưới.
+- Thiết kế giao diện tĩnh responsive cho Desktop, Tablet và Mobile; chuẩn hóa spacing, typography, container, card và grid để các thành viên khác sử dụng thống nhất.
+- Chuẩn bị giao diện tĩnh cho Trang chủ, Category và các màn hình Public mà chưa gắn business logic hoặc dữ liệu thật.
+- Không hard-code dữ liệu Recipe/Category trực tiếp trong Shared Components và không can thiệp logic nghiệp vụ của module thành viên khác.
+- Kiểm tra khả năng tái sử dụng Shared Components và chạy TypeScript compile, lint, production build sau khi hoàn thiện UI Foundation.
+
+---
+
+# Bữa 7 - Hoàn thiện chức năng người dùng và các trang Public chính
+
+**Mục tiêu:** Hoàn thiện các chức năng Authentication và Profile; xây dựng các trang Public chính của Blog App gồm Trang chủ, Danh mục, Chi tiết công thức và Tìm kiếm; kết nối giao diện với API thật và hoàn thiện đầy đủ các trạng thái Loading, Error, Empty, Filter và Pagination cần thiết.
+
+## Lê Thị Ánh Nhung - Home / Category / Public Layout Integration
+
+- Hoàn thiện Trang chủ của Blog App bằng cách tích hợp Header, Footer, Sidebar và Main Content từ các Shared Components đã xây dựng ở Bữa 6.
+- Sidebar của Trang chủ hiển thị danh sách Category lấy từ API thật, không sử dụng dữ liệu hard-code.
+- Main Content hiển thị danh sách Recipe Published mới nhất bằng `RecipeCard`, hỗ trợ page, pageSize và sắp xếp phù hợp theo API.
+- Hoàn thiện các section Category nổi bật hoặc Recipe mới nếu API hiện tại cung cấp dữ liệu tương ứng.
+- Xây dựng trang xem danh sách tất cả Category, hiển thị tên danh mục, hình ảnh, mô tả và `recipeCount`.
+- Hoàn thiện trang Category Detail theo slug, hiển thị thông tin Category và danh sách Recipe thuộc Category.
+- Tích hợp Pagination cho danh sách Recipe trên Trang chủ và Category Detail.
+- Hoàn thiện liên kết điều hướng từ Category Sidebar/Category Card đến trang Category Detail và từ Recipe Card đến Recipe Detail.
+- Tái sử dụng các Shared Components Loading Skeleton, Error State, Empty State và Pagination thay vì viết riêng cho từng màn hình.
+- Bảo đảm Trang chủ và Category hoạt động responsive trên Desktop, Tablet và Mobile.
+- Kiểm tra người dùng chưa đăng nhập vẫn có thể truy cập Trang chủ, danh sách Category và các Recipe Published.
+- Không hard-code dữ liệu Category hoặc Recipe trong UI.
+- Kiểm thử việc tải Trang chủ, danh sách Category, Category Detail, Pagination, Empty State và API Error State.
+
+---
+
+# Bữa 8 - Hoàn thiện quản lý Recipe, Upload Image, Admin và Logging
+
+**Mục tiêu:** Hoàn thiện các chức năng nâng cao gồm upload ảnh, tạo/cập nhật và quản lý vòng đời Recipe, quản trị người dùng, Category, Logging và các chức năng còn thiếu theo SRS; tích hợp đầy đủ các module trước khi thực hiện tổng kiểm thử toàn hệ thống.
+
+## Lê Thị Ánh Nhung - Category Completion / Home & Layout Finalization
+
+- Hoàn thiện các chức năng Category còn thiếu theo SRS, bao gồm giao diện quản lý Category dành cho Admin.
+- Xây dựng và hoàn thiện chức năng tạo Category với các trường Name, Description, ImageUrl, OrderIndex và các trường Backend thực tế yêu cầu.
+- Xây dựng chức năng cập nhật Category và đồng bộ dữ liệu mới trên UI sau khi thao tác thành công.
+- Xây dựng chức năng xóa Category, hiển thị Confirmation Dialog và xử lý lỗi `409 Conflict` khi Category vẫn còn Recipe liên kết.
+- Rà soát Category List và Category Detail sau khi Recipe Create/Edit được tích hợp, bảo đảm `recipeCount` được cập nhật đúng.
+- Rà soát Trang chủ sau khi các chức năng Recipe hoàn thiện, kiểm tra danh sách Recipe mới, Sidebar Category, Pagination, Header và Footer.
+- Hoàn thiện giao diện tổng thể Blog App về responsive, spacing, typography, card layout và mobile navigation.
+- Rà soát các Shared Components gồm Header, Footer, Sidebar, Pagination, Loading, Error và Empty State để bảo đảm cách hiển thị thống nhất giữa các page.
+- Hoàn thiện các chức năng Category, Recipe Read hoặc Dashboard còn thiếu theo SRS thuộc phạm vi Lê Thị Ánh Nhung.
+- Không can thiệp business logic Recipe Create/Edit thuộc Phạm Nguyễn Ngọc Phước.
+- Kiểm thử Category CRUD, Home, Layout và responsive sau khi tích hợp toàn hệ thống.
+
+---
 
 # Cài đặt PostgreSQL bằng Docker
 

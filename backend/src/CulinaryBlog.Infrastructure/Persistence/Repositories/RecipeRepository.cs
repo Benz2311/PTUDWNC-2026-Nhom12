@@ -27,7 +27,7 @@ public class RecipeRepository : IRecipeRepository
                 .OrderByDescending(image => image.IsPrimary)
                 .ThenBy(image => image.OrderIndex)
                 .ThenBy(image => image.Id)
-                .Select(image => image.OriginalUrl)
+                .Select(image => image.ThumbnailUrl ?? image.MediumUrl ?? image.OriginalUrl)
                 .FirstOrDefault(),
             new RecipeCategoryDto(
                 recipe.Category.Id,

@@ -28,6 +28,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
     public DbSet<RecipeStep> RecipeSteps => Set<RecipeStep>();
     public DbSet<RecipeImage> RecipeImages => Set<RecipeImage>();
+    public DbSet<RecipeAuditLog> RecipeAuditLogs => Set<RecipeAuditLog>();
+    public DbSet<RecipeSlugHistory> RecipeSlugHistories => Set<RecipeSlugHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,8 +52,26 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 .HasColumnName("SearchVector")
                 .HasColumnType("tsvector");
 
+            entity.Property(x => x.xmin).IsRowVersion();
+
             entity.HasIndex("SearchVectorFts")
                 .HasMethod("GIN");
+        });
+
+        modelBuilder.Entity<RecipeSlugHistory>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Slug).HasMaxLength(220).IsRequired();
+            entity.HasIndex(x => x.Slug);
+            entity.HasIndex(x => new { x.RecipeId, x.Slug }).IsUnique();
+            entity.HasOne<Recipe>().WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RecipeAuditLog>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Action).HasMaxLength(40).IsRequired();
+            entity.HasIndex(x => new { x.RecipeId, x.CreatedAt });
         });
     }
 }

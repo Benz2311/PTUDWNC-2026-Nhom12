@@ -43,6 +43,10 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(x => x.Bio)
             .HasMaxLength(1000);
 
+        builder.Property(x => x.EmailConfirmed)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(x => x.IsActive)
             .IsRequired()
             .HasDefaultValue(true);
@@ -53,12 +57,16 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
             .IsRequired();
 
         builder.Ignore(x => x.FullName);
-        builder.Ignore(x => x.EmailConfirmed);
-        builder.Ignore(x => x.Roles);
+
+        // Roles được lưu trữ dưới dạng mảng PostgreSQL (text[]) thay vì qua bảng
+        // IdentityRole, phù hợp với thiết kế role in-memory -> JWT tại AuthService.
+        builder.Property(x => x.Roles)
+            .HasColumnName("Roles")
+            .HasColumnType("text[]");
 
         builder.HasMany(x => x.RefreshTokens)
             .WithOne(x => x.User)
             .HasForeignKey(x => x.UserId)
             .OnDelete(DeleteBehavior.Cascade);
     }
-}
+}

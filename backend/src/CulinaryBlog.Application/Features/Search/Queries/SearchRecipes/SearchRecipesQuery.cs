@@ -12,7 +12,12 @@ namespace CulinaryBlog.Application.Features.Search.Queries.SearchRecipes;
 public record SearchRecipesQuery(
     string? Query,
     int Page = 1,
-    int PageSize = 10
+    int PageSize = 10,
+    Guid? CategoryId = null,
+    string? CategorySlug = null,
+    DifficultyLevel? Difficulty = null,
+    int? MaxCookTimeMinutes = null,
+    string? SortBy = null
 ) : IRequest<PagedResult<RecipeSearchResultDto>>;
 
 public class SearchRecipesHandler : IRequestHandler<SearchRecipesQuery, PagedResult<RecipeSearchResultDto>>
@@ -49,6 +54,31 @@ public class SearchRecipesHandler : IRequestHandler<SearchRecipesQuery, PagedRes
             .AsNoTracking()
             .Where(r => r.Status == RecipeStatus.Published && !r.IsDeleted);
 
+        // Filter: Category Id hoặc Category Slug
+        if (request.CategoryId.HasValue)
+        {
+            baseQuery = baseQuery.Where(r => r.CategoryId == request.CategoryId.Value);
+        }
+        if (!string.IsNullOrWhiteSpace(request.CategorySlug))
+        {
+            var catSlug = request.CategorySlug.Trim().ToLowerInvariant();
+            baseQuery = baseQuery.Where(r => r.Category.Slug == catSlug);
+        }
+
+        // Filter: Độ khó (Difficulty)
+        if (request.Difficulty.HasValue)
+        {
+            baseQuery = baseQuery.Where(r => r.Difficulty == request.Difficulty.Value);
+        }
+
+        // Filter: Thời gian nấu tối đa (MaxCookTimeMinutes)
+        if (request.MaxCookTimeMinutes.HasValue && request.MaxCookTimeMinutes.Value > 0)
+        {
+            baseQuery = baseQuery.Where(r => r.CookTimeMinutes <= request.MaxCookTimeMinutes.Value);
+        }
+
+        var sortOption = request.SortBy?.Trim().ToLowerInvariant();
+
         // ==========================================
         // GIAI ĐOẠN 1: POSTGRESQL FULL-TEXT SEARCH (FTS)
         // Sử dụng Shadow Property SearchVectorFts, cấu hình 'simple' và hàm unaccent
@@ -61,11 +91,25 @@ public class SearchRecipesHandler : IRequestHandler<SearchRecipesQuery, PagedRes
 
         if (ftsTotalCount > 0)
         {
-            // Sắp xếp theo relevance score (ts_rank) giảm dần, thứ cấp theo PublishedAt giảm dần
-            var items = await ftsQuery
-                .OrderByDescending(r => EF.Property<NpgsqlTsVector>(r, "SearchVectorFts")
-                    .Rank(EF.Functions.PlainToTsQuery("simple", normalizedKeyword)))
-                .ThenByDescending(r => r.PublishedAt)
+            IOrderedQueryable<Domain.Entities.Recipe> orderedFtsQuery;
+            if (sortOption == "newest" || sortOption == "published_desc")
+            {
+                orderedFtsQuery = ftsQuery.OrderByDescending(r => r.PublishedAt);
+            }
+            else if (sortOption == "cooktime" || sortOption == "cook_time_asc")
+            {
+                orderedFtsQuery = ftsQuery.OrderBy(r => r.CookTimeMinutes).ThenByDescending(r => r.PublishedAt);
+            }
+            else
+            {
+                // Sắp xếp theo relevance score (ts_rank) giảm dần, thứ cấp theo PublishedAt giảm dần
+                orderedFtsQuery = ftsQuery
+                    .OrderByDescending(r => EF.Property<NpgsqlTsVector>(r, "SearchVectorFts")
+                        .Rank(EF.Functions.PlainToTsQuery("simple", normalizedKeyword)))
+                    .ThenByDescending(r => r.PublishedAt);
+            }
+
+            var items = await orderedFtsQuery
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(r => new RecipeSearchResultDto
@@ -107,12 +151,26 @@ public class SearchRecipesHandler : IRequestHandler<SearchRecipesQuery, PagedRes
 
         if (fuzzyTotalCount > 0)
         {
-            // Sắp xếp theo similarity score giảm dần, thứ cấp theo PublishedAt giảm dần
-            var items = await fuzzyQuery
-                .OrderByDescending(r => EF.Functions.TrigramsSimilarity(
-                    EF.Functions.Unaccent(r.Title).ToLower(),
-                    normalizedKeyword))
-                .ThenByDescending(r => r.PublishedAt)
+            IOrderedQueryable<Domain.Entities.Recipe> orderedFuzzyQuery;
+            if (sortOption == "newest" || sortOption == "published_desc")
+            {
+                orderedFuzzyQuery = fuzzyQuery.OrderByDescending(r => r.PublishedAt);
+            }
+            else if (sortOption == "cooktime" || sortOption == "cook_time_asc")
+            {
+                orderedFuzzyQuery = fuzzyQuery.OrderBy(r => r.CookTimeMinutes).ThenByDescending(r => r.PublishedAt);
+            }
+            else
+            {
+                // Sắp xếp theo similarity score giảm dần, thứ cấp theo PublishedAt giảm dần
+                orderedFuzzyQuery = fuzzyQuery
+                    .OrderByDescending(r => EF.Functions.TrigramsSimilarity(
+                        EF.Functions.Unaccent(r.Title).ToLower(),
+                        normalizedKeyword))
+                    .ThenByDescending(r => r.PublishedAt);
+            }
+
+            var items = await orderedFuzzyQuery
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(r => new RecipeSearchResultDto
