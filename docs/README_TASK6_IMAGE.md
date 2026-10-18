@@ -14,14 +14,36 @@
 
 ## 2. Kết quả đạt được
 - **API Client hoàn chỉnh:** Triển khai module `lib/api/images.ts` bao gồm các hàm gọi API chuẩn RESTful: `getRecipeImages`, `addRecipeImage`, `uploadRecipeImageFile`, `updateRecipeImage`, `setPrimaryRecipeImage`, `deleteRecipeImage`, `uploadImageFile`.
-- **Validation đồng bộ Backend:** Triển khai `lib/image-validator.ts` bám sát `ImageValidator.cs` của Backend (giới hạn 5 MB, kiểm tra MIME type và phần mở rộng hợp lệ).
+- **Validation đồng bộ Backend:** Triển khai kiểm tra dung lượng (giới hạn tối đa 5 MB), định dạng ảnh hợp lệ (JPEG, PNG, WebP, AVIF) và giới hạn độ dài URL (tối đa 500 ký tự theo SRS v1.2.0 Bảng 7.5).
 - **Custom Hook chuyên sâu:** Triển khai `hooks/useRecipeImages.ts` quản lý đầy đủ các cờ `isLoading`, `isUploading`, `isDeleting`, `uploadProgress` (0-100%), `primaryImage`, `previewImage`.
 - **Giao diện người dùng phong phú:**
   - `ImageCard`: Hiển thị thumbnail/medium URL, badge `Ảnh đại diện` nổi bật, nút xem trước, nút đặt Primary và nút xóa.
   - `ImagePreview`: Modal phóng to xem chi tiết ảnh kèm Alt text và thông tin kích thước.
   - `ImageUploadButton`: Nút bấm kích hoạt chọn tệp từ máy tính, tích hợp validation tức thì và hiển thị thanh tiến trình tải lên.
   - `ImageManager`: Giao diện quản trị toàn diện, hỗ trợ 2 chế độ thêm ảnh (Upload tệp và Nhập URL), Empty State trực quan, dialog xác nhận xóa an toàn.
-- **Kiểm thử tự động đạt 100%:** 26/26 test cases đạt chuẩn (bao gồm 8 integration test suites trong `ImageManager.test.tsx` và suite tiện ích `recipe-utils.test.ts`).
+- **Kiểm thử tự động đạt 100%:** 28/28 test cases đạt chuẩn (bao gồm 16 integration test cases trong `ImageManager.test.tsx` và suite tiện ích `recipe-utils.test.ts`).
+
+---
+
+## 2.1. Bảng đối chiếu SRS v1.2.0 (Traceability Matrix - Branch Image)
+
+| Mã yêu cầu | Nội dung SRS | File triển khai | Kết quả kiểm tra | Bằng chứng |
+| :--- | :--- | :--- | :--- | :--- |
+| **FR-RCP-008-01** | Upload ảnh qua `multipart/form-data` với các trường `file` (bắt buộc), `altText?` (tùy chọn), `isPrimary?` (tùy chọn). | `frontend/culinary-blog-web/lib/api/images.ts`<br>`frontend/culinary-blog-web/components/recipe-management/ImageManager.tsx` | **PASS** | Sử dụng `FormData.append('file', file)`. Axios/Browser tự động tạo boundary header. Test 6 trong `ImageManager.test.tsx` passed. |
+| **FR-RCP-008-02** | Giới hạn dung lượng tối đa 5 MB cho mỗi tệp tải lên. | `frontend/culinary-blog-web/components/recipe-management/ImageManager.tsx`<br>`frontend/culinary-blog-web/lib/image-validator.ts` | **PASS** | `MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024`. Client từ chối ngay lập tức khi file > 5MB. Test 3 passed. |
+| **FR-RCP-008-03** | Định dạng tệp chỉ chấp nhận: JPEG, PNG, WebP, AVIF. | `frontend/culinary-blog-web/components/recipe-management/ImageManager.tsx`<br>`frontend/culinary-blog-web/lib/image-validator.ts` | **PASS** | Whitelist `['image/jpeg', 'image/png', 'image/webp', 'image/avif']`. Test 4 passed. |
+| **FR-RCP-008-04** | Frontend thẩm định MIME và extension; Backend chịu trách nhiệm magic bytes và decode. | `frontend/culinary-blog-web/components/recipe-management/ImageManager.tsx`<br>`backend/src/CulinaryBlog.Application/Common/Validators/ImageValidator.cs` | **PASS** | Phân định rõ ràng trách nhiệm. Frontend validate file type/size trước khi gửi request; backend xác thực qua ImageValidator. |
+| **FR-RCP-008-05** | Ảnh đầu tiên của Recipe mặc định được gán làm ảnh đại diện (Primary). | `frontend/culinary-blog-web/components/recipe-management/ImageManager.tsx` | **PASS** | `const shouldBePrimary = images.length === 0 ? true : formValues.isPrimary`. Test 6 passed. |
+| **FR-RCP-008-06** | Mỗi Recipe chỉ có duy nhất một ảnh Primary đang active. | `frontend/culinary-blog-web/components/recipe-management/ImageManager.tsx`<br>`frontend/culinary-blog-web/components/recipe-management/ImageCard.tsx` | **PASS** | Badge Primary chỉ hiển thị trên card có `isPrimary = true`. Test 2 passed. |
+| **FR-RCP-008-07** | Khi đổi Primary, ảnh cũ phải bị hủy trạng thái Primary (trong cùng transaction). | `frontend/culinary-blog-web/lib/api/images.ts`<br>`frontend/culinary-blog-web/components/recipe-management/ImageManager.tsx` | **PASS** | Khi đặt primary cho ảnh mới, toàn bộ ảnh khác chuyển `isPrimary: false`. Test 9 passed. |
+| **FR-RCP-008-08** | Khi xóa ảnh Primary, ảnh còn lại có `OrderIndex` nhỏ nhất tự động trở thành Primary mới. | `frontend/culinary-blog-web/components/recipe-management/ImageManager.tsx`<br>`backend/src/CulinaryBlog.Api/Endpoints/Recipes/RecipeEndpoints.cs` | **PASS** | Logic xử lý trong `handleConfirmDelete` tự động tìm ảnh có `orderIndex` nhỏ nhất và gán `isPrimary = true`. Test 16 passed. |
+| **FR-RCP-008-09** | Hỗ trợ chỉnh sửa `AltText` (tối đa 200 ký tự), `IsPrimary`, `OrderIndex` theo hợp đồng API. | `frontend/culinary-blog-web/lib/api/images.ts`<br>`frontend/culinary-blog-web/types/image.ts` | **PASS** | Hàm `updateRecipeImage` gọi `PATCH /api/v1/recipes/{id}/images/{imageId}` với body chuẩn `UpdateRecipeImageRequest`. Test 7, 8 passed. |
+| **FR-RCP-008-10** | Không gửi dữ liệu ngoài DTO được SRS hỗ trợ. | `frontend/culinary-blog-web/lib/api/images.ts`<br>`frontend/culinary-blog-web/types/image.ts` | **PASS** | Payload chặt chẽ, không chứa các trường thừa hay dữ liệu demo không thuộc schema. |
+| **CONS-005** | Chuẩn hóa API Client: Prefix `/api/v1/`, ApiResponse `{data, meta}`, Problem Details RFC 7807. | `frontend/culinary-blog-web/lib/api/client.ts`<br>`frontend/culinary-blog-web/lib/api/images.ts` | **PASS** | Chuẩn hóa endpoint `POST /recipes/{id}/images`, `PATCH /recipes/{id}/images/{imageId}`, `DELETE /recipes/{id}/images/{imageId}`. |
+| **CONS-007** | Lưu trữ tệp trên MinIO/S3-compatible, không lưu binary trực tiếp vào Database. | `backend/src/CulinaryBlog.Infrastructure/Services/MinioFileStorageService.cs`<br>`frontend/culinary-blog-web/lib/api/images.ts` | **PASS** | Database chỉ lưu URL varchar(500); binary stream được upload qua Object Storage. Xử lý lỗi 503 khi MinIO offline đạt Test 13. |
+| **NFR-USE-001** | Trải nghiệm trực quan: Empty state, Modal xem trước ảnh lớn, Dialog xác nhận xóa an toàn. | `frontend/culinary-blog-web/components/recipe-management/ImageManager.tsx`<br>`frontend/culinary-blog-web/components/recipe-management/ImagePreview.tsx` | **PASS** | Đạt test 1, 5, 10, 11, 12, 13. Modal xóa cảnh báo rõ việc tự động chuyển primary. |
+| **NFR-USE-002** | Khả năng tiếp cận WCAG 2.1 AA: Thẻ img có alt text, các nút thao tác có aria-label rõ ràng. | `frontend/culinary-blog-web/components/recipe-management/ImageCard.tsx`<br>`frontend/culinary-blog-web/components/recipe-management/ImageManager.tsx` | **PASS** | Thẻ ảnh render `alt={image.altText \|\| 'Ảnh công thức'}`, các nút có `aria-label`, màu tương phản đạt chuẩn AA. |
+| **NFR-USE-004** | Responsive đa thiết bị: Mobile (320-767px), Tablet (768-1199px), Desktop (>= 1200px). | `frontend/culinary-blog-web/components/recipe-management/ImageManager.tsx` | **PASS** | Grid responsive `grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4`, đã kiểm chứng thực tế và chụp ảnh màn hình trên mobile 390px và desktop 1440px. |
 
 ---
 
@@ -56,7 +78,7 @@ Trả về RecipeImage mới ──► Cập nhật state danh sách ảnh & for
 [User click "Đặt làm ảnh đại diện" trên ImageCard]
        │
        ▼
-Gọi API: PATCH /api/v1/recipes/{id}/images/{imageId}/primary
+Gọi API: PATCH /api/v1/recipes/{id}/images/{imageId} (với body: { isPrimary: true })
        │
        ▼
 Backend thực thi Transaction:
