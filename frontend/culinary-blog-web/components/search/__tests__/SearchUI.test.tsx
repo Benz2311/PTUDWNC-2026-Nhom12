@@ -248,7 +248,7 @@ describe('Search UI Module Tests', () => {
   });
 
   // 14. Bộ lọc theo Độ khó (Difficulty)
-  it('14. Lọc kết quả danh sách theo độ khó Easy', async () => {
+  it('14. Lọc kết quả danh sách theo độ khó Easy và gửi request lên backend', async () => {
     render(<SearchContainer initialQuery="pho bo" />);
 
     await screen.findByTestId('search-toolbar');
@@ -256,13 +256,18 @@ describe('Search UI Module Tests', () => {
     const selectDiff = screen.getByTestId('select-difficulty');
     fireEvent.change(selectDiff, { target: { value: 'easy' } });
 
-    // Chỉ còn 1 card Easy
-    expect(screen.getByText('Phở xào bò rau cải')).toBeInTheDocument();
-    expect(screen.queryByText('Phở bò Hà Nội truyền thống')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(searchApi.searchRecipes).toHaveBeenCalledWith('pho bo', 1, 10, 'easy', 'relevance');
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Phở xào bò rau cải')).toBeInTheDocument();
+      expect(screen.queryByText('Phở bò Hà Nội truyền thống')).not.toBeInTheDocument();
+    });
   });
 
   // 15. Sắp xếp theo Thời gian nấu
-  it('15. Sắp xếp các công thức theo thời gian nấu tăng dần', async () => {
+  it('15. Sắp xếp các công thức theo thời gian nấu tăng dần và gửi request lên backend', async () => {
     render(<SearchContainer initialQuery="pho bo" />);
 
     await screen.findByTestId('search-toolbar');
@@ -270,9 +275,15 @@ describe('Search UI Module Tests', () => {
     const selectSort = screen.getByTestId('select-sort');
     fireEvent.change(selectSort, { target: { value: 'cookTime' } });
 
-    const titles = screen.getAllByTestId(/recipe-title-/);
-    // Món 20 phút (Phở xào) phải đứng trước món 180 phút (Phở bò truyền thống)
-    expect(titles[0]).toHaveTextContent('Phở xào bò rau cải');
-    expect(titles[1]).toHaveTextContent('Phở bò Hà Nội truyền thống');
+    await waitFor(() => {
+      expect(searchApi.searchRecipes).toHaveBeenCalledWith('pho bo', 1, 10, undefined, 'cookTime');
+    });
+
+    await waitFor(() => {
+      const titles = screen.getAllByTestId(/recipe-title-/);
+      // Món 20 phút (Phở xào) phải đứng trước món 180 phút (Phở bò truyền thống)
+      expect(titles[0]).toHaveTextContent('Phở xào bò rau cải');
+      expect(titles[1]).toHaveTextContent('Phở bò Hà Nội truyền thống');
+    });
   });
 });
