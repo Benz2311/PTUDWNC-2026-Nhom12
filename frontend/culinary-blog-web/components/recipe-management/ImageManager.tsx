@@ -203,8 +203,8 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         errors.imageUrl = 'Đường dẫn ảnh (URL) là bắt buộc.';
       } else if (!isValidHttpUrl(trimmedUrl)) {
         errors.imageUrl = 'Đường dẫn ảnh không hợp lệ. Phải bắt đầu bằng http:// hoặc https://';
-      } else if (trimmedUrl.length > 2048) {
-        errors.imageUrl = 'Đường dẫn ảnh không được vượt quá 2048 ký tự.';
+      } else if (trimmedUrl.length > 500) {
+        errors.imageUrl = 'Đường dẫn ảnh không được vượt quá 500 ký tự.';
       }
     }
 
@@ -584,6 +584,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 id="image-url-input"
                 type="url"
                 data-testid="input-image-url"
+                maxLength={500}
                 disabled={isActionDisabled}
                 value={formValues.imageUrl}
                 onChange={(e) => {
