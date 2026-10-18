@@ -128,7 +128,7 @@ export async function uploadRecipeImageFile(
 }
 
 /**
- * Cập nhật thông tin ảnh (PATCH: altText, orderIndex, isPrimary)
+ * Cập nhật thông tin ảnh (PATCH: altText, orderIndex, isPrimary theo SRS v1.2.0 Mục 8.3)
  */
 export async function updateRecipeImage(
   recipeId: string,
@@ -136,7 +136,7 @@ export async function updateRecipeImage(
   input: UpdateRecipeImageInput
 ): Promise<RecipeImage> {
   try {
-    const response = await apiClient.put<ApiResponse<RecipeImage>>(
+    const response = await apiClient.patch<ApiResponse<RecipeImage>>(
       `/recipes/${recipeId}/images/${imageId}`,
       input
     );
@@ -147,7 +147,8 @@ export async function updateRecipeImage(
 }
 
 /**
- * Đặt làm ảnh đại diện (Set Primary trong cùng transaction, backend tự bỏ primary của ảnh khác)
+ * Đặt làm ảnh đại diện theo hợp đồng chuẩn SRS v1.2.0 Mục 8.3:
+ * PATCH /api/v1/recipes/{id}/images/{imageId} với body { isPrimary: true }
  */
 export async function setPrimaryRecipeImage(
   recipeId: string,
@@ -155,7 +156,8 @@ export async function setPrimaryRecipeImage(
 ): Promise<RecipeImage> {
   try {
     const response = await apiClient.patch<ApiResponse<RecipeImage>>(
-      `/recipes/${recipeId}/images/${imageId}/primary`
+      `/recipes/${recipeId}/images/${imageId}`,
+      { isPrimary: true }
     );
     return unwrapData(response);
   } catch (error) {

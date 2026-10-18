@@ -314,4 +314,47 @@ function selectFileInput(input: HTMLElement, file: File) {
     expect(screen.getByTestId('btn-set-primary-1')).toBeDisabled();
     expect(screen.getByTestId('btn-delete-image-0')).toBeDisabled();
   });
+
+  // 15. Validation URL tối đa 500 ký tự theo SRS v1.2.0 Bảng 7.5
+  it('15. Validation ImageUrl: Báo lỗi khi URL vượt quá 500 ký tự theo SRS v1.2.0 Bảng 7.5', async () => {
+    render(<ImageManager initialImages={[]} />);
+
+    const tabUrl = screen.getByTestId('tab-upload-url');
+    fireEvent.click(tabUrl);
+
+    const inputUrl = screen.getByTestId('input-image-url');
+    const longUrl = 'https://example.com/' + 'b'.repeat(500);
+    fireEvent.change(inputUrl, { target: { value: longUrl } });
+
+    const submitBtn = screen.getByTestId('btn-submit-image');
+    fireEvent.click(submitBtn);
+
+    expect(screen.getByTestId('error-image-url')).toHaveTextContent(
+      'Đường dẫn ảnh không được vượt quá 500 ký tự.'
+    );
+  });
+
+  // 16. Khi xóa ảnh Primary, ảnh có orderIndex nhỏ nhất còn lại trở thành Primary (FR-RCP-008)
+  it('16. Xóa ảnh Primary tự động chuyển quyền Primary cho ảnh có orderIndex nhỏ nhất còn lại (FR-RCP-008)', async () => {
+    (imagesApi.deleteRecipeImage as jest.Mock).mockResolvedValue(undefined);
+
+    render(<ImageManager recipeId="recipe-100" initialImages={mockImages} />);
+
+    // mockImages[0] là Primary (orderIndex: 0), mockImages[1] không phải Primary (orderIndex: 1)
+    expect(screen.getByTestId('badge-primary-0')).toBeInTheDocument();
+
+    // Bấm xóa ảnh 0 (Primary)
+    fireEvent.click(screen.getByTestId('btn-delete-image-0'));
+    fireEvent.click(screen.getByTestId('btn-confirm-delete-image'));
+
+    await waitFor(() => {
+      expect(imagesApi.deleteRecipeImage).toHaveBeenCalledWith('recipe-100', 'img-1');
+    });
+
+    // Sau khi xóa ảnh 0, ảnh còn lại (img-2) chuyển thành index 0 trong danh sách và trở thành Primary
+    await waitFor(() => {
+      expect(screen.getByTestId('badge-primary-0')).toBeInTheDocument();
+      expect(screen.getByText(/Góc chụp gần từng lát thịt bò tái mềm/)).toBeInTheDocument();
+    });
+  });
 });
