@@ -247,5 +247,27 @@ npm run build
 
 ---
 
-## 13. Kết luận
-Branch `feat/vohungmanh-task6-step` đã hoàn thành đầy đủ, trọn vẹn và độc lập toàn bộ các yêu cầu của Task 6 dành cho phần Bước nấu ăn (Step Management). Mã nguồn được tổ chức sạch sẽ, tuân thủ đúng quy tắc dự án, không can thiệp vào mã của các thành viên khác, kiểm thử tự động đạt 100% và sẵn sàng cho việc review nghiệm thu.
+## 13. Checklist nghiệm thu và Kết luận
+
+### 13.1. Thiết kế giao diện Culinary Blog & Responsive
+- **Bảng màu ẩm thực đặc trưng:** Gam màu xanh ngọc bích Emerald (`emerald-700`, `emerald-800`) kết hợp viền mảnh mềm mại `emerald-100` và nền sáng ngà `slate-50`.
+- **Card & Typography:** Huy hiệu số bước định dạng 2 chữ số (`01`, `02`) font mono trên nền gradient; các nút điều hướng bo góc `rounded-xl` chuẩn UX hiện đại.
+- **Responsive Mobile:** Kiểm tra thực tế trên viewport 390×844 không bị tràn ngang, các nút thao tác Lên/Xuống/Sửa/Xóa phân bổ hợp lý, dễ bấm trên màn hình cảm ứng.
+- **Modal xác nhận:** Modal xác nhận xóa có hiệu ứng `backdrop-blur-xs`, cảnh báo chi tiết về việc tự động đánh số lại các bước còn lại từ 1 đến N.
+
+### 13.2. Checklist nghiệm thu Task 6 (Step Management)
+- [x] Triển khai đầy đủ API Client `lib/api/steps.ts` với đầy đủ CRUD và Reorder.
+- [x] Triển khai Custom Hook `useRecipeSteps.ts` quản lý state độc lập.
+- [x] Triển khai Component `StepItem.tsx` và `StepEditor.tsx` chuẩn mẫu Culinary Blog.
+- [x] Hỗ trợ song song cả 2 chế độ: Direct API Mode (có `recipeId`) và Controlled Local Mode (tạo mới công thức).
+- [x] Xử lý validation client-side và hiển thị lỗi server `ValidationProblemDetails`.
+- [x] Kiểm thử tự động Jest đạt 100% (25/25 test cases pass).
+- [x] TypeScript check `npx tsc --noEmit` đạt 0 error.
+- [x] ESLint `npm run lint` đạt 0 error.
+- [x] Next.js Production Build `npx next build` thành công xuất sắc.
+- [x] Route preview demo được bảo vệ an toàn bằng guard `notFound()` trong môi trường Production.
+- [x] Không làm mất hay ảnh hưởng đến code của các thành viên khác trong nhóm.
+
+### 13.3. Kết luận
+Branch `feat/vohungmanh-task6-step` đã hoàn thành đầy đủ, trọn vẹn và độc lập toàn bộ các yêu cầu của Task 6 dành cho phần Quản lý bước nấu ăn (Step Management). Mã nguồn đạt chất lượng cao, sẵn sàng phục vụ cho việc tích hợp vào màn hình Recipe Detail (Task 7) và Recipe Form (Task 8).
+
