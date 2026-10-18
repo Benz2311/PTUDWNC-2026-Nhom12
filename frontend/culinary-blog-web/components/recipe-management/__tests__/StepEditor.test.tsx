@@ -136,7 +136,7 @@ describe('StepEditor Component', () => {
   });
 
   // 6. Validation ImageUrl
-  it('6. Validation ImageUrl: Phải là URL hợp lệ http/https và không quá 2048 ký tự', async () => {
+  it('6. Validation ImageUrl: Phải là URL hợp lệ http/https và không quá 500 ký tự (SRS Bảng 7.3)', async () => {
     const user = userEvent.setup();
     render(<StepEditor initialSteps={[]} />);
 
@@ -151,6 +151,16 @@ describe('StepEditor Component', () => {
     await user.click(screen.getByTestId('btn-save-step'));
     expect(screen.getByTestId('error-step-image')).toHaveTextContent(
       'Đường dẫn ảnh không hợp lệ'
+    );
+
+    // Nhập URL dài hơn 500 ký tự
+    await user.clear(imageInput);
+    const longUrl = 'https://example.com/' + 'a'.repeat(500);
+    // Directly fire change event to bypass HTML maxLength attribute during test
+    fireEvent.change(imageInput, { target: { value: longUrl } });
+    await user.click(screen.getByTestId('btn-save-step'));
+    expect(screen.getByTestId('error-step-image')).toHaveTextContent(
+      'Đường dẫn ảnh không được vượt quá 500 ký tự.'
     );
   });
 

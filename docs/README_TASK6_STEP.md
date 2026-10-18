@@ -21,8 +21,29 @@
 - **Giao diện hiện đại & tiện ích:**
   - `StepItem`: Hiển thị số thứ tự định dạng 2 chữ số (01, 02), huy hiệu thời gian hẹn giờ (timer badge), hình ảnh minh họa đính kèm, các nút thao tác Di chuyển lên/xuống, Sửa, Xóa.
   - `StepEditor`: Quản lý danh sách các bước nấu, hiển thị trạng thái rỗng (Empty State), modal form Thêm/Sửa bước và modal xác nhận Xóa an toàn.
-- **Validation chặt chẽ:** Kiểm tra hợp lệ dữ liệu cả ở Client và ánh xạ chi tiết lỗi `ValidationProblem` từ Backend (Description bắt buộc tối đa 2000 ký tự, Title tối đa 200 ký tự, Timer 0-1440 phút, URL ảnh tối đa 2048 ký tự).
-- **Kiểm thử tự động đạt 100%:** 25/25 test cases đạt chuẩn (bao gồm 10 integration test suites chuyên sâu trong `StepEditor.test.tsx` và suite tiện ích `recipe-utils.test.ts`).
+- **Validation chặt chẽ:** Kiểm tra hợp lệ dữ liệu cả ở Client và ánh xạ chi tiết lỗi `ValidationProblem` từ Backend (Description bắt buộc 1-2000 ký tự, Title tùy chọn tối đa 200 ký tự, Timer tùy chọn 0-1440 phút, URL ảnh tối đa 500 ký tự theo SRS v1.2.0 Bảng 7.3).
+- **Kiểm thử tự động đạt 100%:** 25/25 test cases đạt chuẩn (bao gồm 13 test cases chuyên sâu trong `StepEditor.test.tsx` và suite tiện ích `recipe-utils.test.ts`).
+
+---
+
+## 2.1. Bảng đối chiếu SRS v1.2.0 (Traceability Matrix - Branch Step)
+
+| Mã yêu cầu | Nội dung SRS | File triển khai | Kết quả kiểm tra | Bằng chứng |
+| :--- | :--- | :--- | :--- | :--- |
+| **FR-RCP-010-01** | Hỗ trợ đầy đủ thao tác CRUD danh sách bước thực hiện công thức (RecipeStep). | `frontend/culinary-blog-web/lib/api/steps.ts`<br>`frontend/culinary-blog-web/components/recipe-management/StepEditor.tsx`<br>`frontend/culinary-blog-web/hooks/useRecipeSteps.ts` | **PASS** | Giao diện hỗ trợ xem danh sách, thêm, sửa, xóa, hoán đổi thứ tự. Test 7, 8, 9, 10 trong `StepEditor.test.tsx` passed. |
+| **FR-RCP-010-02** | Trường `title`: Tùy chọn, tối đa 200 ký tự. | `frontend/culinary-blog-web/components/recipe-management/StepEditor.tsx`<br>`frontend/culinary-blog-web/types/step.ts` | **PASS** | Hàm `validateForm` kiểm tra `values.title.length > 200`. Test 4 trong `StepEditor.test.tsx` passed. |
+| **FR-RCP-010-03** | Trường `description`: Bắt buộc, độ dài từ 1 đến 2000 ký tự. | `frontend/culinary-blog-web/components/recipe-management/StepEditor.tsx`<br>`frontend/culinary-blog-web/types/step.ts` | **PASS** | `validateForm` bắt buộc không rỗng và `<= 2000 ký tự`. Test 3 trong `StepEditor.test.tsx` passed. |
+| **FR-RCP-010-04** | Trường `timerMinutes`: Tùy chọn, số nguyên không âm (>= 0). | `frontend/culinary-blog-web/components/recipe-management/StepEditor.tsx`<br>`frontend/culinary-blog-web/types/step.ts` | **PASS** | Kiểm tra `minutesNum < 0 \|\| minutesNum > 1440`. Test 5 trong `StepEditor.test.tsx` passed. |
+| **FR-RCP-010-05** | Trường `imageUrl`: Tùy chọn, khớp mô hình dữ liệu SRS (varchar(500), URL hợp lệ). | `frontend/culinary-blog-web/components/recipe-management/StepEditor.tsx`<br>`frontend/culinary-blog-web/types/step.ts` | **PASS** | Chuẩn hóa `maxLength={500}`, kiểm tra `trimmedUrl.length > 500` và URL scheme http/https. Test 6 trong `StepEditor.test.tsx` passed. |
+| **FR-RCP-010-06** | `StepNumber`: Đánh số tuần tự, liên tục từ 1 đến N. | `frontend/culinary-blog-web/components/recipe-management/StepItem.tsx`<br>`frontend/culinary-blog-web/lib/api/steps.ts` | **PASS** | Hiển thị định dạng 2 chữ số (01, 02), client luôn sort theo `stepNumber` tăng dần, backend cấp N+1. Test 1 passed. |
+| **FR-RCP-010-07** | Khi xóa bước, server đánh số lại (renumber) các bước còn lại từ 1..N trong transaction. | `frontend/culinary-blog-web/lib/api/steps.ts`<br>`backend/src/CulinaryBlog.Api/Endpoints/Recipes/RecipeEndpoints.cs` | **PASS** | Gọi `DELETE /api/v1/recipes/{id}/steps/{stepId}`. Backend xử lý transaction renumber các bước còn lại. Test 9 passed. |
+| **FR-RCP-010-08** | Khi sắp xếp lại (reorder), gửi danh sách `stepIds` đầy đủ theo thứ tự mới. | `frontend/culinary-blog-web/lib/api/steps.ts`<br>`frontend/culinary-blog-web/components/recipe-management/StepEditor.tsx` | **PASS** | Gọi `PUT /api/v1/recipes/{id}/steps/reorder` với body `{ stepIds: string[] }`. Test 10 passed. |
+| **FR-RCP-010-09** | Chỉ hỗ trợ danh sách phẳng (flat-list), không có sub-step hoặc ParentStepId. | `frontend/culinary-blog-web/types/step.ts` | **PASS** | Interface `RecipeStep` hoàn toàn không có `parentStepId` hoặc cây phân cấp. Toàn bộ UI là danh sách phẳng 1 chiều. |
+| **FR-RCP-010-10** | Phân quyền Owner/Admin khi gọi các API ghi dữ liệu. | `frontend/culinary-blog-web/lib/api/steps.ts`<br>`frontend/culinary-blog-web/lib/api/client.ts` | **PASS** | Axios interceptor đính kèm Bearer token; `handleStepError` xử lý 401 (chưa đăng nhập) và 403 (không có quyền). Test 11 passed. |
+| **CONS-005** | Quy chuẩn API: URL prefix `/api/v1/`, ApiResponse `{data, meta}`, Problem Details RFC 7807. | `frontend/culinary-blog-web/lib/api/client.ts`<br>`frontend/culinary-blog-web/lib/api/steps.ts` | **PASS** | BaseURL chuẩn hóa `/api/v1`, unwrapping envelope thành công, bắt mã lỗi HTTP 400, 401, 403, 404, 500. |
+| **NFR-USE-001** | Trải nghiệm người dùng: Thao tác trực quan, Empty State, Loading skeleton, Toast/Alert. | `frontend/culinary-blog-web/components/recipe-management/StepEditor.tsx` | **PASS** | Render Empty State sinh động, error alert, modal xác nhận xóa trước khi hủy bước. Đạt test 2, 9, 11, 12. |
+| **NFR-USE-002** | Khả năng tiếp cận WCAG 2.1 AA: Điều hướng bàn phím, tương phản màu, aria-label. | `frontend/culinary-blog-web/components/recipe-management/StepItem.tsx`<br>`frontend/culinary-blog-web/components/recipe-management/StepEditor.tsx` | **PASS** | Tất cả nút có `aria-label`, thẻ gắn `role="dialog"`, màu chữ đạt tỉ lệ tương phản >= 4.5:1. |
+| **NFR-USE-004** | Responsive đa thiết bị: Mobile (320-767px), Tablet (768-1199px), Desktop (>= 1200px). | `frontend/culinary-blog-web/components/recipe-management/StepItem.tsx`<br>`frontend/culinary-blog-web/components/recipe-management/StepEditor.tsx` | **PASS** | Flexbox adaptive `flex-col md:flex-row`, đã kiểm chứng thực tế và chụp ảnh màn hình xác nhận trên mobile 390px và desktop 1440px. |
 
 ---
 
