@@ -32,7 +32,12 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
 
   // Hàm gọi API tìm kiếm
   const executeSearch = useCallback(
-    async (q: string, pageToFetch: number) => {
+    async (
+      q: string,
+      pageToFetch: number,
+      filterDiff: string = difficultyFilter,
+      sortOption: 'relevance' | 'newest' | 'cookTime' = sortBy
+    ) => {
       const trimmed = q.trim();
       if (trimmed.length < 2) {
         setSearchResponse(null);
@@ -46,7 +51,21 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
       setActiveQuery(trimmed);
 
       try {
-        const result = await searchRecipes(trimmed, pageToFetch, pageSize);
+        const diffParam = filterDiff !== 'all' ? filterDiff : undefined;
+        const sortParam =
+          sortOption === 'newest'
+            ? 'publishedAt'
+            : sortOption === 'cookTime'
+            ? 'cookTime'
+            : 'relevance';
+
+        let result: SearchResponse;
+        if (diffParam || sortParam !== 'relevance') {
+          result = await searchRecipes(trimmed, pageToFetch, pageSize, diffParam, sortParam);
+        } else {
+          result = await searchRecipes(trimmed, pageToFetch, pageSize);
+        }
+
         setSearchResponse(result);
         setCurrentPage(result.page);
       } catch (err) {
@@ -58,7 +77,7 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
         setIsLoading(false);
       }
     },
-    [pageSize]
+    [pageSize, difficultyFilter, sortBy]
   );
 
   // Khởi động tìm kiếm nếu có initialQuery
@@ -72,6 +91,24 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
   const handleSearchSubmit = (newQuery: string) => {
     setCurrentPage(1);
     executeSearch(newQuery, 1);
+  };
+
+  // Thay đổi bộ lọc độ khó (gọi lại API và reset trang 1)
+  const handleDifficultyChange = (newDifficulty: string) => {
+    setDifficultyFilter(newDifficulty);
+    setCurrentPage(1);
+    if (activeQuery.trim().length >= 2) {
+      executeSearch(activeQuery, 1, newDifficulty, sortBy);
+    }
+  };
+
+  // Thay đổi tiêu chí sắp xếp (gọi lại API và reset trang 1)
+  const handleSortChange = (newSort: 'relevance' | 'newest' | 'cookTime') => {
+    setSortBy(newSort);
+    setCurrentPage(1);
+    if (activeQuery.trim().length >= 2) {
+      executeSearch(activeQuery, 1, difficultyFilter, newSort);
+    }
   };
 
   // Chuyển trang
@@ -199,7 +236,7 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
                 id="filter-difficulty"
                 data-testid="select-difficulty"
                 value={difficultyFilter}
-                onChange={(e) => setDifficultyFilter(e.target.value)}
+                onChange={(e) => handleDifficultyChange(e.target.value)}
                 className="px-3 py-1.5 rounded-xl border border-emerald-200 bg-white text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600 shadow-2xs"
               >
                 <option value="all">Tất cả</option>
@@ -216,7 +253,7 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
                 id="sort-by"
                 data-testid="select-sort"
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => handleSortChange(e.target.value as any)}
                 className="px-3 py-1.5 rounded-xl border border-emerald-200 bg-white text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600 shadow-2xs"
               >
                 <option value="relevance">Độ liên quan (FTS Rank)</option>

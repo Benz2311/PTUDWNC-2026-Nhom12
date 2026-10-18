@@ -20,7 +20,9 @@ export class SearchApiError extends Error {
 export async function searchRecipes(
   queryOrParams: string | SearchRequest,
   page = 1,
-  pageSize = 10
+  pageSize = 10,
+  difficulty?: string,
+  sortBy?: string
 ): Promise<SearchResponse> {
   let params: SearchRequest;
 
@@ -29,6 +31,8 @@ export async function searchRecipes(
       q: queryOrParams,
       page,
       pageSize,
+      difficulty,
+      sortBy,
     };
   } else {
     params = { ...queryOrParams };
