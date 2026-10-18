@@ -1,8 +1,14 @@
-import { apiFetch, apiJson, ApiError } from '@/lib/api';
-import type { RecipeImage, AddRecipeImageInput } from '@/types/image';
+import { apiClient, unwrapData, ApiError } from './client';
+import type {
+  RecipeImage,
+  AddRecipeImageInput,
+  UpdateRecipeImageInput,
+} from '@/types/image';
+import type { ApiResponse } from '@/types/api';
 
 export class ImageApiError extends Error {
   status: number;
+
   errors?: Record<string, string[]>;
 
   constructor(message: string, status: number, errors?: Record<string, string[]>) {
@@ -14,13 +20,12 @@ export class ImageApiError extends Error {
 }
 
 /**
- * Chuyển đổi ApiError từ apiFetch/apiJson thành ImageApiError thân thiện với người dùng
+ * Chuyển đổi lỗi từ apiClient thành ImageApiError thân thiện với người dùng
  */
 function handleImageError(error: unknown): never {
-  if (error && typeof error === 'object' && 'status' in error) {
-    const apiErr = error as ApiError;
-    const status = apiErr.status ?? 500;
-    let message = apiErr.message || 'Thao tác với hình ảnh công thức không thành công.';
+  if (error instanceof ApiError) {
+    const status = error.status ?? 500;
+    let message = error.message || 'Thao tác với hình ảnh công thức không thành công.';
 
     if (status === 401) {
       message = 'Bạn cần đăng nhập để quản lý hình ảnh của công thức.';
@@ -32,7 +37,7 @@ function handleImageError(error: unknown): never {
       message = 'Dịch vụ lưu trữ hình ảnh (MinIO / Object Storage) hiện không khả dụng (HTTP 503). Vui lòng thử lại sau.';
     }
 
-    throw new ImageApiError(message, status, apiErr.errors);
+    throw new ImageApiError(message, status, error.errors);
   }
 
   if (error instanceof Error) {
@@ -47,11 +52,14 @@ function handleImageError(error: unknown): never {
  */
 export async function getRecipeImages(slugOrId: string): Promise<RecipeImage[]> {
   try {
-    const data = await apiJson<{ images?: RecipeImage[] }>(`/api/v1/recipes/${slugOrId}`);
+    const response = await apiClient.get<ApiResponse<{ images?: RecipeImage[] }>>(
+      `/recipes/${encodeURIComponent(slugOrId)}`
+    );
+    const data = unwrapData(response);
     const images = data?.images ?? [];
     return [...images].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
   } catch (error) {
-    if (error && typeof error === 'object' && 'status' in error && (error as ApiError).status === 404) {
+    if (error instanceof ApiError && error.status === 404) {
       return [];
     }
     return handleImageError(error);
@@ -59,25 +67,80 @@ export async function getRecipeImages(slugOrId: string): Promise<RecipeImage[]> 
 }
 
 /**
- * Thêm hình ảnh mới cho công thức (Ảnh đầu tiên tự động thành Primary trên backend)
+ * Thêm hình ảnh mới cho công thức bằng URL đã có (Ảnh đầu tiên tự động thành Primary trên backend)
  */
 export async function addRecipeImage(
   recipeId: string,
   input: AddRecipeImageInput
 ): Promise<RecipeImage> {
   try {
-    return await apiFetch<RecipeImage>(`/api/v1/recipes/${recipeId}/images`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        originalUrl: input.originalUrl.trim(),
-        mediumUrl: input.mediumUrl?.trim() || null,
-        thumbnailUrl: input.thumbnailUrl?.trim() || null,
-        altText: input.altText?.trim() || null,
-        isPrimary: input.isPrimary ?? null,
-        orderIndex: input.orderIndex ?? null,
-      }),
-    });
+    const payload = {
+      originalUrl: input.originalUrl.trim(),
+      mediumUrl: input.mediumUrl?.trim() || null,
+      thumbnailUrl: input.thumbnailUrl?.trim() || null,
+      altText: input.altText?.trim() || null,
+      isPrimary: input.isPrimary ?? null,
+      orderIndex: input.orderIndex ?? null,
+    };
+
+    const response = await apiClient.post<ApiResponse<RecipeImage>>(
+      `/recipes/${recipeId}/images`,
+      payload
+    );
+    return unwrapData(response);
+  } catch (error) {
+    return handleImageError(error);
+  }
+}
+
+/**
+ * Tải file ảnh trực tiếp lên Recipe qua multipart/form-data
+ * KHÔNG hard-code boundary: Browser/Axios tự động tạo Content-Type multipart boundary
+ */
+export async function uploadRecipeImageFile(
+  recipeId: string,
+  file: File,
+  altText?: string,
+  isPrimary?: boolean,
+  onUploadProgress?: (progressEvent: { loaded: number; total?: number }) => void
+): Promise<RecipeImage> {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (altText) {
+      formData.append('altText', altText.trim());
+    }
+    if (isPrimary !== undefined) {
+      formData.append('isPrimary', String(isPrimary));
+    }
+
+    const response = await apiClient.post<ApiResponse<RecipeImage>>(
+      `/recipes/${recipeId}/images`,
+      formData,
+      {
+        onUploadProgress,
+      }
+    );
+    return unwrapData(response);
+  } catch (error) {
+    return handleImageError(error);
+  }
+}
+
+/**
+ * Cập nhật thông tin ảnh (PATCH: altText, orderIndex, isPrimary)
+ */
+export async function updateRecipeImage(
+  recipeId: string,
+  imageId: string,
+  input: UpdateRecipeImageInput
+): Promise<RecipeImage> {
+  try {
+    const response = await apiClient.put<ApiResponse<RecipeImage>>(
+      `/recipes/${recipeId}/images/${imageId}`,
+      input
+    );
+    return unwrapData(response);
   } catch (error) {
     return handleImageError(error);
   }
@@ -91,9 +154,10 @@ export async function setPrimaryRecipeImage(
   imageId: string
 ): Promise<RecipeImage> {
   try {
-    return await apiFetch<RecipeImage>(`/api/v1/recipes/${recipeId}/images/${imageId}/primary`, {
-      method: 'PATCH',
-    });
+    const response = await apiClient.patch<ApiResponse<RecipeImage>>(
+      `/recipes/${recipeId}/images/${imageId}/primary`
+    );
+    return unwrapData(response);
   } catch (error) {
     return handleImageError(error);
   }
@@ -107,39 +171,9 @@ export async function deleteRecipeImage(
   imageId: string
 ): Promise<void> {
   try {
-    await apiFetch<void>(`/api/v1/recipes/${recipeId}/images/${imageId}`, {
-      method: 'DELETE',
-    });
+    await apiClient.delete(`/recipes/${recipeId}/images/${imageId}`);
   } catch (error) {
-    return handleImageError(error);
-  }
-}
-
-/**
- * Tải file ảnh trực tiếp lên Recipe qua multipart/form-data (POST /api/v1/recipes/{recipeId}/images)
- */
-export async function uploadRecipeImageFile(
-  recipeId: string,
-  file: File,
-  altText?: string,
-  isPrimary?: boolean
-): Promise<RecipeImage> {
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    if (altText) {
-      formData.append('altText', altText);
-    }
-    if (isPrimary !== undefined) {
-      formData.append('isPrimary', String(isPrimary));
-    }
-
-    return await apiFetch<RecipeImage>(`/api/v1/recipes/${recipeId}/images`, {
-      method: 'POST',
-      body: formData,
-    });
-  } catch (error) {
-    return handleImageError(error);
+    handleImageError(error);
   }
 }
 
@@ -151,11 +185,13 @@ export async function uploadImageFile(file: File): Promise<{ url: string }> {
     const formData = new FormData();
     formData.append('file', file);
 
-    return await apiFetch<{ url: string }>('/api/v1/files/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const response = await apiClient.post<ApiResponse<{ url: string }>>(
+      '/files/upload',
+      formData
+    );
+    return unwrapData(response);
   } catch (error) {
     return handleImageError(error);
   }
 }
+
