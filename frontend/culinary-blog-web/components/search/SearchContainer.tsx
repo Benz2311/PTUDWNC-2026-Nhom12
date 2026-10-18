@@ -114,10 +114,17 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
     <div className="w-full max-w-5xl mx-auto px-4 py-8 space-y-8" data-testid="search-container">
       {/* Header & SearchBox */}
       <div className="space-y-4 text-center max-w-2xl mx-auto">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 shadow-2xs">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          Tìm kiếm thông minh FTS & Fuzzy Trigram
+        </div>
+
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
           Tìm kiếm công thức nấu ăn
         </h1>
-        <p className="text-sm text-gray-600">
+        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
           Khám phá hàng ngàn công thức thơm ngon với công nghệ tìm kiếm toàn văn FTS & gợi ý Trigram thông minh.
         </p>
 
@@ -130,14 +137,14 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
         </div>
 
         {/* Quick query tags */}
-        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-          <span className="text-xs text-gray-400">Gợi ý từ khóa:</span>
+        <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+          <span className="text-xs text-slate-400 font-medium">Gợi ý từ khóa:</span>
           {['Phở bò', 'Bún chả', 'Gà nướng', 'Thịt kho', 'Cá hồi'].map((tag) => (
             <button
               key={tag}
               type="button"
               onClick={() => handleSearchSubmit(tag)}
-              className="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 hover:bg-green-50 hover:text-green-800 transition-colors"
+              className="text-xs px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100 font-semibold transition-all shadow-2xs"
             >
               {tag}
             </button>
@@ -149,20 +156,22 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
       {errorMessage && (
         <div
           data-testid="search-error-banner"
-          className="p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-800 flex items-start gap-3"
+          className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-sm text-rose-800 flex items-start gap-3 shadow-xs animate-shake"
         >
-          <svg className="w-5 h-5 text-red-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10" strokeWidth="2" />
-            <line x1="12" y1="8" x2="12" y2="12" strokeWidth="2" strokeLinecap="round" />
-            <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2" strokeLinecap="round" />
-          </svg>
+          <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0 mt-0.5">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" strokeWidth={2} />
+              <line x1="12" y1="8" x2="12" y2="12" strokeWidth={2} strokeLinecap="round" />
+              <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth={2} strokeLinecap="round" />
+            </svg>
+          </div>
           <div className="flex-1">
-            <strong className="font-semibold">Đã xảy ra sự cố:</strong> {errorMessage}
+            <strong className="font-semibold block text-rose-900">Đã xảy ra sự cố:</strong> {errorMessage}
           </div>
           <button
             type="button"
             onClick={() => setErrorMessage(null)}
-            className="text-red-500 hover:text-red-700 p-0.5"
+            className="text-rose-500 hover:text-rose-700 p-1"
             aria-label="Đóng thông báo lỗi"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -176,22 +185,22 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
       {searchResponse && searchResponse.totalCount > 0 && (
         <div
           data-testid="search-toolbar"
-          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-gray-50 border border-gray-200 text-xs sm:text-sm"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-emerald-50/40 border border-emerald-100/90 text-xs sm:text-sm shadow-2xs"
         >
-          <div data-testid="search-result-count" className="font-medium text-gray-700">
-            Tìm thấy <strong className="text-green-800 font-bold">{searchResponse.totalCount}</strong> công thức cho từ khóa &ldquo;<span className="text-gray-900 font-semibold">{activeQuery}</span>&rdquo;
+          <div data-testid="search-result-count" className="font-medium text-slate-700">
+            Tìm thấy <strong className="text-emerald-800 font-bold">{searchResponse.totalCount}</strong> công thức cho từ khóa &ldquo;<span className="text-slate-900 font-semibold">{activeQuery}</span>&rdquo;
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             {/* Filter by Difficulty */}
             <div className="flex items-center gap-1.5">
-              <label htmlFor="filter-difficulty" className="text-gray-500 text-xs font-medium">Độ khó:</label>
+              <label htmlFor="filter-difficulty" className="text-slate-600 text-xs font-semibold">Độ khó:</label>
               <select
                 id="filter-difficulty"
                 data-testid="select-difficulty"
                 value={difficultyFilter}
                 onChange={(e) => setDifficultyFilter(e.target.value)}
-                className="px-2.5 py-1 rounded-lg border border-gray-300 bg-white text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-700"
+                className="px-3 py-1.5 rounded-xl border border-emerald-200 bg-white text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600 shadow-2xs"
               >
                 <option value="all">Tất cả</option>
                 <option value="easy">Dễ</option>
@@ -202,13 +211,13 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
 
             {/* Sort options */}
             <div className="flex items-center gap-1.5">
-              <label htmlFor="sort-by" className="text-gray-500 text-xs font-medium">Sắp xếp:</label>
+              <label htmlFor="sort-by" className="text-slate-600 text-xs font-semibold">Sắp xếp:</label>
               <select
                 id="sort-by"
                 data-testid="select-sort"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-2.5 py-1 rounded-lg border border-gray-300 bg-white text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-700"
+                className="px-3 py-1.5 rounded-xl border border-emerald-200 bg-white text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600 shadow-2xs"
               >
                 <option value="relevance">Độ liên quan (FTS Rank)</option>
                 <option value="newest">Mới nhất</option>
@@ -225,12 +234,16 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
           /* Loading Skeletons */
           <div data-testid="search-loading" className="space-y-4 animate-pulse">
             {[1, 2, 3].map((n) => (
-              <div key={n} className="flex flex-col sm:flex-row bg-white rounded-xl border border-gray-200 overflow-hidden h-44">
-                <div className="sm:w-56 bg-gray-200 shrink-0" />
-                <div className="p-4 sm:p-5 flex-1 space-y-3">
-                  <div className="h-4 bg-gray-200 rounded w-1/4" />
-                  <div className="h-6 bg-gray-200 rounded w-3/4" />
-                  <div className="h-4 bg-gray-200 rounded w-full" />
+              <div key={n} className="flex flex-col sm:flex-row bg-white rounded-2xl border border-emerald-100/80 overflow-hidden sm:h-44 shadow-xs">
+                <div className="w-full sm:w-60 h-44 sm:h-full bg-slate-200/80 shrink-0" />
+                <div className="p-5 flex-1 space-y-3 flex flex-col justify-center">
+                  <div className="flex items-center gap-2">
+                    <div className="h-5 bg-emerald-100/80 rounded-full w-24" />
+                    <div className="h-5 bg-slate-200 rounded-full w-16" />
+                  </div>
+                  <div className="h-6 bg-slate-200 rounded-xl w-3/4" />
+                  <div className="h-4 bg-slate-100 rounded-lg w-full" />
+                  <div className="h-4 bg-slate-100 rounded-lg w-1/2" />
                 </div>
               </div>
             ))}
@@ -239,15 +252,15 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
           /* Initial Empty State (Chưa tìm kiếm) */
           <div
             data-testid="search-initial-state"
-            className="flex flex-col items-center justify-center p-12 rounded-xl bg-white border border-dashed border-gray-200 text-center space-y-3"
+            className="flex flex-col items-center justify-center p-12 rounded-3xl bg-emerald-50/30 border-2 border-dashed border-emerald-200 text-center space-y-3"
           >
-            <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center text-green-800">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-800 shadow-2xs">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
-            <h3 className="text-base font-bold text-gray-900">Sẵn sàng khám phá ẩm thực</h3>
-            <p className="text-xs sm:text-sm text-gray-500 max-w-md">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900">Sẵn sàng khám phá ẩm thực</h3>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md leading-relaxed">
               Nhập từ khóa bất kỳ để tìm kiếm công thức yêu thích của bạn. Hệ thống hỗ trợ tìm kiếm cả tiếng Việt có dấu và không dấu.
             </p>
           </div>
@@ -255,16 +268,16 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
           /* No Results State */
           <div
             data-testid="search-no-results"
-            className="flex flex-col items-center justify-center p-12 rounded-xl bg-white border border-gray-200 text-center space-y-3"
+            className="flex flex-col items-center justify-center p-12 rounded-3xl bg-amber-50/20 border border-amber-200 text-center space-y-3 shadow-xs"
           >
-            <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center text-amber-700">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-800 shadow-2xs">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h3 className="text-base font-bold text-gray-900">Không tìm thấy công thức phù hợp</h3>
-            <p className="text-xs sm:text-sm text-gray-500 max-w-md">
-              Không tìm thấy công thức nào cho từ khóa &ldquo;<span className="font-semibold text-gray-700">{activeQuery}</span>&rdquo;.
+            <h3 className="text-base sm:text-lg font-bold text-slate-900">Không tìm thấy công thức phù hợp</h3>
+            <p className="text-xs sm:text-sm text-slate-600 max-w-md leading-relaxed">
+              Không tìm thấy công thức nào cho từ khóa &ldquo;<span className="font-semibold text-slate-900">{activeQuery}</span>&rdquo;.
               Hãy thử kiểm tra lỗi chính tả hoặc tìm với từ khóa ngắn gọn hơn (vd: &ldquo;pho bo&rdquo;, &ldquo;thịt gà&rdquo;).
             </p>
           </div>
@@ -272,7 +285,7 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
           /* Results List */
           <div data-testid="search-results-list" className="space-y-4">
             {filteredAndSortedItems.length === 0 ? (
-              <div className="p-8 text-center text-sm text-gray-500 bg-white rounded-xl border border-gray-200">
+              <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-2xl border border-emerald-100 shadow-xs">
                 Không có kết quả nào khớp với bộ lọc đã chọn.
               </div>
             ) : (
@@ -288,14 +301,14 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
       {searchResponse && searchResponse.totalPages > 1 && !isLoading && (
         <div
           data-testid="search-pagination"
-          className="flex items-center justify-center gap-3 pt-6 border-t border-gray-200"
+          className="flex items-center justify-center gap-3 pt-6 border-t border-emerald-100"
         >
           <button
             type="button"
             data-testid="btn-prev-page"
             disabled={!searchResponse.hasPreviousPage}
             onClick={() => handlePageChange(currentPage - 1)}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-200 bg-white text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -303,8 +316,8 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
             Trang trước
           </button>
 
-          <span data-testid="pagination-info" className="text-xs font-medium text-gray-600">
-            Trang <strong className="text-gray-900">{searchResponse.page}</strong> / {searchResponse.totalPages}
+          <span data-testid="pagination-info" className="text-xs font-medium text-slate-600 px-3 py-1.5 rounded-xl bg-slate-100 font-mono">
+            Trang <strong className="text-emerald-800">{searchResponse.page}</strong> / {searchResponse.totalPages}
           </span>
 
           <button
@@ -312,7 +325,7 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
             data-testid="btn-next-page"
             disabled={!searchResponse.hasNextPage}
             onClick={() => handlePageChange(currentPage + 1)}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-200 bg-white text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs"
           >
             Trang sau
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -324,3 +337,5 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
     </div>
   );
 };
+
+export default SearchContainer;

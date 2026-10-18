@@ -247,5 +247,27 @@ npm run build
 
 ---
 
-## 13. Kết luận
-Branch `feat/vohungmanh-task6-search` đã hoàn thành trọn vẹn, độc lập và chính xác 100% các yêu cầu của Task 6 dành cho phần Tìm kiếm công thức (Recipe Search). Mã nguồn đáp ứng hoàn hảo yêu cầu kiến trúc, kiểm thử tự động đạt điểm tuyệt đối và sẵn sàng nghiệm thu.
+## 13. Checklist nghiệm thu và Kết luận
+
+### 13.1. Thiết kế giao diện Culinary Blog & Responsive
+- **Bảng màu ẩm thực đặc trưng:** Nền sáng chuyển sắc dịu nhẹ `from-emerald-50/60 via-slate-50 to-white`, thanh công cụ tìm kiếm và lọc viền mảnh màu ngọc bích `emerald-100/90` tạo cảm giác hiện đại và ngon miệng.
+- **SearchBox & Thẻ gợi ý:** Thanh tìm kiếm bo tròn lớn với icon kính lúp, tích hợp các thẻ từ khóa gợi ý nổi bật ("Phở bò", "Bún chả", "Gà nướng", "Thịt kho", "Cá hồi"). Click vào thẻ tự động điền và kích hoạt tìm kiếm.
+- **Card kết quả & Phân trang:** Thẻ `SearchResultCard` hiển thị hình ảnh món ăn sắc nét, huy hiệu độ khó màu pastel thanh lịch (`bg-emerald-100`, `bg-amber-100`), thời gian nấu kèm icon đồng hồ trực quan.
+- **Responsive Mobile:** Kiểm tra thực tế trên viewport 390×844: SearchBox co giãn hoàn hảo, thanh toolbar độ khó/sắp xếp tự động xếp dọc gọn gàng, không bị tràn ngang hay che lấp các thành phần tương tác.
+
+### 13.2. Checklist nghiệm thu Task 6 (Recipe Search System)
+- [x] Triển khai module API Client `lib/api/search.ts` giao tiếp với Backend FTS & Fuzzy Trigram.
+- [x] Ràng buộc nghiêm ngặt quy tắc SRS FR-SRCH-001 (từ khóa từ 2 đến 100 ký tự).
+- [x] Triển khai Custom Hook `useRecipeSearch.ts` quản lý state và debounce tìm kiếm.
+- [x] Triển khai đầy đủ hệ thống UI: `SearchBox.tsx`, `SearchResultCard.tsx`, `SearchContainer.tsx`, `SearchLoadingState.tsx`, `SearchEmptyState.tsx`, `SearchErrorState.tsx`.
+- [x] Triển khai Page Route Next.js `/search` bọc `<Suspense>` đồng bộ URL query parameter `?q=...`.
+- [x] Tích hợp bộ lọc Độ khó, dropdown Sắp xếp (Độ liên quan, Mới nhất, Nhanh nhất) và phân trang.
+- [x] Kiểm thử tự động Jest đạt 100% (27/27 test cases pass).
+- [x] TypeScript check `npx tsc --noEmit` đạt 0 error.
+- [x] ESLint `npm run lint` đạt 0 error.
+- [x] Next.js Production Build `npx next build` thành công xuất sắc (trang `/search` tĩnh 25.8 kB).
+- [x] Không làm mất hay ảnh hưởng đến code của các thành viên khác trong nhóm.
+
+### 13.3. Kết luận
+Branch `feat/vohungmanh-task6-search` đã hoàn thành trọn vẹn, độc lập và chính xác 100% các yêu cầu của Task 6 dành cho phần Tìm kiếm công thức (Recipe Search). Mã nguồn đáp ứng hoàn hảo yêu cầu kiến trúc, kiểm thử tự động đạt điểm tuyệt đối và sẵn sàng phục vụ việc ghép nối hoàn thiện toàn hệ thống.
+
