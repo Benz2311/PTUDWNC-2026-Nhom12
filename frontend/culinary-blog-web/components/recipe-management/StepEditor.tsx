@@ -154,11 +154,11 @@ export const StepEditor: React.FC<StepEditorProps> = ({
       }
     }
 
-    // ImageUrl: optional, max 2048, valid url
+    // ImageUrl: optional, max 500, valid url
     if (values.imageUrl && values.imageUrl.trim() !== '') {
       const trimmedUrl = values.imageUrl.trim();
-      if (trimmedUrl.length > 2048) {
-        errors.imageUrl = 'Đường dẫn ảnh không được vượt quá 2048 ký tự.';
+      if (trimmedUrl.length > 500) {
+        errors.imageUrl = 'Đường dẫn ảnh không được vượt quá 500 ký tự.';
       } else if (!isValidUrl(trimmedUrl)) {
         errors.imageUrl = 'Đường dẫn ảnh không hợp lệ (cần bắt đầu bằng http:// hoặc https://).';
       }
@@ -552,16 +552,16 @@ export const StepEditor: React.FC<StepEditorProps> = ({
               )}
             </div>
 
-            {/* Image URL (Optional, max 2048) */}
+            {/* Image URL (Optional, max 500) */}
             <div className="space-y-1.5">
               <label htmlFor="step-input-image" className="block text-xs font-semibold text-gray-800">
-                URL ảnh minh họa <span className="text-gray-400 font-normal">(tùy chọn)</span>
+                URL ảnh minh họa <span className="text-gray-400 font-normal">(tùy chọn, tối đa 500 ký tự)</span>
               </label>
               <input
                 id="step-input-image"
                 data-testid="input-step-image"
                 type="url"
-                maxLength={2048}
+                maxLength={500}
                 value={formValues.imageUrl}
                 onChange={(e) => {
                   setFormValues({ ...formValues, imageUrl: e.target.value });
