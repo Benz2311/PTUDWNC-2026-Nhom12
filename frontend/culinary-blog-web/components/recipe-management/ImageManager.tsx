@@ -11,6 +11,7 @@ import {
   ImageApiError,
 } from '@/lib/api/images';
 import { ImageCard } from './ImageCard';
+import { ImagePreview } from './ImagePreview';
 
 export interface ImageManagerProps {
   /**
@@ -67,6 +68,8 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
 
   // Modal xác nhận xóa
   const [imageToDelete, setImageToDelete] = useState<RecipeImage | null>(null);
+  // Modal xem trước ảnh lớn
+  const [previewImage, setPreviewImage] = useState<RecipeImage | null>(null);
 
   // Tự động load ảnh từ backend khi có recipeId
   useEffect(() => {
@@ -396,22 +399,30 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
   return (
     <div className="space-y-6" data-testid="image-manager">
       {/* Header section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-emerald-100">
         <div>
-          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <svg className="w-5 h-5 text-green-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Bộ sưu tập hình ảnh ({images.length})
+          <div className="flex items-center gap-2 mb-1">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Culinary Gallery
+            </span>
+          </div>
+          <h3 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+            Bộ sưu tập hình ảnh
+            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-700 text-white shadow-2xs">
+              {images.length}
+            </span>
           </h3>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Quản lý ảnh minh họa của món ăn. Ảnh đầu tiên được thêm sẽ tự động đặt làm ảnh đại diện.
           </p>
         </div>
 
         {!isDirectApiMode && (
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
-            <svg className="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+            <svg className="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             Chế độ công thức mới (State cục bộ)
@@ -423,20 +434,23 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
       {errorMessage && (
         <div
           data-testid="image-error-banner"
-          className="p-3.5 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800 flex items-start gap-2.5"
+          className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-sm text-rose-800 flex items-start gap-3 shadow-xs animate-shake"
         >
-          <svg className="w-5 h-5 text-red-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10" strokeWidth="2" />
-            <line x1="12" y1="8" x2="12" y2="12" strokeWidth="2" strokeLinecap="round" />
-            <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2" strokeLinecap="round" />
-          </svg>
+          <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0 mt-0.5">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" strokeWidth="2" />
+              <line x1="12" y1="8" x2="12" y2="12" strokeWidth="2" strokeLinecap="round" />
+              <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
           <div className="flex-1">
-            <strong className="font-semibold">Đã xảy ra lỗi:</strong> {errorMessage}
+            <strong className="font-semibold block text-rose-900">Đã xảy ra lỗi:</strong>
+            <span className="text-xs sm:text-sm">{errorMessage}</span>
           </div>
           <button
             type="button"
             onClick={() => setErrorMessage(null)}
-            className="text-red-500 hover:text-red-700 p-0.5"
+            className="text-rose-500 hover:text-rose-800 p-1 rounded-lg hover:bg-rose-100/60 transition-colors"
             aria-label="Đóng thông báo"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -447,11 +461,17 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
       )}
 
       {/* Upload & Add Form Section */}
-      <div className="p-4 sm:p-5 rounded-xl bg-gray-50/50 border border-gray-200 space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <span className="text-sm font-semibold text-gray-900">Thêm hình ảnh mới</span>
+      <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-emerald-50/50 via-white to-emerald-50/30 border border-emerald-100/90 shadow-xs space-y-5">
+        <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-emerald-100/60">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800 font-bold text-xs">
+              +
+            </div>
+            <span className="text-sm font-bold text-slate-900">Thêm hình ảnh mới</span>
+          </div>
+
           {/* Mode Switch Tabs */}
-          <div className="inline-flex rounded-lg p-0.5 bg-gray-200/80 text-xs">
+          <div className="inline-flex rounded-xl p-1 bg-slate-100 border border-slate-200 text-xs">
             <button
               type="button"
               data-testid="tab-upload-file"
@@ -459,10 +479,10 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 setUploadMode('file');
                 setFormErrors({});
               }}
-              className={`px-3 py-1 rounded-md font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
                 uploadMode === 'file'
-                  ? 'bg-white text-green-800 shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Tải từ thiết bị (File)
@@ -474,10 +494,10 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 setUploadMode('url');
                 setFormErrors({});
               }}
-              className={`px-3 py-1 rounded-md font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
                 uploadMode === 'url'
-                  ? 'bg-white text-green-800 shadow-xs'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Nhập liên kết (URL)
@@ -491,10 +511,10 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
             <div className="space-y-2">
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
+                className={`relative flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-200 ${
                   formErrors.file
-                    ? 'border-red-300 bg-red-50/30'
-                    : 'border-gray-300 bg-white hover:border-green-600 hover:bg-green-50/20'
+                    ? 'border-rose-300 bg-rose-50/40'
+                    : 'border-emerald-300 bg-emerald-50/20 hover:border-emerald-600 hover:bg-emerald-50/50'
                 }`}
               >
                 <input
@@ -508,44 +528,57 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 />
 
                 {previewUrl ? (
-                  <div className="flex flex-col items-center gap-2">
+                  <div className="flex flex-col items-center gap-2.5">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={previewUrl}
                       alt="Preview ảnh trước khi upload"
                       data-testid="image-preview"
-                      className="h-36 w-auto max-w-full rounded-lg object-contain shadow-xs border border-gray-200"
+                      className="h-40 w-auto max-w-full rounded-xl object-contain shadow-md border border-emerald-200 bg-white p-1"
                     />
-                    <p className="text-xs text-green-800 font-medium">
-                      Đã chọn: {selectedFile?.name} ({(selectedFile?.size ? selectedFile.size / (1024 * 1024) : 0).toFixed(2)} MB)
-                    </p>
-                    <span className="text-[11px] text-gray-500 underline">Nhấp để chọn ảnh khác</span>
+                    <div className="text-center">
+                      <p className="text-xs text-emerald-900 font-semibold">
+                        Đã chọn: {selectedFile?.name} ({(selectedFile?.size ? selectedFile.size / (1024 * 1024) : 0).toFixed(2)} MB)
+                      </p>
+                      <span className="text-[11px] text-emerald-700 underline font-medium hover:text-emerald-900">
+                        Nhấp để thay đổi ảnh khác
+                      </span>
+                    </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center text-center space-y-1.5">
-                    <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <p className="text-xs font-medium text-gray-700">
-                      Nhấp để chọn ảnh từ máy hoặc kéo thả vào đây
-                    </p>
-                    <p className="text-[11px] text-gray-400">
-                      Hỗ trợ JPEG, PNG, WebP, AVIF (Tối đa 5 MB)
-                    </p>
+                  <div className="flex flex-col items-center text-center space-y-2">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-100/80 flex items-center justify-center text-emerald-800 shadow-2xs">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-xs sm:text-sm font-semibold text-slate-800">
+                        Nhấp để chọn ảnh từ máy hoặc kéo thả vào đây
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Hỗ trợ JPEG, PNG, WebP, AVIF (Tối đa 5 MB)
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
               {formErrors.file && (
-                <p data-testid="error-file" className="text-xs text-red-600 font-medium">
+                <p data-testid="error-file" className="text-xs text-rose-600 font-medium flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" strokeWidth="2" />
+                    <line x1="12" y1="8" x2="12" y2="12" strokeWidth="2" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2" />
+                  </svg>
                   {formErrors.file}
                 </p>
               )}
             </div>
           ) : (
             /* Upload Mode: Direct URL */
-            <div className="space-y-1">
-              <label htmlFor="image-url-input" className="block text-xs font-semibold text-gray-700">
-                Đường dẫn ảnh (Image URL) <span className="text-red-500">*</span>
+            <div className="space-y-1.5">
+              <label htmlFor="image-url-input" className="block text-xs font-semibold text-slate-700">
+                Đường dẫn ảnh (Image URL) <span className="text-rose-500">*</span>
               </label>
               <input
                 id="image-url-input"
@@ -558,14 +591,19 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                   if (formErrors.imageUrl) setFormErrors({ ...formErrors, imageUrl: undefined });
                 }}
                 placeholder="https://example.com/photos/recipe-main.jpg"
-                className={`w-full px-3 py-2 text-sm rounded-lg border bg-white focus:outline-none focus:ring-2 transition-colors ${
+                className={`w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border bg-white focus:outline-none focus:ring-2 transition-all ${
                   formErrors.imageUrl
-                    ? 'border-red-300 focus:ring-red-200'
-                    : 'border-gray-300 focus:ring-green-100 focus:border-green-700'
+                    ? 'border-rose-300 focus:ring-rose-200'
+                    : 'border-emerald-200 focus:ring-emerald-100 focus:border-emerald-600'
                 }`}
               />
               {formErrors.imageUrl && (
-                <p data-testid="error-image-url" className="text-xs text-red-600 font-medium">
+                <p data-testid="error-image-url" className="text-xs text-rose-600 font-medium flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" strokeWidth="2" />
+                    <line x1="12" y1="8" x2="12" y2="12" strokeWidth="2" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2" />
+                  </svg>
                   {formErrors.imageUrl}
                 </p>
               )}
@@ -577,10 +615,10 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
             {/* AltText */}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label htmlFor="image-alt-input" className="block text-xs font-medium text-gray-700">
+                <label htmlFor="image-alt-input" className="block text-xs font-semibold text-slate-700">
                   Chú thích ảnh (Alt text)
                 </label>
-                <span className="text-[10px] text-gray-400">{formValues.altText.length}/200</span>
+                <span className="text-[10px] text-slate-400 font-mono">{formValues.altText.length}/200</span>
               </div>
               <input
                 id="image-alt-input"
@@ -594,16 +632,16 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                   if (formErrors.altText) setFormErrors({ ...formErrors, altText: undefined });
                 }}
                 placeholder="Mô tả món ăn khi hoàn thành..."
-                className="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-green-100 focus:border-green-700"
+                className="w-full px-3.5 py-2 text-xs rounded-xl border border-emerald-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600"
               />
               {formErrors.altText && (
-                <p className="text-xs text-red-600">{formErrors.altText}</p>
+                <p className="text-xs text-rose-600">{formErrors.altText}</p>
               )}
             </div>
 
             {/* OrderIndex */}
             <div className="space-y-1">
-              <label htmlFor="image-order-input" className="block text-xs font-medium text-gray-700">
+              <label htmlFor="image-order-input" className="block text-xs font-semibold text-slate-700">
                 Thứ tự hiển thị (OrderIndex)
               </label>
               <input
@@ -618,15 +656,15 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                   if (formErrors.orderIndex) setFormErrors({ ...formErrors, orderIndex: undefined });
                 }}
                 placeholder={`Tự động (${images.length > 0 ? Math.max(...images.map((img) => img.orderIndex ?? 0)) + 1 : 0})`}
-                className="w-full px-3 py-1.5 text-xs rounded-lg border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-green-100 focus:border-green-700"
+                className="w-full px-3.5 py-2 text-xs rounded-xl border border-emerald-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600"
               />
               {formErrors.orderIndex && (
-                <p className="text-xs text-red-600">{formErrors.orderIndex}</p>
+                <p className="text-xs text-rose-600">{formErrors.orderIndex}</p>
               )}
             </div>
 
             {/* IsPrimary Checkbox */}
-            <div className="flex items-center gap-2 pt-5">
+            <div className="flex items-center gap-2.5 pt-5">
               <input
                 id="image-primary-checkbox"
                 type="checkbox"
@@ -634,22 +672,22 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 disabled={isActionDisabled}
                 checked={formValues.isPrimary || images.length === 0}
                 onChange={(e) => setFormValues({ ...formValues, isPrimary: e.target.checked })}
-                className="w-4 h-4 text-green-800 border-gray-300 rounded focus:ring-green-700"
+                className="w-4 h-4 text-emerald-700 border-emerald-300 rounded-md focus:ring-emerald-600 cursor-pointer"
               />
-              <label htmlFor="image-primary-checkbox" className="text-xs font-medium text-gray-800 cursor-pointer">
+              <label htmlFor="image-primary-checkbox" className="text-xs font-semibold text-slate-800 cursor-pointer select-none">
                 Đặt làm ảnh đại diện chính
               </label>
             </div>
           </div>
 
           {/* Submit button */}
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-emerald-100/60">
             {(selectedFile || formValues.imageUrl || formValues.altText) && (
               <button
                 type="button"
                 onClick={resetForm}
                 disabled={isActionDisabled}
-                className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-2xs"
               >
                 Hủy bỏ
               </button>
@@ -659,11 +697,11 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
               type="submit"
               data-testid="btn-submit-image"
               disabled={isActionDisabled}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg text-white bg-green-800 hover:bg-green-900 shadow-xs disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold rounded-xl text-white bg-emerald-700 hover:bg-emerald-800 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {isLoading ? (
                 <>
-                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 animate-spin text-emerald-200" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
@@ -671,7 +709,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 </>
               ) : (
                 <>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                   Tải lên & Lưu hình ảnh
@@ -687,15 +725,15 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         /* Empty State */
         <div
           data-testid="image-empty-state"
-          className="flex flex-col items-center justify-center p-10 rounded-xl bg-white border border-dashed border-gray-200 text-center space-y-2"
+          className="flex flex-col items-center justify-center p-12 rounded-2xl bg-emerald-50/20 border-2 border-dashed border-emerald-200 text-center space-y-3"
         >
-          <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-800">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-800 shadow-2xs">
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <h4 className="text-sm font-semibold text-gray-800">Chưa có hình ảnh nào cho công thức</h4>
-          <p className="text-xs text-gray-500 max-w-sm">
+          <h4 className="text-base font-bold text-slate-800">Chưa có hình ảnh nào cho công thức</h4>
+          <p className="text-xs sm:text-sm text-slate-500 max-w-md leading-relaxed">
             Tải lên ít nhất một ảnh minh họa cho món ăn của bạn. Ảnh đầu tiên được thêm sẽ tự động trở thành ảnh đại diện chính của công thức.
           </p>
         </div>
@@ -703,7 +741,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         /* Image Grid */
         <div
           data-testid="image-grid"
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
         >
           {images.map((image, idx) => (
             <ImageCard
@@ -713,30 +751,41 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
               disabled={isActionDisabled}
               onSetPrimary={handleSetPrimary}
               onDeleteRequest={handleDeleteRequest}
+              onPreview={(img) => setPreviewImage(img)}
             />
           ))}
         </div>
       )}
 
+      {/* Preview Modal */}
+      <ImagePreview
+        image={previewImage}
+        isOpen={Boolean(previewImage)}
+        onClose={() => setPreviewImage(null)}
+        onSetPrimary={handleSetPrimary}
+        onDeleteRequest={handleDeleteRequest}
+        disabled={isActionDisabled}
+      />
+
       {/* Delete Confirmation Dialog */}
       {imageToDelete && (
         <div
           data-testid="modal-delete-image"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs animate-fade-in"
         >
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4 border border-gray-200">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-full bg-red-100 text-red-600 shrink-0">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-emerald-100">
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 rounded-2xl bg-rose-100 text-rose-600 shrink-0">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </div>
-              <div className="space-y-1">
-                <h4 className="text-sm font-bold text-gray-900">Xác nhận xóa hình ảnh</h4>
-                <p className="text-xs text-gray-600 leading-relaxed">
+              <div className="space-y-1.5">
+                <h4 className="text-base font-bold text-slate-900">Xác nhận xóa hình ảnh</h4>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                   Bạn có chắc chắn muốn xóa hình ảnh này không?
                   {imageToDelete.isPrimary && (
-                    <span className="block mt-1 font-semibold text-amber-700">
+                    <span className="block mt-2 p-2.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold">
                       Lưu ý: Đây là ảnh đại diện chính. Khi xóa, hệ thống sẽ tự động chuyển cờ đại diện cho ảnh kế tiếp.
                     </span>
                   )}
@@ -744,13 +793,13 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
               <button
                 type="button"
                 data-testid="btn-cancel-delete-image"
                 disabled={isLoading}
                 onClick={() => setImageToDelete(null)}
-                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
               >
                 Hủy bỏ
               </button>
@@ -759,7 +808,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 data-testid="btn-confirm-delete-image"
                 disabled={isLoading}
                 onClick={handleConfirmDelete}
-                className="px-3.5 py-1.5 text-xs font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 rounded-xl hover:bg-rose-700 disabled:opacity-50 transition-colors shadow-xs"
               >
                 {isLoading ? 'Đang xóa...' : 'Xóa hình ảnh'}
               </button>

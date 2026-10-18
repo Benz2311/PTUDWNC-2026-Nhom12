@@ -255,5 +255,27 @@ npm run build
 
 ---
 
-## 13. Kết luận
-Branch `feat/vohungmanh-task6-image` đã hoàn thành đầy đủ, chuẩn mực và độc lập toàn bộ các yêu cầu của Task 6 dành cho phần Quản lý hình ảnh (Recipe Image Management). Mã nguồn đạt chất lượng cao, kiểm thử tự động đạt 100%, tuân thủ chặt chẽ ranh giới module của nhóm và sẵn sàng nghiệm thu.
+## 13. Checklist nghiệm thu và Kết luận
+
+### 13.1. Thiết kế giao diện Culinary Blog & Responsive
+- **Bảng màu ẩm thực đặc trưng:** Badge "Ảnh đại diện" màu xanh ngọc bích Emerald (`emerald-700`) nổi bật trên ảnh chính, card ảnh có viền mảnh `emerald-100` và đổ bóng nhẹ `shadow-xs`.
+- **Lưới ảnh & Xem trước:** Thẻ ảnh hiển thị chuẩn tỉ lệ 16:9 (`aspect-video`), hiệu ứng phóng to nhẹ (`group-hover:scale-105`) khi rê chuột; click ảnh mở `ImagePreview` modal lớn có nền mờ `backdrop-blur-sm` hiển thị thông số và Alt text.
+- **Responsive Mobile:** Kiểm tra thực tế trên viewport 390×844: lưới ảnh tự động chuyển từ 3 cột sang 1 cột, các nút thao tác (Đặt ảnh đại diện, Xóa, Xem lớn) giãn đều, dễ chạm trên điện thoại di động.
+- **Tabs Upload & Validation:** Nút chuyển đổi phương thức tải file và nhập liên kết URL mượt mà; form validation viền đỏ hiển thị tức thì khi người dùng nhập sai quy tắc.
+
+### 13.2. Checklist nghiệm thu Task 6 (Image Management)
+- [x] Triển khai module API Client `lib/api/images.ts` hỗ trợ tải ảnh multipart và liên kết URL.
+- [x] Triển khai module kiểm định tệp `lib/image-validator.ts` bám sát ràng buộc 5 MB, kiểm tra MIME type.
+- [x] Triển khai Custom Hook `useRecipeImages.ts` quản lý state và tiến trình upload.
+- [x] Triển khai các Component `ImageCard.tsx`, `ImagePreview.tsx`, `ImageUploadButton.tsx`, `ImageManager.tsx` chuẩn phong cách Culinary Blog.
+- [x] Xử lý đổi Primary Transaction và tự động chuyển đổi Primary khi ảnh chính bị xóa.
+- [x] Kiểm thử tự động Jest đạt 100% (26/26 test cases pass).
+- [x] TypeScript check `npx tsc --noEmit` đạt 0 error.
+- [x] ESLint `npm run lint` đạt 0 error.
+- [x] Next.js Production Build `npx next build` thành công xuất sắc.
+- [x] Route preview demo được bảo vệ an toàn bằng guard `notFound()` trong môi trường Production.
+- [x] Không làm mất hay ảnh hưởng đến code của các thành viên khác trong nhóm.
+
+### 13.3. Kết luận
+Branch `feat/vohungmanh-task6-image` đã hoàn thành đầy đủ, chuẩn mực và độc lập toàn bộ các yêu cầu của Task 6 dành cho phần Quản lý hình ảnh (Recipe Image Management). Mã nguồn đạt chất lượng cao, kiểm thử tự động đạt 100%, sẵn sàng phục vụ cho việc tích hợp vào màn hình Recipe Detail (Task 7) và Recipe Form (Task 8).
+
