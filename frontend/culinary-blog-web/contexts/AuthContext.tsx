@@ -11,6 +11,7 @@ import {
 import type { ReactNode } from "react";
 import { authApi } from "@/lib/api/auth";
 import { authStorage } from "@/lib/auth-storage";
+import { useAuthStore } from "@/lib/auth-store";
 import type {
   LoginRequest,
   RegisterRequest,
@@ -31,17 +32,11 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-/**
- * Auth Provider — quản lý trạng thái xác thực của ứng dụng:
- * - Lưu JWT Token vào localStorage
- * - Tự động gọi GET /api/v1/auth/me khi mở ứng dụng (nếu có token)
- */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Khởi tạo: nếu có token trong localStorage, tải thông tin user
   useEffect(() => {
     let cancelled = false;
 
@@ -57,13 +52,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           setUser(me);
           setAccessToken(token);
+          useAuthStore.getState().setTokens(token, authStorage.getRefreshToken());
+          useAuthStore.getState().setUser(me);
         }
       } catch {
-        // Token hết hạn hoặc bị thu hồi — đăng xuất im lặng
         if (!cancelled) {
           authStorage.clear();
           setUser(null);
           setAccessToken(null);
+          useAuthStore.getState().clear();
         }
       } finally {
         if (!cancelled) {
@@ -77,11 +74,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Lắng nghe sự kiện phiên hết hạn từ Axios Silent Refresh interceptor
   useEffect(() => {
     const handleSessionExpired = () => {
       setUser(null);
       setAccessToken(null);
+      useAuthStore.getState().clear();
     };
 
     window.addEventListener("auth:session-expired", handleSessionExpired);
@@ -94,6 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authStorage.setTokens(response.accessToken, response.refreshToken);
     setAccessToken(response.accessToken);
     setUser(response.user);
+    useAuthStore.getState().setTokens(response.accessToken, response.refreshToken);
+    useAuthStore.getState().setUser(response.user);
   }, []);
 
   const register = useCallback(async (request: RegisterRequest) => {
@@ -101,6 +100,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authStorage.setTokens(response.accessToken, response.refreshToken);
     setAccessToken(response.accessToken);
     setUser(response.user);
+    useAuthStore.getState().setTokens(response.accessToken, response.refreshToken);
+    useAuthStore.getState().setUser(response.user);
   }, []);
 
   const logout = useCallback(async () => {
@@ -113,12 +114,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authStorage.clear();
       setUser(null);
       setAccessToken(null);
+      useAuthStore.getState().clear();
     }
   }, []);
 
   const updateProfile = useCallback(async (request: UpdateProfileRequest) => {
     const updated = await authApi.updateProfile(request);
     setUser(updated);
+    useAuthStore.getState().setUser(updated);
     return updated;
   }, []);
 
