@@ -249,7 +249,7 @@ export function Header() {
               </DropdownMenu>
             ) : (
               /* Guest Auth Buttons */
-              <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -322,6 +322,33 @@ export function Header() {
               );
             })}
           </nav>
+
+          {user.role === "Guest" && (
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setIsAuthModalOpen(true);
+                }}
+                className="w-full text-xs font-medium"
+              >
+                Đăng nhập
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setIsAuthModalOpen(true);
+                }}
+                className="w-full text-xs font-semibold"
+              >
+                Đăng ký
+              </Button>
+            </div>
+          )}
 
           <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
             <span className="text-xs text-gray-500 font-medium">
