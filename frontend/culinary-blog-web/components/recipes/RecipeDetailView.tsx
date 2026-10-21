@@ -16,7 +16,7 @@ const nutritionLabels = [
   ['sodium', 'Natri', 'mg'],
 ] as const;
 
-export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
+export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
   const images = [...(recipe.images || [])].sort((left, right) =>
     Number(Boolean(right.isPrimary)) - Number(Boolean(left.isPrimary)) ||
     ((left.sortOrder ?? left.orderIndex ?? 0) - (right.sortOrder ?? right.orderIndex ?? 0)));
@@ -131,3 +131,5 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
     </article>
   );
 }
+
+export default RecipeDetailView;

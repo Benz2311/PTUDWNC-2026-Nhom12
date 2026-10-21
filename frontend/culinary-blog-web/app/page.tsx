@@ -101,7 +101,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-x-hidden">
       {/* ── HERO BANNER ─────────────────────────────────────────────── */}
       <section className="relative overflow-hidden culinary-hero-gradient text-white py-16 px-4 sm:px-6 lg:px-8">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
@@ -145,8 +145,8 @@ export default function HomePage() {
       </section>
 
       {/* ── FEATURED CATEGORIES ROW ─────────────────────────────────── */}
-      <section className="bg-white border-b border-gray-100 py-6">
-        <div className="container-page">
+      <section className="bg-white border-b border-gray-100 py-6 overflow-hidden">
+        <div className="container-page w-full overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <ChefHat className="h-5 w-5 text-emerald-700" />
@@ -157,7 +157,7 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+          <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar w-full">
             <button
               onClick={() => setFilters((prev) => ({ ...prev, categorySlug: undefined, page: 1 }))}
               className={`shrink-0 flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold border transition-all cursor-pointer ${
