@@ -1,12 +1,14 @@
-import { apiFetch, apiJson, ApiError } from '@/lib/api';
+import { apiClient, unwrapData, ApiError } from './client';
 import type {
   RecipeStep,
   CreateStepInput,
   UpdateStepInput,
 } from '@/types/step';
+import type { ApiResponse } from '@/types/api';
 
 export class StepApiError extends Error {
   status: number;
+
   errors?: Record<string, string[]>;
 
   constructor(message: string, status: number, errors?: Record<string, string[]>) {
@@ -18,13 +20,12 @@ export class StepApiError extends Error {
 }
 
 /**
- * Chuyển đổi ApiError từ apiFetch/apiJson thành StepApiError thân thiện với người dùng
+ * Chuyển đổi lỗi từ API client chung thành StepApiError thân thiện với người dùng
  */
 function handleStepError(error: unknown): never {
-  if (error && typeof error === 'object' && 'status' in error) {
-    const apiErr = error as ApiError;
-    const status = apiErr.status ?? 500;
-    let message = apiErr.message || 'Thao tác với bước thực hiện không thành công.';
+  if (error instanceof ApiError) {
+    const status = error.status ?? 500;
+    let message = error.message || 'Thao tác với bước thực hiện không thành công.';
 
     if (status === 401) {
       message = 'Bạn cần đăng nhập để thực hiện thao tác này.';
@@ -34,7 +35,7 @@ function handleStepError(error: unknown): never {
       message = 'Không tìm thấy công thức hoặc bước thực hiện tương ứng.';
     }
 
-    throw new StepApiError(message, status, apiErr.errors);
+    throw new StepApiError(message, status, error.errors);
   }
 
   if (error instanceof Error) {
@@ -49,10 +50,14 @@ function handleStepError(error: unknown): never {
  */
 export async function getRecipeSteps(slugOrId: string): Promise<RecipeStep[]> {
   try {
-    const data = await apiJson<{ steps?: RecipeStep[] }>(`/api/v1/recipes/${slugOrId}`);
-    return data?.steps ?? [];
+    const response = await apiClient.get<ApiResponse<{ steps?: RecipeStep[] }>>(
+      `/recipes/${encodeURIComponent(slugOrId)}`
+    );
+    const data = unwrapData(response);
+    const steps = data?.steps ?? [];
+    return [...steps].sort((a, b) => (a.stepNumber ?? 0) - (b.stepNumber ?? 0));
   } catch (error) {
-    if (error && typeof error === 'object' && 'status' in error && (error as ApiError).status === 404) {
+    if (error instanceof ApiError && error.status === 404) {
       return [];
     }
     return handleStepError(error);
@@ -67,16 +72,18 @@ export async function createRecipeStep(
   input: CreateStepInput
 ): Promise<RecipeStep> {
   try {
-    return await apiFetch<RecipeStep>(`/api/v1/recipes/${recipeId}/steps`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: input.title?.trim() || null,
-        description: input.description.trim(),
-        timerMinutes: input.timerMinutes ?? null,
-        imageUrl: input.imageUrl?.trim() || null,
-      }),
-    });
+    const payload = {
+      title: input.title?.trim() || null,
+      description: input.description.trim(),
+      timerMinutes: input.timerMinutes ?? null,
+      imageUrl: input.imageUrl?.trim() || null,
+    };
+
+    const response = await apiClient.post<ApiResponse<RecipeStep>>(
+      `/recipes/${recipeId}/steps`,
+      payload
+    );
+    return unwrapData(response);
   } catch (error) {
     return handleStepError(error);
   }
@@ -91,16 +98,18 @@ export async function updateRecipeStep(
   input: UpdateStepInput
 ): Promise<RecipeStep> {
   try {
-    return await apiFetch<RecipeStep>(`/api/v1/recipes/${recipeId}/steps/${stepId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: input.title?.trim() || null,
-        description: input.description.trim(),
-        timerMinutes: input.timerMinutes ?? null,
-        imageUrl: input.imageUrl?.trim() || null,
-      }),
-    });
+    const payload = {
+      title: input.title?.trim() || null,
+      description: input.description.trim(),
+      timerMinutes: input.timerMinutes ?? null,
+      imageUrl: input.imageUrl?.trim() || null,
+    };
+
+    const response = await apiClient.put<ApiResponse<RecipeStep>>(
+      `/recipes/${recipeId}/steps/${stepId}`,
+      payload
+    );
+    return unwrapData(response);
   } catch (error) {
     return handleStepError(error);
   }
@@ -114,11 +123,9 @@ export async function deleteRecipeStep(
   stepId: string
 ): Promise<void> {
   try {
-    await apiFetch<void>(`/api/v1/recipes/${recipeId}/steps/${stepId}`, {
-      method: 'DELETE',
-    });
+    await apiClient.delete(`/recipes/${recipeId}/steps/${stepId}`);
   } catch (error) {
-    return handleStepError(error);
+    handleStepError(error);
   }
 }
 
@@ -130,20 +137,18 @@ export async function reorderRecipeSteps(
   stepIds: string[]
 ): Promise<RecipeStep[]> {
   try {
-    return await apiFetch<RecipeStep[]>(`/api/v1/recipes/${recipeId}/steps/reorder`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        stepIds,
-      }),
-    });
+    const response = await apiClient.put<ApiResponse<RecipeStep[]>>(
+      `/recipes/${recipeId}/steps/reorder`,
+      { stepIds }
+    );
+    return unwrapData(response);
   } catch (error) {
     return handleStepError(error);
   }
 }
 
 /**
- * Tải lên tệp ảnh cho bước thực hiện (Multipart Form Data)
+ * Tải lên tệp ảnh cho bước thực hiện (Multipart Form Data - Browser/Axios tự tạo boundary)
  */
 export async function uploadStepImageFile(
   recipeId: string,
@@ -153,12 +158,12 @@ export async function uploadStepImageFile(
     const formData = new FormData();
     formData.append('file', file);
 
-    return await apiFetch<{ url: string }>(`/api/v1/recipes/${recipeId}/steps/images`, {
-      method: 'POST',
-      body: formData,
-    });
+    const response = await apiClient.post<ApiResponse<{ url: string }>>(
+      `/recipes/${recipeId}/steps/images`,
+      formData
+    );
+    return unwrapData(response);
   } catch (error) {
     return handleStepError(error);
   }
 }
-

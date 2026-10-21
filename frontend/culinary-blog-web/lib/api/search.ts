@@ -1,5 +1,5 @@
-import { apiFetchWithResponse, ApiError } from '@/lib/api';
-import type { SearchResponse, SearchResult } from '@/types/search';
+import { apiClient, unwrapPaged, ApiError } from './client';
+import type { SearchRequest, SearchResponse, SearchResult } from '@/types/search';
 import type { ApiResponse, PaginationMeta } from '@/types/api';
 
 export class SearchApiError extends Error {
@@ -15,20 +15,37 @@ export class SearchApiError extends Error {
 /**
  * Tìm kiếm công thức nấu ăn qua endpoint Full-Text Search & Fuzzy Trigram
  * Hỗ trợ từ khóa tiếng Việt có dấu và không dấu ("pho bo" -> "Phở bò")
+ * Validation SRS FR-SRCH-001: Từ khóa từ 2-100 ký tự. Ngoài phạm vi trả về rỗng không gửi request.
  */
 export async function searchRecipes(
-  query: string,
+  queryOrParams: string | SearchRequest,
   page = 1,
-  pageSize = 10
+  pageSize = 10,
+  difficulty?: string,
+  sortBy?: string
 ): Promise<SearchResponse> {
-  const trimmed = query.trim();
+  let params: SearchRequest;
 
-  // SRS FR-SRCH-001: Query dài 2-100 ký tự; ngoài phạm vi trả về danh sách rỗng
-  if (trimmed.length < 2 || trimmed.length > 100) {
-    return {
-      items: [],
+  if (typeof queryOrParams === 'string') {
+    params = {
+      q: queryOrParams,
       page,
       pageSize,
+      difficulty,
+      sortBy,
+    };
+  } else {
+    params = { ...queryOrParams };
+  }
+
+  const trimmedQuery = (params.q ?? '').trim();
+
+  // SRS FR-SRCH-001: Query dài 2-100 ký tự; ngoài phạm vi không gửi request, trả về danh sách rỗng
+  if (trimmedQuery.length < 2 || trimmedQuery.length > 100) {
+    return {
+      items: [],
+      page: params.page ?? 1,
+      pageSize: params.pageSize ?? 10,
       totalCount: 0,
       totalPages: 0,
       hasPreviousPage: false,
@@ -36,32 +53,42 @@ export async function searchRecipes(
     };
   }
 
-  const queryParams = new URLSearchParams({
-    q: trimmed,
-    page: String(page > 0 ? page : 1),
-    pageSize: String(pageSize > 0 && pageSize <= 100 ? pageSize : 10),
-  });
+  const queryParams: Record<string, string | number> = {
+    q: trimmedQuery,
+    page: params.page && params.page > 0 ? params.page : 1,
+    pageSize: params.pageSize && params.pageSize > 0 && params.pageSize <= 100 ? params.pageSize : 10,
+  };
+
+  if (params.categoryId) queryParams.categoryId = params.categoryId;
+  if (params.categorySlug) queryParams.categorySlug = params.categorySlug;
+  if (params.difficulty) queryParams.difficulty = params.difficulty;
+  if (params.maxCookTimeMinutes) queryParams.maxCookTimeMinutes = params.maxCookTimeMinutes;
+  if (params.sortBy) queryParams.sortBy = params.sortBy;
 
   try {
-    const res = await apiFetchWithResponse<ApiResponse<SearchResult[], PaginationMeta>>(`/api/v1/recipes/search?${queryParams.toString()}`);
-    const payload = res.data;
-    const items = payload.data ?? [];
-    const meta = payload.meta;
+    const response = await apiClient.get<ApiResponse<SearchResult[], PaginationMeta>>(
+      '/recipes/search',
+      {
+        params: queryParams,
+      }
+    );
+
+    const paged = unwrapPaged<SearchResult>(response);
+
     return {
-      items,
-      page: meta?.page ?? page,
-      pageSize: meta?.pageSize ?? pageSize,
-      totalCount: meta?.total ?? items.length,
-      totalPages: meta?.totalPages ?? 1,
-      hasPreviousPage: meta?.hasPreviousPage ?? false,
-      hasNextPage: meta?.hasNextPage ?? false,
+      items: paged.items,
+      page: paged.page,
+      pageSize: paged.pageSize,
+      totalCount: paged.totalCount,
+      totalPages: paged.totalPages,
+      hasPreviousPage: paged.hasPreviousPage,
+      hasNextPage: paged.hasNextPage,
     };
   } catch (error) {
-    if (error && typeof error === 'object' && 'status' in error) {
-      const apiErr = error as ApiError;
+    if (error instanceof ApiError) {
       throw new SearchApiError(
-        apiErr.message || 'Không thể tìm kiếm công thức vào lúc này.',
-        apiErr.status || 500
+        error.message || 'Không thể tìm kiếm công thức vào lúc này.',
+        error.status || 500
       );
     }
     if (error instanceof Error) {
