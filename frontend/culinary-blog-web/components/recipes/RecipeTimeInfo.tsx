@@ -1,17 +1,17 @@
 type RecipeTimeInfoProps = {
-  prepTimeMinutes: number;
-  cookTimeMinutes: number;
+  prepTimeMinutes?: number;
+  cookTimeMinutes?: number;
   servings?: number;
   compact?: boolean;
 };
 
 export default function RecipeTimeInfo({
-  prepTimeMinutes,
-  cookTimeMinutes,
+  prepTimeMinutes = 0,
+  cookTimeMinutes = 0,
   servings,
   compact = false,
 }: RecipeTimeInfoProps) {
-  const totalMinutes = prepTimeMinutes + cookTimeMinutes;
+  const totalMinutes = (prepTimeMinutes ?? 0) + (cookTimeMinutes ?? 0);
 
   return (
     <div className={`recipe-time-info${compact ? ' recipe-time-info-compact' : ''}`}>

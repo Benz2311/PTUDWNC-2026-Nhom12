@@ -32,5 +32,5 @@ export function ProtectedRoute({ children, roles, fallback }: ProtectedRouteProp
   if (roles && roles.length > 0 && !roles.some((r) => userRoles.includes(r))) {
     return null;
   }
-  return <>{children}</>;
+  return children as React.ReactElement;
 }

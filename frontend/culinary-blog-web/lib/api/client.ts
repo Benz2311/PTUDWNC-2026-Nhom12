@@ -279,3 +279,11 @@ export function extractErrorMessage(error: unknown, fallback = "Đã xảy ra l�
   return fallback;
 }
 
+export function setStoredToken(token: string): void {
+  authStorage.setTokens(token);
+}
+
+export function removeStoredToken(): void {
+  authStorage.clear();
+}
+

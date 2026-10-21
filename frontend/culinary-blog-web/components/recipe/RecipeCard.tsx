@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import type { RecipeSummary } from '@/types/recipe';
+import type { RecipeListItem, RecipeSummary } from '@/types/recipe';
 import DifficultyBadge from './DifficultyBadge';
 import RecipeMeta from './RecipeMeta';
 import RecipeStatusBadge from './RecipeStatusBadge';
@@ -13,14 +13,23 @@ const fallbackImages = [
 ];
 
 type RecipeCardProps = {
-  recipe: RecipeSummary;
+  recipe: RecipeSummary | RecipeListItem;
   className?: string;
   showStatus?: boolean;
   actions?: ReactNode;
 };
 
 export default function RecipeCard({ recipe, className = '', showStatus = false, actions }: RecipeCardProps) {
-  const imageUrl = recipe.primaryImageUrl || fallbackImages[recipe.title.length % fallbackImages.length];
+  const imageUrl =
+    recipe.primaryImageUrl ||
+    recipe.coverImageUrl ||
+    recipe.imageUrl ||
+    fallbackImages[recipe.title.length % fallbackImages.length];
+
+  const categoryName =
+    typeof recipe.category === 'object' && recipe.category
+      ? recipe.category.name
+      : (recipe.category || recipe.categoryName || 'Ẩm thực');
 
   return (
     <article className={`recipe-card ${className}`.trim()}>
@@ -35,7 +44,7 @@ export default function RecipeCard({ recipe, className = '', showStatus = false,
           aria-label={`Ảnh món ${recipe.title}`}
           style={{ backgroundImage: `url("${imageUrl}")` }}
         >
-          <span className="recipe-tag">{recipe.category}</span>
+          <span className="recipe-tag">{categoryName}</span>
           <span className="recipe-image-icon" aria-hidden="true">↗</span>
         </div>
         <div className="recipe-body">
@@ -47,8 +56,8 @@ export default function RecipeCard({ recipe, className = '', showStatus = false,
           <p>{recipe.description || 'Khám phá cách chế biến món ăn này.'}</p>
           <RecipeMeta category={recipe.category} author={recipe.author} publishedAt={recipe.publishedAt} />
           <RecipeTimeInfo
-            prepTimeMinutes={recipe.prepTimeMinutes}
-            cookTimeMinutes={recipe.cookTimeMinutes}
+            prepTimeMinutes={recipe.prepTimeMinutes ?? recipe.prepTime}
+            cookTimeMinutes={recipe.cookTimeMinutes ?? recipe.cookTime}
             compact
           />
         </div>

@@ -17,8 +17,9 @@ const nutritionLabels = [
 ] as const;
 
 export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
-  const images = [...recipe.images].sort((left, right) =>
-    Number(right.isPrimary) - Number(left.isPrimary) || left.sortOrder - right.sortOrder);
+  const images = [...(recipe.images || [])].sort((left, right) =>
+    Number(Boolean(right.isPrimary)) - Number(Boolean(left.isPrimary)) ||
+    ((left.sortOrder ?? left.orderIndex ?? 0) - (right.sortOrder ?? right.orderIndex ?? 0)));
   const [activeImage, setActiveImage] = useState(0);
   const selectedImage = images[activeImage];
 
@@ -33,8 +34,8 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
         {recipe.description && <p className="detail-lead">{recipe.description}</p>}
         <RecipeMeta category={recipe.category} author={recipe.author} publishedAt={recipe.publishedAt} />
         <RecipeTimeInfo
-          prepTimeMinutes={recipe.prepTimeMinutes}
-          cookTimeMinutes={recipe.cookTimeMinutes}
+          prepTimeMinutes={recipe.prepTimeMinutes ?? recipe.prepTime}
+          cookTimeMinutes={recipe.cookTimeMinutes ?? recipe.cookTime}
           servings={recipe.servings}
         />
       </header>
@@ -44,7 +45,7 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
           className="recipe-detail-cover"
           role="img"
           aria-label={selectedImage?.altText || recipe.title}
-          style={{ backgroundImage: `url("${selectedImage?.url ?? '/sample-images/food-01.svg'}")` }}
+          style={{ backgroundImage: `url("${selectedImage?.url ?? selectedImage?.originalUrl ?? '/sample-images/food-01.svg'}")` }}
         />
         {images.length > 1 && (
           <div className="recipe-detail-thumbnails" aria-label="Chọn ảnh công thức">
@@ -56,7 +57,7 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
                 onClick={() => setActiveImage(index)}
                 aria-label={`Xem ảnh ${index + 1}`}
                 aria-pressed={index === activeImage}
-                style={{ backgroundImage: `url("${image.url}")` }}
+                style={{ backgroundImage: `url("${image.url ?? image.originalUrl}")` }}
               />
             ))}
           </div>
@@ -72,12 +73,12 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
 
           <section className="detail-section">
             <h2>Nguyên liệu</h2>
-            {recipe.ingredients.length === 0 ? (
+            {(!recipe.ingredients || recipe.ingredients.length === 0) ? (
               <p className="detail-content">Chưa có nguyên liệu được cung cấp.</p>
             ) : (
               <ul className="ingredient-list">
                 {[...recipe.ingredients]
-                  .sort((left, right) => left.sortOrder - right.sortOrder)
+                  .sort((left, right) => (left.sortOrder ?? left.orderIndex ?? 0) - (right.sortOrder ?? right.orderIndex ?? 0))
                   .map((ingredient) => (
                     <li className="ingredient-item" key={ingredient.id}>
                       <span>{ingredient.name}{ingredient.notes && <small>{ingredient.notes}</small>}</span>
@@ -90,7 +91,7 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
 
           <section className="detail-section">
             <h2>Các bước thực hiện</h2>
-            {recipe.steps.length === 0 ? (
+            {(!recipe.steps || recipe.steps.length === 0) ? (
               <p className="detail-content">Chưa có hướng dẫn chế biến.</p>
             ) : (
               <ol className="step-list">
@@ -118,7 +119,7 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
               {nutritionLabels.map(([key, label, unit]) => (
                 <div key={key}>
                   <dt>{label}</dt>
-                  <dd>{recipe.nutrition?.[key] ?? '—'}{recipe.nutrition?.[key] == null ? '' : unit}</dd>
+                  <dd>{(recipe.nutrition as any)?.[key] ?? '—'}{(recipe.nutrition as any)?.[key] == null ? '' : unit}</dd>
                 </div>
               ))}
             </dl>
