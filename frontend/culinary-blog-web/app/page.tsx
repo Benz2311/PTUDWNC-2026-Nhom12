@@ -24,6 +24,8 @@ export default function HomePage() {
     page: 1,
     pageSize: 9,
     totalPages: 1,
+    hasNextPage: false,
+    hasPreviousPage: false,
   });
   const [filters, setFilters] = useState<RecipeFilterParams>({
     page: 1,
@@ -207,7 +209,7 @@ export default function HomePage() {
           <RecipeFilter
             categories={categories}
             filters={filters}
-            onFilterChange={(newFilters) => setFilters(newFilters)}
+            onFilterChange={(newFilters: RecipeFilterParams) => setFilters(newFilters)}
             onReset={handleResetFilters}
             isAdmin={isAdmin}
           />
