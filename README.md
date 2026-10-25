@@ -49,21 +49,27 @@ Không commit `.env` hoặc thông tin đăng nhập thật. Compose khởi đ�
 - [Tổng quan kiến trúc](./ARCHITECTURE.md): các tầng và luồng dữ liệu.
 - [Phân tích truy vấn Category](./docs/database/explain-analyze-category-recipe.md).
 
-## Phạm Nguyễn Ngọc Phước - API Utilities / Recipe Shared Components (Bữa 6)
+## Phạm Nguyễn Ngọc Phước - Chi tiết công thức theo Slug (Bữa 7)
 
-Trong Bữa 6, Phạm Nguyễn Ngọc Phước phụ trách hoàn thiện tiện ích gọi API và xây dựng các thành phần giao diện Recipe có thể tái sử dụng:
+Trong Bữa 7, Phạm Nguyễn Ngọc Phước phụ trách hoàn thiện trang xem chi tiết công thức nấu ăn theo Slug và tích hợp dữ liệu với Backend:
 
-- Tiếp tục dùng API Client đã có từ Bữa 5; tập trung các hàm truy vấn, tìm kiếm và thao tác Recipe trong `frontend/lib/api/recipes.ts`, không tạo API Client mới.
-- Hỗ trợ tạo query string với phân trang, tìm kiếm, danh mục, trạng thái và sắp xếp; xử lý response theo các Recipe Type/schema dùng chung.
-- Chuẩn hóa các thao tác Recipe như tạo, cập nhật, đổi trạng thái, xóa và quản lý nguyên liệu/bước/ảnh; các thao tác có kiểm soát phiên bản sử dụng ETag và `If-Match`.
-- Xây dựng các component dùng chung `RecipeCard`, `RecipeList`, `RecipeMeta`, `RecipeStatusBadge`, `DifficultyBadge` và `RecipeTimeInfo`. Dữ liệu được truyền qua props, các component sử dụng Recipe Types hiện có thay vì khai báo type nghiệp vụ trùng lặp.
-- Tích hợp Recipe Shared Components vào trang chủ, trang khám phá/tìm kiếm, trang danh mục và khu vực quản lý công thức. Recipe Card hiển thị ảnh, tên món, danh mục, tác giả, độ khó, thời gian chuẩn bị/nấu và ngày xuất bản khi API có dữ liệu.
-- Hoàn thiện giao diện Recipe Detail với thông tin công thức, ảnh và thư viện ảnh, nguyên liệu, dinh dưỡng và các bước chế biến.
-- Sắp xếp Recipe Form thành các khu vực thông tin cơ bản, nguyên liệu, các bước, dinh dưỡng, ảnh và trạng thái công thức. `StepEditor` và `ImageManager` được tích hợp vào bố cục; không thay đổi logic bên trong hai component này.
-- Bổ sung ngày xuất bản vào response DTO và Recipe Type để giao diện hiển thị đúng ngày xuất bản, không dùng ngày tạo thay thế.
-- Bổ sung kiểm thử serialize query và mở rộng cấu hình Vitest để nhận diện kiểm thử trong `lib/`.
+- Hoàn thiện trang xem chi tiết công thức theo Slug bằng API `GET /api/v1/recipes/{slug}`, truyền xác thực `withAuth = true` để hỗ trợ phân quyền người dùng.
+- Hiển thị đầy đủ các thông tin cơ bản: Title, Description, Content, Author, Category, Difficulty (`DifficultyBadge`), PrepTimeMinutes, CookTimeMinutes, Servings (`RecipeTimeInfo`), trạng thái (`RecipeStatusBadge`) và ngày xuất bản PublishedAt (định dạng ngày chuẩn tiếng Việt).
+- Tích hợp hệ thống Breadcrumbs điều hướng: *Trang chủ* > *Công thức* > *Danh mục* > *Tên công thức*.
+- Hiển thị ảnh Primary của Recipe ở vị trí nổi bật có huy hiệu *Ảnh chính* và caption mô tả; hiển thị bộ sưu tập ảnh phụ theo thứ tự `sortOrder` với thumbnail có thể tương tác; có giao diện fallback trang nhã khi công thức chưa có ảnh.
+- Sắp xếp danh sách nguyên liệu (Ingredients) đúng theo `OrderIndex` (`orderIndex ?? sortOrder`), hiển thị chi tiết Name, Quantity, Unit và Notes; hỗ trợ Empty State khi chưa có nguyên liệu.
+- Hiển thị bảng thông tin dinh dưỡng (Nutrition) gồm đầy đủ 6 chỉ số: Calories (kcal), Protein (g), Carbohydrates (g), Chất béo (g), Chất xơ (g) và Natri (mg) khi công thức có dữ liệu; hiển thị thông báo phù hợp khi chưa có dinh dưỡng.
+- Hiển thị các bước thực hiện đúng theo `StepNumber`, kèm Title, Description, thời gian hẹn giờ `TimerMinutes` (⏱ X phút) và hình ảnh bước chế biến (`imageUrl`) nếu có.
+- Tái sử dụng component `RecipeSteps` thuộc Võ Hùng Mạnh ở chế độ hiển thị phù hợp mà không sửa logic nội bộ của component; liên kết trực tiếp sang chế độ nấu tương tác `CookingGuide` (`/recipes/[slug]/cook`).
+- Hiển thị thông tin tác giả, Category với liên kết điều hướng lọc danh mục và liên kết quay lại danh sách công thức.
+- Xử lý trường hợp Recipe không tồn tại bằng giao diện 404 Not Found thích hợp kèm các nút điều hướng khám phá món ăn khác hoặc về trang chủ.
+- Xử lý quyền truy cập đối với công thức `Draft` hoặc `Archived` đúng theo Backend: chỉ cho phép Author sở hữu hoặc Admin xem khi có token xác thực; hiển thị màn hình 403 Forbidden giải thích rõ lý do kèm nút đăng nhập tài khoản khi người dùng không đủ quyền truy cập.
+- Xây dựng component `RecipeDetailSkeleton` với hiệu ứng shimmer mô phỏng chính xác bố cục trang chi tiết; hoàn thiện giao diện Error State kèm nút "Thử lại" và các Empty State dùng chung.
+- Hoàn thiện Responsive layout cho Recipe Detail: bố cục 2 cột trên Desktop (cột nội dung chính và bảng dinh dưỡng sticky cố định), tự động co giãn và chuyển sang 1 cột tối ưu trên Tablet và Mobile.
+- Không triển khai chức năng Create/Edit Recipe trong Bữa 7.
+- Kiểm thử tự động Recipe Detail tại `frontend/lib/api/recipe-detail.test.ts` bao phủ các trường hợp: Recipe Published đầy đủ, Recipe có/không có ảnh, Recipe có nhiều Step/Ingredient, Recipe không tồn tại (404) và Recipe không đủ quyền xem (403).
 
-Kiểm tra Bữa 6: `npm run build`, `npm run lint` và `npm test` trong thư mục `frontend`; build API bằng `dotnet build backend/src/CulinaryBlog.Api/CulinaryBlog.API.csproj --no-restore`. Frontend build, lint và 5 kiểm thử đều đạt; backend build thành công, còn các cảnh báo analyzer hiện có.
+Kiểm tra Bữa 7: `npm run build`, `npm run lint` và `npm test` trong thư mục `frontend`; build API bằng `dotnet build backend/src/CulinaryBlog.Api/CulinaryBlog.API.csproj --no-restore`. Frontend build thành công 21 routes, lint 0 lỗi/cảnh báo, toàn bộ 11 tests đều đạt; backend build thành công 0 lỗi và 80 unit tests đều PASS.
 
 ## Kiểm thử backend
 
