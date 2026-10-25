@@ -596,7 +596,7 @@ public static class RecipeEndpoints
             await TouchRecipeAsync(recipe, db, httpContext, invalidator, cancellationToken);
             return Results.Created(
                 $"/api/recipes/{id}/ingredients/{ingredient.Id}",
-                new IngredientResponse(ingredient.Id, ingredient.Name, ingredient.Quantity, ingredient.Unit, ingredient.SortOrder, ingredient.Notes));
+                new IngredientResponse(ingredient.Id, ingredient.Name, ingredient.Quantity, ingredient.Unit, ingredient.SortOrder, ingredient.Notes, ingredient.SortOrder));
         }).RequireAuthorization()
         .Produces<IngredientResponse>(StatusCodes.Status201Created)
         .Produces(StatusCodes.Status403Forbidden)
@@ -641,7 +641,7 @@ public static class RecipeEndpoints
             ingredient.SortOrder = request.OrderIndex ?? request.SortOrder;
             await recipeWriteService.UpdateIngredientAsync(ingredient, cancellationToken);
             await TouchRecipeAsync(recipe, db, httpContext, invalidator, cancellationToken);
-            return Results.Ok(new IngredientResponse(ingredient.Id, ingredient.Name, ingredient.Quantity, ingredient.Unit, ingredient.SortOrder, ingredient.Notes));
+            return Results.Ok(new IngredientResponse(ingredient.Id, ingredient.Name, ingredient.Quantity, ingredient.Unit, ingredient.SortOrder, ingredient.Notes, ingredient.SortOrder));
         }).RequireAuthorization()
         .Produces<IngredientResponse>()
         .Produces(StatusCodes.Status403Forbidden)
@@ -712,12 +712,14 @@ public static class RecipeEndpoints
                 StepNumber = recipe.Steps.Count == 0 ? 1 : recipe.Steps.Max(item => item.StepNumber) + 1,
                 Title = request.Title?.Trim() ?? string.Empty,
                 Description = request.Description.Trim(),
+                TimerMinutes = request.TimerMinutes,
+                ImageUrl = request.ImageUrl,
             };
             await recipeWriteService.AddStepAsync(step, cancellationToken);
             await TouchRecipeAsync(recipe, db, httpContext, invalidator, cancellationToken);
             return Results.Created(
                 $"/api/recipes/{id}/steps/{step.Id}",
-                new StepResponse(step.Id, step.StepNumber, step.Title, step.Description));
+                new StepResponse(step.Id, step.StepNumber, step.Title, step.Description, step.TimerMinutes, step.ImageUrl));
         }).RequireAuthorization()
         .Produces<StepResponse>(StatusCodes.Status201Created)
         .Produces(StatusCodes.Status403Forbidden)
@@ -757,9 +759,11 @@ public static class RecipeEndpoints
 
             step.Title = request.Title?.Trim() ?? string.Empty;
             step.Description = request.Description.Trim();
+            step.TimerMinutes = request.TimerMinutes;
+            step.ImageUrl = request.ImageUrl;
             await recipeWriteService.UpdateStepAsync(step, cancellationToken);
             await TouchRecipeAsync(recipe, db, httpContext, invalidator, cancellationToken);
-            return Results.Ok(new StepResponse(step.Id, step.StepNumber, step.Title, step.Description));
+            return Results.Ok(new StepResponse(step.Id, step.StepNumber, step.Title, step.Description, step.TimerMinutes, step.ImageUrl));
         }).RequireAuthorization()
         .Produces<StepResponse>()
         .Produces(StatusCodes.Status403Forbidden)
@@ -1213,11 +1217,13 @@ public static class RecipeEndpoints
                 StepNumber = index + 1,
                 Title = request.Title?.Trim() ?? string.Empty,
                 Description = request.Description.Trim(),
+                TimerMinutes = request.TimerMinutes,
+                ImageUrl = request.ImageUrl,
             })
             .ToList();
 
     private static RecipeDetailResponse ToDetail(Recipe recipe) =>
-        new(recipe.Id, recipe.Title, recipe.Slug, recipe.Description, recipe.Content, recipe.CategoryId, recipe.Category.Name, recipe.Author.FullName, recipe.PrepTimeMinutes, recipe.CookTimeMinutes, recipe.Servings, recipe.Difficulty.ToString(), recipe.Status.ToString(), recipe.CreatedAt, recipe.PublishedAt, recipe.Ingredients.Select(ingredient => new IngredientResponse(ingredient.Id, ingredient.Name, ingredient.Quantity, ingredient.Unit, ingredient.SortOrder, ingredient.Notes)), recipe.Steps.OrderBy(step => step.StepNumber).Select(step => new StepResponse(step.Id, step.StepNumber, step.Title, step.Description)), recipe.Nutrition is null ? null : new NutritionResponse(recipe.Nutrition.Calories, recipe.Nutrition.Protein, recipe.Nutrition.Carbohydrates, recipe.Nutrition.Fat, recipe.Nutrition.Fiber, recipe.Nutrition.Sodium), recipe.Images.OrderBy(image => image.SortOrder).Select(image => new ImageResponse(image.Id, image.Url, image.AltText, image.IsPrimary, image.SortOrder)));
+        new(recipe.Id, recipe.Title, recipe.Slug, recipe.Description, recipe.Content, recipe.CategoryId, recipe.Category.Name, recipe.Author.FullName, recipe.PrepTimeMinutes, recipe.CookTimeMinutes, recipe.Servings, recipe.Difficulty.ToString(), recipe.Status.ToString(), recipe.CreatedAt, recipe.PublishedAt, recipe.Ingredients.Select(ingredient => new IngredientResponse(ingredient.Id, ingredient.Name, ingredient.Quantity, ingredient.Unit, ingredient.SortOrder, ingredient.Notes, ingredient.SortOrder)), recipe.Steps.OrderBy(step => step.StepNumber).Select(step => new StepResponse(step.Id, step.StepNumber, step.Title, step.Description, step.TimerMinutes, step.ImageUrl)), recipe.Nutrition is null ? null : new NutritionResponse(recipe.Nutrition.Calories, recipe.Nutrition.Protein, recipe.Nutrition.Carbohydrates, recipe.Nutrition.Fat, recipe.Nutrition.Fiber, recipe.Nutrition.Sodium), recipe.Images.OrderBy(image => image.SortOrder).Select(image => new ImageResponse(image.Id, image.Url, image.AltText, image.IsPrimary, image.SortOrder)));
 
     private static string Slugify(string value) => SlugHelper.Generate(value);
 

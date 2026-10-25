@@ -7,4 +7,5 @@ public sealed record IngredientResponse(
     decimal? Quantity,
     string? Unit,
     int SortOrder,
-    string? Notes);
+    string? Notes,
+    int? OrderIndex = null);

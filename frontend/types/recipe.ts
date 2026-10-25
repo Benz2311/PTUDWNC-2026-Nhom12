@@ -12,6 +12,7 @@ export const recipeIngredientSchema = z.object({
   quantity: z.number().nullable(),
   unit: z.string().nullable(),
   sortOrder: z.number().int(),
+  orderIndex: z.number().int().optional(),
   notes: z.string().nullable(),
 });
 export type RecipeIngredient = z.infer<typeof recipeIngredientSchema>;
@@ -31,6 +32,8 @@ export const recipeStepSchema = z.object({
   stepNumber: z.number().int(),
   title: z.string(),
   description: z.string(),
+  timerMinutes: z.number().int().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
 });
 export type RecipeStep = z.infer<typeof recipeStepSchema>;
 
