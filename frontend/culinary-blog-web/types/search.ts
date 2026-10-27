@@ -44,7 +44,9 @@ export interface SearchResponse {
 }
 
 export interface SearchFilterState {
+  categoryId?: string;
   categorySlug?: string;
   difficulty?: string;
+  maxCookTimeMinutes?: number;
   sortBy?: 'relevance' | 'newest' | 'cookTime';
 }

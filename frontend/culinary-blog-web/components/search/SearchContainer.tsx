@@ -3,21 +3,35 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { SearchResponse } from '@/types/search';
 import { searchRecipes } from '@/lib/api/search';
+import { getCategories } from '@/lib/api/categories';
 import { SearchBox } from './SearchBox';
 import { SearchResultCard } from './SearchResultCard';
+import { SearchLoadingState } from './SearchLoadingState';
+import { SearchEmptyState } from './SearchEmptyState';
+import { SearchErrorState } from './SearchErrorState';
 
 export interface SearchContainerProps {
   initialQuery?: string;
   initialPage?: number;
+  initialCategory?: string;
+  initialDifficulty?: string;
+  initialMaxCookTime?: number;
+  initialSort?: 'relevance' | 'newest' | 'cookTime';
   pageSize?: number;
   autoSearchOnMount?: boolean;
+  syncUrl?: boolean;
 }
 
 export const SearchContainer: React.FC<SearchContainerProps> = ({
   initialQuery = '',
   initialPage = 1,
+  initialCategory = 'all',
+  initialDifficulty = 'all',
+  initialMaxCookTime = 0,
+  initialSort = 'relevance',
   pageSize = 10,
   autoSearchOnMount = true,
+  syncUrl = true,
 }) => {
   const [activeQuery, setActiveQuery] = useState<string>(initialQuery);
   const [currentPage, setCurrentPage] = useState<number>(initialPage);
@@ -27,8 +41,62 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
   const [hasSearched, setHasSearched] = useState<boolean>(Boolean(initialQuery.trim().length >= 2));
 
   // Bộ lọc và sắp xếp
-  const [difficultyFilter, setDifficultyFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'relevance' | 'newest' | 'cookTime'>('relevance');
+  const [categoryFilter, setCategoryFilter] = useState<string>(initialCategory);
+  const [difficultyFilter, setDifficultyFilter] = useState<string>(initialDifficulty);
+  const [maxCookTimeFilter, setMaxCookTimeFilter] = useState<number>(initialMaxCookTime);
+  const [sortBy, setSortBy] = useState<'relevance' | 'newest' | 'cookTime'>(initialSort);
+
+  // Danh mục lấy từ API thật
+  const [categories, setCategories] = useState<{ slug: string; name: string }[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    getCategories()
+      .then((data) => {
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setCategories(data.map((c) => ({ slug: c.slug, name: c.name })));
+        }
+      })
+      .catch(() => {
+        // Fallback an toàn nếu API danh mục tạm ngắt
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Hàm đồng bộ URL query parameters
+  const updateUrlParams = useCallback(
+    (
+      q: string,
+      pageToFetch: number,
+      diff: string,
+      sort: 'relevance' | 'newest' | 'cookTime',
+      cat: string,
+      cookTime: number
+    ) => {
+      if (!syncUrl || typeof window === 'undefined') return;
+
+      const params = new URLSearchParams();
+      if (q.trim()) params.set('q', q.trim());
+      if (pageToFetch > 1) params.set('page', String(pageToFetch));
+      if (cat && cat !== 'all') params.set('category', cat);
+      if (diff && diff !== 'all') params.set('difficulty', diff);
+      if (cookTime > 0) params.set('maxCookTime', String(cookTime));
+      if (sort !== 'relevance') params.set('sort', sort);
+
+      const qs = params.toString();
+      const targetUrl = qs ? `/search?${qs}` : '/search';
+      if (window.location.pathname + window.location.search !== targetUrl) {
+        window.history.pushState(
+          { q, page: pageToFetch, diff, sort, cat, cookTime },
+          '',
+          targetUrl
+        );
+      }
+    },
+    [syncUrl]
+  );
 
   // Hàm gọi API tìm kiếm
   const executeSearch = useCallback(
@@ -36,7 +104,10 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
       q: string,
       pageToFetch: number,
       filterDiff: string = difficultyFilter,
-      sortOption: 'relevance' | 'newest' | 'cookTime' = sortBy
+      sortOption: 'relevance' | 'newest' | 'cookTime' = sortBy,
+      filterCat: string = categoryFilter,
+      filterCookTime: number = maxCookTimeFilter,
+      shouldUpdateUrl: boolean = true
     ) => {
       const trimmed = q.trim();
       if (trimmed.length < 2) {
@@ -58,9 +129,21 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
             : sortOption === 'cookTime'
             ? 'cookTime'
             : 'relevance';
+        const catParam = filterCat !== 'all' && filterCat ? filterCat : undefined;
+        const cookParam = filterCookTime > 0 ? filterCookTime : undefined;
 
         let result: SearchResponse;
-        if (diffParam || sortParam !== 'relevance') {
+        if (catParam || cookParam) {
+          result = await searchRecipes({
+            q: trimmed,
+            page: pageToFetch,
+            pageSize,
+            categorySlug: catParam,
+            difficulty: diffParam,
+            maxCookTimeMinutes: cookParam,
+            sortBy: sortParam,
+          });
+        } else if (diffParam || sortParam !== 'relevance') {
           result = await searchRecipes(trimmed, pageToFetch, pageSize, diffParam, sortParam);
         } else {
           result = await searchRecipes(trimmed, pageToFetch, pageSize);
@@ -68,6 +151,10 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
 
         setSearchResponse(result);
         setCurrentPage(result.page);
+
+        if (shouldUpdateUrl) {
+          updateUrlParams(trimmed, pageToFetch, filterDiff, sortOption, filterCat, filterCookTime);
+        }
       } catch (err) {
         setErrorMessage(
           err instanceof Error ? err.message : 'Không thể kết nối đến máy chủ tìm kiếm.'
@@ -77,20 +164,78 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
         setIsLoading(false);
       }
     },
-    [pageSize, difficultyFilter, sortBy]
+    [pageSize, difficultyFilter, sortBy, categoryFilter, maxCookTimeFilter, updateUrlParams]
   );
 
   // Khởi động tìm kiếm nếu có initialQuery
   useEffect(() => {
     if (autoSearchOnMount && initialQuery.trim().length >= 2) {
-      executeSearch(initialQuery, initialPage);
+      executeSearch(
+        initialQuery,
+        initialPage,
+        initialDifficulty,
+        initialSort,
+        initialCategory,
+        initialMaxCookTime,
+        false
+      );
     }
-  }, [autoSearchOnMount, initialQuery, initialPage, executeSearch]);
+  }, [
+    autoSearchOnMount,
+    initialQuery,
+    initialPage,
+    initialDifficulty,
+    initialSort,
+    initialCategory,
+    initialMaxCookTime,
+    executeSearch,
+  ]);
+
+  // Lắng nghe sự kiện popstate để hỗ trợ Back / Forward của trình duyệt
+  useEffect(() => {
+    if (!syncUrl || typeof window === 'undefined') return;
+
+    const handlePopState = () => {
+      const sp = new URLSearchParams(window.location.search);
+      const urlQ = sp.get('q') || '';
+      const urlPage = parseInt(sp.get('page') || '1', 10) || 1;
+      const urlCat = sp.get('category') || 'all';
+      const urlDiff = sp.get('difficulty') || 'all';
+      const urlCook = parseInt(sp.get('maxCookTime') || '0', 10) || 0;
+      const urlSort = (sp.get('sort') as any) || 'relevance';
+
+      setActiveQuery(urlQ);
+      setCurrentPage(urlPage);
+      setCategoryFilter(urlCat);
+      setDifficultyFilter(urlDiff);
+      setMaxCookTimeFilter(urlCook);
+      setSortBy(urlSort);
+
+      if (urlQ.trim().length >= 2) {
+        executeSearch(urlQ, urlPage, urlDiff, urlSort, urlCat, urlCook, false);
+      } else {
+        setSearchResponse(null);
+        setHasSearched(false);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [syncUrl, executeSearch]);
 
   // Xử lý khi người dùng nhập từ khóa mới và submit
   const handleSearchSubmit = (newQuery: string) => {
     setCurrentPage(1);
-    executeSearch(newQuery, 1);
+    executeSearch(newQuery, 1, difficultyFilter, sortBy, categoryFilter, maxCookTimeFilter);
+  };
+
+  // Thay đổi bộ lọc danh mục
+  const handleCategoryChange = (newCategory: string) => {
+    setCategoryFilter(newCategory);
+    setCurrentPage(1);
+    if (activeQuery.trim().length >= 2) {
+      executeSearch(activeQuery, 1, difficultyFilter, sortBy, newCategory, maxCookTimeFilter);
+    }
   };
 
   // Thay đổi bộ lọc độ khó (gọi lại API và reset trang 1)
@@ -98,7 +243,17 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
     setDifficultyFilter(newDifficulty);
     setCurrentPage(1);
     if (activeQuery.trim().length >= 2) {
-      executeSearch(activeQuery, 1, newDifficulty, sortBy);
+      executeSearch(activeQuery, 1, newDifficulty, sortBy, categoryFilter, maxCookTimeFilter);
+    }
+  };
+
+  // Thay đổi bộ lọc thời gian nấu tối đa
+  const handleMaxCookTimeChange = (newCookTimeStr: string) => {
+    const newCookTime = parseInt(newCookTimeStr, 10) || 0;
+    setMaxCookTimeFilter(newCookTime);
+    setCurrentPage(1);
+    if (activeQuery.trim().length >= 2) {
+      executeSearch(activeQuery, 1, difficultyFilter, sortBy, categoryFilter, newCookTime);
     }
   };
 
@@ -107,7 +262,19 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
     setSortBy(newSort);
     setCurrentPage(1);
     if (activeQuery.trim().length >= 2) {
-      executeSearch(activeQuery, 1, difficultyFilter, newSort);
+      executeSearch(activeQuery, 1, difficultyFilter, newSort, categoryFilter, maxCookTimeFilter);
+    }
+  };
+
+  // Reset toàn bộ bộ lọc
+  const handleResetFilters = () => {
+    setCategoryFilter('all');
+    setDifficultyFilter('all');
+    setMaxCookTimeFilter(0);
+    setSortBy('relevance');
+    setCurrentPage(1);
+    if (activeQuery.trim().length >= 2) {
+      executeSearch(activeQuery, 1, 'all', 'relevance', 'all', 0);
     }
   };
 
@@ -115,8 +282,19 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
   const handlePageChange = (newPage: number) => {
     if (!searchResponse) return;
     if (newPage < 1 || newPage > searchResponse.totalPages) return;
-    executeSearch(activeQuery, newPage);
+    executeSearch(activeQuery, newPage, difficultyFilter, sortBy, categoryFilter, maxCookTimeFilter);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleClearSearch = () => {
+    setActiveQuery('');
+    setSearchResponse(null);
+    setHasSearched(false);
+    setErrorMessage(null);
+    setCurrentPage(1);
+    if (syncUrl && typeof window !== 'undefined') {
+      window.history.pushState({}, '', '/search');
+    }
   };
 
   // Lọc và sắp xếp kết quả hiển thị trên client
@@ -125,7 +303,7 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
 
     let items = [...searchResponse.items];
 
-    // Lọc theo độ khó nếu có chọn
+    // Lọc theo độ khó nếu có chọn (fallback an toàn trên client)
     if (difficultyFilter !== 'all') {
       items = items.filter((item) => {
         const diffStr = String(item.difficulty || '').toLowerCase();
@@ -147,6 +325,12 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
     return items;
   }, [searchResponse, difficultyFilter, sortBy]);
 
+  const hasActiveFilters =
+    categoryFilter !== 'all' ||
+    difficultyFilter !== 'all' ||
+    maxCookTimeFilter > 0 ||
+    sortBy !== 'relevance';
+
   return (
     <div className="w-full max-w-5xl mx-auto px-4 py-8 space-y-8" data-testid="search-container">
       {/* Header & SearchBox */}
@@ -162,7 +346,7 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
           Tìm kiếm công thức nấu ăn
         </h1>
         <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-          Khám phá hàng ngàn công thức thơm ngon với công nghệ tìm kiếm toàn văn FTS & gợi ý Trigram thông minh.
+          Khám phá hàng ngàn công thức thơm ngon với công nghệ tìm kiếm toàn văn PostgreSQL FTS & gợi ý Trigram thông minh.
         </p>
 
         <div className="pt-2">
@@ -181,7 +365,7 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
               key={tag}
               type="button"
               onClick={() => handleSearchSubmit(tag)}
-              className="text-xs px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100 font-semibold transition-all shadow-2xs"
+              className="text-xs px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100 font-semibold transition-all shadow-2xs cursor-pointer"
             >
               {tag}
             </button>
@@ -191,44 +375,64 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
 
       {/* Error banner */}
       {errorMessage && (
-        <div
-          data-testid="search-error-banner"
-          className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-sm text-rose-800 flex items-start gap-3 shadow-xs animate-shake"
-        >
-          <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0 mt-0.5">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10" strokeWidth={2} />
-              <line x1="12" y1="8" x2="12" y2="12" strokeWidth={2} strokeLinecap="round" />
-              <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth={2} strokeLinecap="round" />
-            </svg>
-          </div>
-          <div className="flex-1">
-            <strong className="font-semibold block text-rose-900">Đã xảy ra sự cố:</strong> {errorMessage}
-          </div>
-          <button
-            type="button"
-            onClick={() => setErrorMessage(null)}
-            className="text-rose-500 hover:text-rose-700 p-1"
-            aria-label="Đóng thông báo lỗi"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+        <SearchErrorState
+          message={errorMessage}
+          onRetry={() =>
+            executeSearch(
+              activeQuery,
+              currentPage,
+              difficultyFilter,
+              sortBy,
+              categoryFilter,
+              maxCookTimeFilter
+            )
+          }
+        />
       )}
 
-      {/* Filter and Sort Toolbar (Chỉ hiển thị khi có kết quả) */}
+      {/* Filter and Sort Toolbar (Chỉ hiển thị khi có kết quả hoặc đã tìm kiếm) */}
       {searchResponse && searchResponse.totalCount > 0 && (
         <div
           data-testid="search-toolbar"
-          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-emerald-50/40 border border-emerald-100/90 text-xs sm:text-sm shadow-2xs"
+          className="flex flex-col gap-3.5 p-4 rounded-2xl bg-emerald-50/40 border border-emerald-100/90 text-xs sm:text-sm shadow-2xs"
         >
-          <div data-testid="search-result-count" className="font-medium text-slate-700">
-            Tìm thấy <strong className="text-emerald-800 font-bold">{searchResponse.totalCount}</strong> công thức cho từ khóa &ldquo;<span className="text-slate-900 font-semibold">{activeQuery}</span>&rdquo;
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div data-testid="search-result-count" className="font-medium text-slate-700">
+              Tìm thấy <strong className="text-emerald-800 font-bold">{searchResponse.totalCount}</strong> công thức cho từ khóa &ldquo;<span className="text-slate-900 font-semibold">{activeQuery}</span>&rdquo;
+            </div>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                data-testid="btn-reset-filters"
+                onClick={handleResetFilters}
+                className="self-start sm:self-auto text-xs text-emerald-700 hover:text-emerald-900 font-semibold underline underline-offset-2 transition-colors cursor-pointer"
+              >
+                Đặt lại bộ lọc
+              </button>
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-emerald-100/60">
+            {/* Filter by Category */}
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="filter-category" className="text-slate-600 text-xs font-semibold">Danh mục:</label>
+              <select
+                id="filter-category"
+                data-testid="select-category"
+                value={categoryFilter}
+                onChange={(e) => handleCategoryChange(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border border-emerald-200 bg-white text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600 shadow-2xs"
+              >
+                <option value="all">Tất cả danh mục</option>
+                {categories.map((c) => (
+                  <option key={c.slug} value={c.slug}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Filter by Difficulty */}
             <div className="flex items-center gap-1.5">
               <label htmlFor="filter-difficulty" className="text-slate-600 text-xs font-semibold">Độ khó:</label>
@@ -246,8 +450,26 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
               </select>
             </div>
 
-            {/* Sort options */}
+            {/* Filter by Max Cook Time */}
             <div className="flex items-center gap-1.5">
+              <label htmlFor="filter-cook-time" className="text-slate-600 text-xs font-semibold">Thời gian nấu:</label>
+              <select
+                id="filter-cook-time"
+                data-testid="select-max-cook-time"
+                value={String(maxCookTimeFilter)}
+                onChange={(e) => handleMaxCookTimeChange(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border border-emerald-200 bg-white text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-600 shadow-2xs"
+              >
+                <option value="0">Tất cả thời gian</option>
+                <option value="15">Dưới 15 phút</option>
+                <option value="30">Dưới 30 phút</option>
+                <option value="60">Dưới 60 phút</option>
+                <option value="120">Dưới 120 phút</option>
+              </select>
+            </div>
+
+            {/* Sort options */}
+            <div className="flex items-center gap-1.5 ml-auto">
               <label htmlFor="sort-by" className="text-slate-600 text-xs font-semibold">Sắp xếp:</label>
               <select
                 id="sort-by"
@@ -268,58 +490,12 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
       {/* Main Results Section */}
       <div className="space-y-4">
         {isLoading ? (
-          /* Loading Skeletons */
-          <div data-testid="search-loading" className="space-y-4 animate-pulse">
-            {[1, 2, 3].map((n) => (
-              <div key={n} className="flex flex-col sm:flex-row bg-white rounded-2xl border border-emerald-100/80 overflow-hidden sm:h-44 shadow-xs">
-                <div className="w-full sm:w-60 h-44 sm:h-full bg-slate-200/80 shrink-0" />
-                <div className="p-5 flex-1 space-y-3 flex flex-col justify-center">
-                  <div className="flex items-center gap-2">
-                    <div className="h-5 bg-emerald-100/80 rounded-full w-24" />
-                    <div className="h-5 bg-slate-200 rounded-full w-16" />
-                  </div>
-                  <div className="h-6 bg-slate-200 rounded-xl w-3/4" />
-                  <div className="h-4 bg-slate-100 rounded-lg w-full" />
-                  <div className="h-4 bg-slate-100 rounded-lg w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <SearchLoadingState count={3} />
         ) : !hasSearched ? (
-          /* Initial Empty State (Chưa tìm kiếm) */
-          <div
-            data-testid="search-initial-state"
-            className="flex flex-col items-center justify-center p-12 rounded-3xl bg-emerald-50/30 border-2 border-dashed border-emerald-200 text-center space-y-3"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-800 shadow-2xs">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <h3 className="text-base sm:text-lg font-bold text-slate-900">Sẵn sàng khám phá ẩm thực</h3>
-            <p className="text-xs sm:text-sm text-slate-500 max-w-md leading-relaxed">
-              Nhập từ khóa bất kỳ để tìm kiếm công thức yêu thích của bạn. Hệ thống hỗ trợ tìm kiếm cả tiếng Việt có dấu và không dấu.
-            </p>
-          </div>
+          <SearchEmptyState />
         ) : searchResponse && searchResponse.totalCount === 0 ? (
-          /* No Results State */
-          <div
-            data-testid="search-no-results"
-            className="flex flex-col items-center justify-center p-12 rounded-3xl bg-amber-50/20 border border-amber-200 text-center space-y-3 shadow-xs"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-800 shadow-2xs">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-base sm:text-lg font-bold text-slate-900">Không tìm thấy công thức phù hợp</h3>
-            <p className="text-xs sm:text-sm text-slate-600 max-w-md leading-relaxed">
-              Không tìm thấy công thức nào cho từ khóa &ldquo;<span className="font-semibold text-slate-900">{activeQuery}</span>&rdquo;.
-              Hãy thử kiểm tra lỗi chính tả hoặc tìm với từ khóa ngắn gọn hơn (vd: &ldquo;pho bo&rdquo;, &ldquo;thịt gà&rdquo;).
-            </p>
-          </div>
+          <SearchEmptyState query={activeQuery} onClearQuery={handleClearSearch} />
         ) : (
-          /* Results List */
           <div data-testid="search-results-list" className="space-y-4">
             {filteredAndSortedItems.length === 0 ? (
               <div className="p-8 text-center text-sm text-slate-500 bg-white rounded-2xl border border-emerald-100 shadow-xs">
@@ -345,7 +521,7 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
             data-testid="btn-prev-page"
             disabled={!searchResponse.hasPreviousPage}
             onClick={() => handlePageChange(currentPage - 1)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-200 bg-white text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-200 bg-white text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs cursor-pointer"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -362,7 +538,7 @@ export const SearchContainer: React.FC<SearchContainerProps> = ({
             data-testid="btn-next-page"
             disabled={!searchResponse.hasNextPage}
             onClick={() => handlePageChange(currentPage + 1)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-200 bg-white text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-200 bg-white text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs cursor-pointer"
           >
             Trang sau
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
