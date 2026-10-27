@@ -1,5 +1,6 @@
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Features.Recipes.Dtos;
+using RecipeDetailDto = CulinaryBlog.Application.DTOs.RecipeDetailDto;
 
 namespace CulinaryBlog.Application.Interfaces;
 

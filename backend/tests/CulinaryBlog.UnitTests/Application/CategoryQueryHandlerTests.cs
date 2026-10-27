@@ -111,11 +111,20 @@ public class CategoryQueryHandlerTests
             TotalRecipes:    100,
             PublishedRecipes: 85,
             DraftRecipes:     15,
+            ArchivedRecipes:  0,
             Categories: new[]
             {
-                new CategoryStatisticItemDto(Guid.NewGuid(), "Món Chính",   30),
-                new CategoryStatisticItemDto(Guid.NewGuid(), "Đồ Uống",     15),
-                new CategoryStatisticItemDto(Guid.NewGuid(), "Ăn Vặt",      12),
+                new CategoryStatisticItemDto(Guid.NewGuid(), "Món Chính",   30, 35.29m),
+                new CategoryStatisticItemDto(Guid.NewGuid(), "Đồ Uống",     15, 17.65m),
+                new CategoryStatisticItemDto(Guid.NewGuid(), "Ăn Vặt",      12, 14.12m),
+            },
+            TopCategories: new[]
+            {
+                new CategoryStatisticItemDto(Guid.NewGuid(), "Món Chính", 30, 35.29m)
+            },
+            RecipesByMonth: new[]
+            {
+                new RecipeMonthlyStatisticDto(2026, 9, 12)
             });
 
         _categoryRepoMock
@@ -132,7 +141,12 @@ public class CategoryQueryHandlerTests
         result.TotalRecipes.Should().Be(100);
         result.PublishedRecipes.Should().Be(85);
         result.DraftRecipes.Should().Be(15);
+        result.ArchivedRecipes.Should().Be(0);
         result.Categories.Should().HaveCount(3);
+        result.Categories[0].Percentage.Should().Be(35.29m);
+        result.TopCategories.Should().ContainSingle();
+        result.RecipesByMonth.Should().ContainSingle()
+            .Which.RecipeCount.Should().Be(12);
     }
 
     [Fact]
@@ -141,10 +155,13 @@ public class CategoryQueryHandlerTests
         // Arrange
         var statistics = new CategoryStatisticsDto(
             TotalCategories:  5,
-            TotalRecipes:    60,
+            TotalRecipes:    70,
             PublishedRecipes: 45,
             DraftRecipes:     15,
-            Categories: Array.Empty<CategoryStatisticItemDto>());
+            ArchivedRecipes:  10,
+            Categories: Array.Empty<CategoryStatisticItemDto>(),
+            TopCategories: Array.Empty<CategoryStatisticItemDto>(),
+            RecipesByMonth: Array.Empty<RecipeMonthlyStatisticDto>());
 
         _categoryRepoMock
             .Setup(r => r.GetCategoryStatisticsAsync(It.IsAny<CancellationToken>()))
@@ -155,8 +172,8 @@ public class CategoryQueryHandlerTests
         // Act
         var result = await handler.Handle(new GetCategoryStatisticsQuery(), CancellationToken.None);
 
-        // Assert — published + draft = total
-        (result.PublishedRecipes + result.DraftRecipes)
+        // Assert — all statuses account for the total.
+        (result.PublishedRecipes + result.DraftRecipes + result.ArchivedRecipes)
             .Should().Be(result.TotalRecipes);
     }
 
@@ -166,7 +183,15 @@ public class CategoryQueryHandlerTests
         // Arrange
         _categoryRepoMock
             .Setup(r => r.GetCategoryStatisticsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new CategoryStatisticsDto(0, 0, 0, 0, Array.Empty<CategoryStatisticItemDto>()));
+            .ReturnsAsync(new CategoryStatisticsDto(
+                0,
+                0,
+                0,
+                0,
+                0,
+                Array.Empty<CategoryStatisticItemDto>(),
+                Array.Empty<CategoryStatisticItemDto>(),
+                Array.Empty<RecipeMonthlyStatisticDto>()));
 
         var handler = new GetCategoryStatisticsQueryHandler(_categoryRepoMock.Object);
 

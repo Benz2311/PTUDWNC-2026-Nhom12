@@ -1,5 +1,5 @@
-using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Exceptions;
+using CulinaryBlog.Application.Features.Recipes.Dtos;
 using CulinaryBlog.Application.Interfaces;
 using CulinaryBlog.Domain.Enums;
 using MediatR;
@@ -39,7 +39,8 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
             {
                 r.Id,
                 r.AuthorId,
-                r.Status
+                r.Status,
+                r.xmin
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -61,73 +62,99 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
         // 2. Query chi tiết với AsNoTracking và Projection tối ưu, triệt tiêu hoàn toàn N+1
         var recipeDto = await _context.Recipes
             .AsNoTracking()
+            .AsSplitQuery()
             .Where(r => r.Id == recipeHeader.Id)
-            .Select(r => new RecipeDetailDto(
-                r.Id,
-                r.Title,
-                r.Slug,
-                r.Description,
-                r.Content,
-                r.PrepTimeMinutes,
-                r.CookTimeMinutes,
-                r.Servings,
-                r.Difficulty.ToString(),
-                r.PublishedAt,
-                new RecipeCategoryDto(
-                    r.Category.Id,
-                    r.Category.Name,
-                    r.Category.Slug,
-                    r.Category.Description),
-                r.Ingredients
-                    .Where(i => !i.IsDeleted)
-                    .OrderBy(i => i.SortOrder)
-                    .Select(i => new RecipeIngredientDto(
-                        i.Id,
-                        i.Name,
-                        i.Quantity,
-                        i.Unit,
-                        i.Notes,
-                        i.SortOrder))
-                    .ToList(),
-                r.Steps
+            .Select(r => new RecipeDetailDto
+            {
+                Id = r.Id,
+                Title = r.Title,
+                Slug = r.Slug,
+                Description = r.Description,
+                Content = r.Content,
+                CoverImageUrl = r.CoverImageUrl 
+                    ?? r.Images.Where(img => !img.IsDeleted && img.IsPrimary).Select(img => img.MediumUrl ?? img.OriginalUrl).FirstOrDefault()
+                    ?? r.Images.Where(img => !img.IsDeleted).OrderBy(img => img.OrderIndex).Select(img => img.MediumUrl ?? img.OriginalUrl).FirstOrDefault(),
+                PrepTimeMinutes = r.PrepTimeMinutes,
+                CookTimeMinutes = r.CookTimeMinutes,
+                Servings = r.Servings,
+                Difficulty = r.Difficulty,
+                Status = r.Status,
+                PublishedAt = r.PublishedAt,
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt,
+                Author = new AuthorSummaryDto
+                {
+                    Id = r.Author.Id,
+                    DisplayName = r.Author.DisplayName,
+                    AvatarUrl = r.Author.AvatarUrl
+                },
+                Category = new CategorySummaryDto
+                {
+                    Id = r.Category.Id,
+                    Name = r.Category.Name,
+                    Slug = r.Category.Slug
+                },
+                Nutrition = r.Nutrition != null ? new RecipeNutritionDto
+                {
+                    Calories = r.Nutrition.Calories,
+                    Protein = r.Nutrition.Protein,
+                    Carbohydrates = r.Nutrition.Carbohydrates,
+                    Fat = r.Nutrition.Fat,
+                    Fiber = r.Nutrition.Fiber,
+                    Sodium = r.Nutrition.Sodium
+                } : null,
+                Steps = r.Steps
                     .Where(s => !s.IsDeleted)
                     .OrderBy(s => s.StepNumber)
-                    .Select(s => new RecipeStepDto(
-                        s.Id,
-                        s.StepNumber,
-                        s.Title ?? string.Empty,
-                        s.Description))
+                    .ThenBy(s => s.Id)
+                    .Select(s => new RecipeStepDto
+                    {
+                        Id = s.Id,
+                        StepNumber = s.StepNumber,
+                        Title = s.Title,
+                        Description = s.Description,
+                        TimerMinutes = s.TimerMinutes,
+                        ImageUrl = s.ImageUrl
+                    })
                     .ToList(),
-                r.Images
+                Ingredients = r.Ingredients
+                    .Where(i => !i.IsDeleted)
+                    .OrderBy(i => i.SortOrder)
+                    .ThenBy(i => i.Id)
+                    .Select(i => new RecipeIngredientDto
+                    {
+                        Id = i.Id,
+                        Name = i.Name,
+                        Quantity = i.Quantity,
+                        Unit = i.Unit,
+                        Notes = i.Notes,
+                        SortOrder = i.SortOrder
+                    })
+                    .ToList(),
+                Images = r.Images
                     .Where(img => !img.IsDeleted)
                     .OrderBy(img => img.OrderIndex)
-                    .Select(img => new RecipeImageDto(
-                        img.Id,
-                        img.OriginalUrl,
-                        img.AltText,
-                        img.IsPrimary,
-                        img.OrderIndex))
-                    .ToList(),
-                new RecipeNutritionDto(
-                    r.Nutrition.Calories,
-                    r.Nutrition.Protein,
-                    r.Nutrition.Carbohydrates,
-                    r.Nutrition.Fat,
-                    r.Nutrition.Fiber,
-                    r.Nutrition.Sodium),
-                r.Author != null
-                    ? new RecipeAuthorDto(
-                        r.Author.Id,
-                        r.Author.DisplayName ?? r.Author.UserName ?? "",
-                        r.Author.AvatarUrl)
-                    : null,
-                r.Status))
+                    .ThenBy(img => img.Id)
+                    .Select(img => new RecipeImageDto
+                    {
+                        Id = img.Id,
+                        OriginalUrl = img.OriginalUrl,
+                        MediumUrl = img.MediumUrl,
+                        ThumbnailUrl = img.ThumbnailUrl,
+                        AltText = img.AltText,
+                        IsPrimary = img.IsPrimary,
+                        OrderIndex = img.OrderIndex
+                    })
+                    .ToList()
+            })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (recipeDto == null)
         {
             throw new NotFoundException($"Recipe with slug '{request.Slug}' was not found.");
         }
+
+        recipeDto.Version = recipeHeader.xmin.ToString();
 
         return recipeDto;
     }

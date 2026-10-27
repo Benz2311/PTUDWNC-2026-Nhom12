@@ -62,6 +62,13 @@ public record RecipeListItemDto(
     RecipeCategoryDto Category,
     DateTime? PublishedAt);
 
+public record RecipeTrashItemDto(
+    Guid Id,
+    string Title,
+    string Slug,
+    string Status,
+    DateTime? DeletedAt);
+
 public record RecipeIngredientDto(
     Guid Id,
     string Name,
@@ -86,12 +93,12 @@ public record RecipeImageDto(
 public record RecipeNutritionDto(
     decimal? Calories,
     decimal? Protein,
-    decimal? Carbs,
+    decimal? Carbohydrates,
     decimal? Fat,
     decimal? Fiber = null,
     decimal? Sodium = null)
 {
-    public decimal? Carbohydrates => Carbs;
+    public decimal? Carbs => Carbohydrates;
 }
 
 public record RecipeAuthorDto(
@@ -138,4 +145,6 @@ public record RecipeListOptions(
     RecipeSortField SortBy = RecipeSortField.PublishedAt,
     bool SortDescending = true,
     Guid? CategoryId = null,
-    int? MaxCookTimeMinutes = null);
+    int? MaxCookTimeMinutes = null,
+    Guid? AuthorId = null,
+    RecipeStatus? Status = null);

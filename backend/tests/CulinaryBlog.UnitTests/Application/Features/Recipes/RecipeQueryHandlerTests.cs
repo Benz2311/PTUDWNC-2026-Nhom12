@@ -31,7 +31,7 @@ public class RecipeQueryHandlerTests
             0);
         var cancellationToken = new CancellationTokenSource().Token;
         repository
-            .Setup(item => item.GetPublishedAsync(2, 8, options, cancellationToken))
+            .Setup(item => item.GetListAsync(2, 8, options, cancellationToken))
             .ReturnsAsync(expected);
         var handler = new GetRecipesQueryHandler(repository.Object);
 
@@ -79,21 +79,23 @@ public class RecipeQueryHandlerTests
     public async Task GetRecipesByCategoryHandler_DelegatesCategoryAndPagination()
     {
         var repository = new Mock<IRecipeRepository>();
+        var authorId = Guid.NewGuid();
         var expected = new CategoryRecipesResponseDto(
             new RecipeCategoryDto(Guid.NewGuid(), "Main dishes", "main-dishes", null),
             new PagedResultDto<RecipeListItemDto>([], 0, 1, 12, 0));
         var cancellationToken = new CancellationTokenSource().Token;
         repository
-            .Setup(item => item.GetPublishedByCategorySlugAsync(
+            .Setup(item => item.GetByCategorySlugAsync(
                 "main-dishes",
                 1,
                 12,
+                authorId,
                 cancellationToken))
             .ReturnsAsync(expected);
         var handler = new GetRecipesByCategoryQueryHandler(repository.Object);
 
         var result = await handler.Handle(
-            new GetRecipesByCategoryQuery("main-dishes"),
+            new GetRecipesByCategoryQuery("main-dishes", AuthorId: authorId),
             cancellationToken);
 
         result.Should().BeSameAs(expected);

@@ -17,6 +17,7 @@ public sealed class BearerSecuritySchemeTransformer : IOpenApiDocumentTransforme
         CancellationToken cancellationToken)
     {
         document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
 
         document.Components.SecuritySchemes[SchemeName] = new OpenApiSecurityScheme
         {
@@ -29,6 +30,7 @@ public sealed class BearerSecuritySchemeTransformer : IOpenApiDocumentTransforme
 
         // Áp dụng Bearer auth toàn cục cho mọi endpoint
         var schemeReference = new OpenApiSecuritySchemeReference(SchemeName, document, null);
+        document.Security ??= new List<OpenApiSecurityRequirement>();
         document.Security.Add(new OpenApiSecurityRequirement
         {
             { schemeReference, new List<string>() }

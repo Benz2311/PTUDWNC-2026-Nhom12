@@ -1,10 +1,11 @@
+import type { ProblemDetails, ApiErrorResponse } from "./api";
 /**
  * TypeScript Types cho module Auth/User — đối chiếu trực tiếp với DTO/Response của Backend.
  * Hợp đồng REST API: Chương 8.1 SRS_Culinary_Blog_v1.0.0
  */
 
 /** Role hợp lệ trong hệ thống (RoleType enum của Backend). */
-export type RoleType = "User" | "Author" | "Admin";
+export type RoleType = "Guest" | "Author" | "Admin";
 
 /**
  * User — khớp `UserResponse` (Backend `UserResponse` DTO).
@@ -91,21 +92,7 @@ export interface ForgotPasswordRequest {
  * ApiProblemDetails — cấu trúc lỗi RFC 7807 trả về từ Backend.
  * Khớp `ProblemDetails` của ASP.NET Core.
  */
-export interface ApiProblemDetails {
-  type?: string;
-  title?: string;
-  status?: number;
-  detail?: string;
-  instance?: string;
-  traceId?: string;
-  errors?: Record<string, string[]>;
-}
+export type ApiProblemDetails = ProblemDetails;
 
 /** AuthError — lỗi xác thực/phân quyền đã chuẩn hóa (từ ApiError của api client). */
-export interface AuthError {
-  status?: number;
-  title?: string;
-  message: string;
-  errors?: Record<string, string[]>;
-  traceId?: string;
-}
+export type AuthError = ApiErrorResponse;

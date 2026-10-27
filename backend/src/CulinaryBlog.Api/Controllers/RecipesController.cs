@@ -12,6 +12,7 @@ using CulinaryBlog.Domain.Exceptions;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RecipeDetailDto = CulinaryBlog.Application.DTOs.RecipeDetailDto;
 
 namespace CulinaryBlog.API.Controllers;
 

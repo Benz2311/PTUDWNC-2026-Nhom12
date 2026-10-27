@@ -1,12 +1,9 @@
 using System.Linq.Expressions;
 using CulinaryBlog.Application.Contracts.Persistence;
-using CulinaryBlog.Application.Common.Utilities;
 using CulinaryBlog.Application.DTOs;
-using CulinaryBlog.Application.Features.Recipes.Dtos;
 using CulinaryBlog.Domain.Entities;
 using CulinaryBlog.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
-using NpgsqlTypes;
 
 namespace CulinaryBlog.Infrastructure.Persistence.Repositories;
 
@@ -30,7 +27,7 @@ public class RecipeRepository : IRecipeRepository
                 .OrderByDescending(image => image.IsPrimary)
                 .ThenBy(image => image.OrderIndex)
                 .ThenBy(image => image.Id)
-                .Select(image => image.OriginalUrl)
+                .Select(image => image.ThumbnailUrl ?? image.MediumUrl ?? image.OriginalUrl)
                 .FirstOrDefault(),
             new RecipeCategoryDto(
                 recipe.Category.Id,
@@ -46,15 +43,25 @@ public class RecipeRepository : IRecipeRepository
         _db = db;
     }
 
-    public Task<PagedResultDto<RecipeListItemDto>> GetPublishedAsync(
+    public Task<PagedResultDto<RecipeListItemDto>> GetListAsync(
         int page,
         int pageSize,
         RecipeListOptions options,
         CancellationToken cancellationToken = default)
     {
-        var query = _db.Recipes
-            .AsNoTracking()
-            .Where(recipe => recipe.Status == RecipeStatus.Published);
+        var query = _db.Recipes.AsNoTracking();
+        if (options.AuthorId.HasValue)
+        {
+            query = query.Where(recipe => recipe.AuthorId == options.AuthorId.Value);
+            if (options.Status.HasValue)
+            {
+                query = query.Where(recipe => recipe.Status == options.Status.Value);
+            }
+        }
+        else
+        {
+            query = query.Where(recipe => recipe.Status == RecipeStatus.Published);
+        }
 
         if (!string.IsNullOrWhiteSpace(options.Search))
         {
@@ -92,7 +99,7 @@ public class RecipeRepository : IRecipeRepository
                 options.MaxTotalTimeMinutes.Value);
         }
 
-        return GetPublishedPageAsync(
+        return GetRecipePageAsync(
             query,
             page,
             pageSize,
@@ -100,91 +107,44 @@ public class RecipeRepository : IRecipeRepository
             cancellationToken);
     }
 
-    public async Task<PagedResultDto<RecipeListItemDto>> SearchFullTextAsync(
-        RecipeSearchQueryDto query,
+    public async Task<PagedResultDto<RecipeTrashItemDto>> GetDeletedAsync(
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var page = Math.Max(query.Page, 1);
-        var pageSize = query.PageSize <= 0
+        page = Math.Max(page, 1);
+        pageSize = pageSize <= 0
             ? DefaultPageSize
-            : Math.Min(query.PageSize, MaximumPageSize);
-        var skip = (int)Math.Min((long)(page - 1) * pageSize, int.MaxValue);
+            : Math.Min(pageSize, MaximumPageSize);
 
-        // Chuẩn hóa từ khóa: xóa dấu tiếng Việt, lowercase — khớp với tsvector unaccent('simple') trong DB
-        var keyword = VietnameseTextNormalizer.Normalize(query.Search ?? string.Empty);
-        if (keyword.Length < 2)
-        {
-            return new PagedResultDto<RecipeListItemDto>(
-                Array.Empty<RecipeListItemDto>(), 0, page, pageSize, 0);
-        }
-
-        var baseQuery = _db.Recipes
+        var query = _db.Recipes
+            .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(recipe => recipe.Status == RecipeStatus.Published);
+            .Where(recipe => recipe.IsDeleted);
 
-        if (query.CategoryId.HasValue)
-        {
-            baseQuery = baseQuery.Where(recipe => recipe.CategoryId == query.CategoryId.Value);
-        }
-
-        if (!string.IsNullOrWhiteSpace(query.CategorySlug))
-        {
-            var categorySlug = query.CategorySlug.Trim();
-            baseQuery = baseQuery.Where(recipe => recipe.Category.Slug == categorySlug);
-        }
-
-        if (query.Difficulty.HasValue)
-        {
-            baseQuery = baseQuery.Where(recipe => recipe.Difficulty == query.Difficulty.Value);
-        }
-
-        if (query.MaxCookTimeMinutes.HasValue)
-        {
-            baseQuery = baseQuery.Where(recipe => recipe.CookTimeMinutes <= query.MaxCookTimeMinutes.Value);
-        }
-
-        if (query.MaxTotalTimeMinutes.HasValue)
-        {
-            baseQuery = baseQuery.Where(recipe =>
-                recipe.PrepTimeMinutes + recipe.CookTimeMinutes <= query.MaxTotalTimeMinutes.Value);
-        }
-
-        var isInMemory = _db.Database.ProviderName?.Contains("InMemory") == true;
-
-        // GIAI ĐOẠN 1: PostgreSQL Full-Text Search trên cột SearchVector (tsvector, unaccent, config 'simple')
-        IQueryable<Recipe> matchedQuery = isInMemory
-            ? baseQuery.Where(recipe =>
-                recipe.Title.Contains(keyword) || recipe.Description.Contains(keyword))
-            : baseQuery.Where(recipe =>
-                EF.Property<NpgsqlTsVector>(recipe, "SearchVectorFts")
-                    .Matches(EF.Functions.PlainToTsQuery("simple", keyword)));
-
-        var totalCount = await matchedQuery.CountAsync(cancellationToken);
-        if (totalCount == 0)
-        {
-            return new PagedResultDto<RecipeListItemDto>(
-                Array.Empty<RecipeListItemDto>(), 0, page, pageSize, 0);
-        }
-
-        // Sắp xếp theo độ liên quan ts_rank DESC, thứ cấp theo PublishedAt DESC
-        IQueryable<Recipe> rankedQuery = isInMemory
-            ? matchedQuery
-                .OrderByDescending(recipe => recipe.PublishedAt)
-                .ThenBy(recipe => recipe.Id)
-            : matchedQuery
-                .OrderByDescending(recipe => EF.Property<NpgsqlTsVector>(recipe, "SearchVectorFts")
-                    .Rank(EF.Functions.PlainToTsQuery("simple", keyword)))
-                .ThenByDescending(recipe => recipe.PublishedAt)
-                .ThenBy(recipe => recipe.Id);
-
-        var items = await rankedQuery
-            .Select(ListProjection)
+        var totalCount = await query.CountAsync(cancellationToken);
+        var skip = (int)Math.Min((long)(page - 1) * pageSize, int.MaxValue);
+        var items = await query
+            .OrderByDescending(recipe => recipe.UpdatedAt.HasValue)
+            .ThenByDescending(recipe => recipe.UpdatedAt)
+            .ThenByDescending(recipe => recipe.Id)
+            .Select(recipe => new RecipeTrashItemDto(
+                recipe.Id,
+                recipe.Title,
+                recipe.Slug,
+                recipe.Status.ToString(),
+                recipe.UpdatedAt))
             .Skip(skip)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
         var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
-        return new PagedResultDto<RecipeListItemDto>(items, totalCount, page, pageSize, totalPages);
+        return new PagedResultDto<RecipeTrashItemDto>(
+            items,
+            totalCount,
+            page,
+            pageSize,
+            totalPages);
     }
 
     public Task<RecipeDetailDto?> GetPublishedBySlugAsync(
@@ -259,15 +219,15 @@ public class RecipeRepository : IRecipeRepository
                         recipe.Author.Id,
                         recipe.Author.DisplayName,
                         recipe.Author.AvatarUrl)
-                    : null,
-                recipe.Status))
+                    : null))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<CategoryRecipesResponseDto?> GetPublishedByCategorySlugAsync(
+    public async Task<CategoryRecipesResponseDto?> GetByCategorySlugAsync(
         string categorySlug,
         int page,
         int pageSize,
+        Guid? authorId = null,
         CancellationToken cancellationToken = default)
     {
         var category = await _db.Categories
@@ -285,12 +245,15 @@ public class RecipeRepository : IRecipeRepository
             return null;
         }
 
-        var recipes = await GetPublishedPageAsync(
+        var recipes = await GetRecipePageAsync(
             _db.Recipes
                 .AsNoTracking()
                 .Where(recipe =>
                     recipe.CategoryId == category.Id &&
-                    recipe.Status == RecipeStatus.Published),
+                    (recipe.Status == RecipeStatus.Published ||
+                     (authorId.HasValue &&
+                      recipe.AuthorId == authorId.Value &&
+                      recipe.Status == RecipeStatus.Draft))),
             page,
             pageSize,
             new RecipeListOptions(),
@@ -299,7 +262,7 @@ public class RecipeRepository : IRecipeRepository
         return new CategoryRecipesResponseDto(category, recipes);
     }
 
-    private static async Task<PagedResultDto<RecipeListItemDto>> GetPublishedPageAsync(
+    private static async Task<PagedResultDto<RecipeListItemDto>> GetRecipePageAsync(
         IQueryable<Recipe> query,
         int page,
         int pageSize,

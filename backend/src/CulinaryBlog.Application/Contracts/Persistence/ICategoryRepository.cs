@@ -21,6 +21,10 @@ public interface ICategoryRepository
         Guid? excludeId = null,
         CancellationToken cancellationToken = default);
 
+    Task<bool> SlugExistsAsync(
+        string slug,
+        CancellationToken cancellationToken = default);
+
     Task<int> CountRecipesAsync(
         Guid categoryId,
         CancellationToken cancellationToken = default);

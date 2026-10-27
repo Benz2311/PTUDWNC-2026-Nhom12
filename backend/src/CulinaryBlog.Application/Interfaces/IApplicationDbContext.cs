@@ -13,6 +13,8 @@ public interface IApplicationDbContext
     DbSet<RecipeIngredient> RecipeIngredients { get; }
     DbSet<Category> Categories { get; }
     DbSet<ApplicationUser> Users { get; }
+    DbSet<RecipeAuditLog> RecipeAuditLogs { get; }
+    DbSet<RecipeSlugHistory> RecipeSlugHistories { get; }
 
     DatabaseFacade Database { get; }
 

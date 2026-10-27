@@ -1,153 +1,304 @@
+using CulinaryBlog.API.Extensions;
+using System.Diagnostics;
+using System.Security.Claims;
+using CulinaryBlog.API.Endpoints;
+using CulinaryBlog.Api.Middleware;
+using CulinaryBlog.API.Middleware;
 using CulinaryBlog.Application;
+using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Infrastructure;
 using CulinaryBlog.Infrastructure.Persistence;
-using CulinaryBlog.Api.Middleware;
-using CulinaryBlog.Api.OpenApi;
+using CulinaryBlog.Infrastructure.Persistence.Seed;
+using CulinaryBlog.Domain.Entities;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Scalar.AspNetCore;
 using Serilog;
+using Serilog.Events;
 
-namespace CulinaryBlog.Api;
+// ── Serilog — cấu hình trước khi build host ──────────────────────────────────
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(new ConfigurationBuilder()
+        .SetBasePath(AppContext.BaseDirectory)
+        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+        .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true)
+        .AddEnvironmentVariables()
+        .Build())
+    .Enrich.FromLogContext()
+    .CreateLogger();
 
-public class Program
+try
 {
-    public static async Task Main(string[] args)
-    {
-        var builder = WebApplication.CreateBuilder(args);
+    Log.Information("Starting CulinaryBlog API");
 
-        // ── Serilog — cấu hình sau khi có builder ──────────────────────────────────
-        // Make Serilog config resilient for test environments
+    var builder = WebApplication.CreateBuilder(args);
+
+    // Dùng Serilog thay thế logging mặc định
+    builder.Host.UseSerilog();
+
+    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(builder.Configuration);
+
+    builder.Services.ConfigureHttpJsonOptions(options =>
+    {
+        options.SerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    });
+
+    builder.Services.AddControllers()
+        .AddJsonOptions(options =>
+        {
+            options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        });
+    builder.Services.AddHostedService<CulinaryBlog.Api.Jobs.RecipePurgeHostedService>();
+    builder.Services.AddHostedService<CulinaryBlog.Api.Jobs.SitemapGenerationHostedService>();
+    builder.Services.AddOpenApi(options =>
+    {
+        options.AddDocumentTransformer(new CulinaryBlog.Api.OpenApi.BearerSecuritySchemeTransformer());
+    });
+
+    builder.Services.AddRateLimitingConfiguration(builder.Configuration);
+
+    builder.Services.AddAuthorizationBuilder()
+        .AddPolicy("RequireUser", policy => policy.RequireAuthenticatedUser())
+        .AddPolicy("RequireAuthor", policy => policy.RequireRole("Author"))
+        .AddPolicy("RequireAdmin", policy => policy.RequireRole("Admin"))
+        .AddPolicy("RequireAuthorOrAdmin", policy => policy.RequireRole("Author", "Admin"));
+
+    builder.Services.AddCors(options =>
+    {
+        var allowedOrigins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? Array.Empty<string>();
+
+        if (builder.Environment.IsDevelopment())
+        {
+            var devOrigins = new[] { "http://localhost:3000", "http://localhost:5000", "http://127.0.0.1:3000" };
+            allowedOrigins = allowedOrigins.Union(devOrigins, StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+
+        options.AddPolicy("Frontend", policy =>
+        {
+            if (allowedOrigins.Length > 0)
+            {
+                policy.WithOrigins(allowedOrigins)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+            }
+            else
+            {
+                policy.SetIsOriginAllowed(_ => false)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+            }
+        });
+    });
+
+    var app = builder.Build();
+
+    // ── Migrate + Seed ────────────────────────────────────────────────────────
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         try
         {
-            Log.Logger = new LoggerConfiguration()
-                .ReadFrom.Configuration(builder.Configuration)
-                .Enrich.FromLogContext()
-                .CreateLogger();
+            await dbContext.Database.MigrateAsync();
         }
-        catch
+        catch (Exception ex)
         {
-            // Fallback to basic console logger if config fails (e.g., in tests)
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Information()
-                .Enrich.FromLogContext()
-                .WriteTo.Console()
-                .CreateLogger();
+            Log.Warning(ex, "Database migration skipped or tables already exist.");
         }
 
-        Log.Information("Starting CulinaryBlog API");
-
-        // Dùng Serilog thay thế logging mặc định
-        builder.Host.UseSerilog();
-
-        builder.Services.AddApplication();
-        builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
-
-        builder.Services.AddControllers();
-        builder.Services.AddOpenApi(options =>
+        try
         {
-            // Swagger/Scalar: hỗ trợ nhập JWT Bearer Token
-            options.AddDocumentTransformer(new BearerSecuritySchemeTransformer());
-        });
-
-        // Authorization policies
-        builder.Services.AddAuthorizationBuilder()
-            .AddPolicy("RequireUser", policy => policy.RequireRole("User"))
-            .AddPolicy("RequireAuthor", policy => policy.RequireRole("Author"))
-            .AddPolicy("RequireAdmin", policy => policy.RequireRole("Admin"))
-            .AddPolicy("RequireAuthorOrAdmin", policy => policy.RequireRole("Author", "Admin"));
-
-        builder.Services.AddCors(options =>
+            await CategoryDataSeeder.SeedAsync(dbContext, targetCount: 20);
+        }
+        catch (Exception seedEx)
         {
-            // NFR-SEC-005: Only allow configured origins — never wildcard "*".
-            // Development: http://localhost:3000 (SRS). Production: read from "Cors:AllowedOrigins".
-            var allowedOrigins = builder.Configuration
-                .GetSection("Cors:AllowedOrigins")
-                .Get<string[]>() ?? Array.Empty<string>();
+            Log.Warning(seedEx, "Seeding skipped: {Message}", seedEx.Message);
+        }
 
-            if (builder.Environment.IsDevelopment() &&
-                !allowedOrigins.Contains("http://localhost:3000", StringComparer.OrdinalIgnoreCase))
+        try
+        {
+            var passwordHasher = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.IPasswordHasher<ApplicationUser>>();
+            if (!await dbContext.Users.AnyAsync(u => u.Email == "admin@culinaryblog.com"))
             {
-                allowedOrigins = allowedOrigins.Append("http://localhost:3000").ToArray();
+                var admin = new ApplicationUser
+                {
+                    Id = Guid.NewGuid(),
+                    UserName = "admin",
+                    Email = "admin@culinaryblog.com",
+                    DisplayName = "Quản trị viên",
+                    EmailConfirmed = true,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    Roles = ["Admin", "Author"]
+                };
+                admin.PasswordHash = passwordHasher.HashPassword(admin, "Admin@123");
+                await dbContext.Users.AddAsync(admin);
+                await dbContext.SaveChangesAsync();
+                Log.Information("Successfully seeded Admin user admin@culinaryblog.com");
             }
 
-            options.AddPolicy("Frontend", policy =>
+            if (!await dbContext.Users.AnyAsync(u => u.Email == "author@culinaryblog.com"))
             {
-                if (allowedOrigins.Length > 0)
+                var author = new ApplicationUser
                 {
-                    policy.WithOrigins(allowedOrigins)
-                        .AllowAnyHeader()
-                        .AllowAnyMethod()
-                        .AllowCredentials();
-                }
-                else
-                {
-                    // Fail closed: reject every origin when none is configured.
-                    policy.SetIsOriginAllowed(_ => false)
-                        .AllowAnyHeader()
-                        .AllowAnyMethod()
-                        .AllowCredentials();
-                }
-            });
-        });
-
-        // Rate limiting configuration - higher limits in Testing environment
-        // Limits can be overridden via configuration (e.g. tests).
-        // Defaults: Auth=10, Refresh=5, Api=100, Upload=5 requests/min/IP (NFR-SEC-003)
-        var isTesting = builder.Environment.IsEnvironment("Testing");
-        var defaultAuthLimit = isTesting ? 1000 : 10;
-        var defaultRefreshLimit = isTesting ? 1000 : 5;
-        var defaultApiLimit = isTesting ? 10000 : 100;
-        var defaultUploadLimit = isTesting ? 1000 : 5;
-
-        // Keep a reference to the configuration manager — it is finalized during Build()
-        // (test-factory ConfigureAppConfiguration sources are applied at that point).
-        var configuration = builder.Configuration;
-
-        var app = builder.Build();
-
-        // ── Middleware pipeline ───────────────────────────────────────────────────
-        app.UseExceptionHandling();
-
-        app.MapOpenApi();
-        app.MapScalarApiReference();
-
-        app.UseCors("Frontend");
-
-        // Read rate limits AFTER Build() so test-factory configuration overrides
-        // (ConfigureAppConfiguration) are fully applied before values are captured.
-        var authRateLimit = configuration.GetValue("RateLimiting:Auth:PermitLimit", defaultAuthLimit);
-        var refreshRateLimit = configuration.GetValue("RateLimiting:Refresh:PermitLimit", defaultRefreshLimit);
-        var apiRateLimit = configuration.GetValue("RateLimiting:Api:PermitLimit", defaultApiLimit);
-        var uploadRateLimit = configuration.GetValue("RateLimiting:Upload:PermitLimit", defaultUploadLimit);
-
-        // Rate limiting: apply specific policies per SRS NFR-SEC-003
-        // Auth endpoints: 10 request/min/IP
-        app.UseRateLimitingPolicy("auth", authRateLimit, 1, new[] { "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/google", "/api/v1/auth/email/resend" });
-        // Refresh/logout endpoints: 5 request/min/IP
-        app.UseRateLimitingPolicy("refresh", refreshRateLimit, 1, new[] { "/api/v1/auth/refresh", "/api/v1/auth/refresh-token", "/api/v1/auth/revoke", "/api/v1/auth/logout" });
-        // Upload endpoints: 5 request/min/IP (POST only — file upload)
-        app.UseRateLimitingPolicy("upload", uploadRateLimit, 1, new[] { "/api/v1/recipes/", "/api/v1/admin/recipes/" }, new[] { "POST" });
-        // General API: 100 request/min/IP
-        app.UseRateLimitingPolicy("api", apiRateLimit, 1, new[] { "/api/v1/" });
-
-        app.UseAuthentication();
-        app.UseAuthorization();
-
-        // Hangfire Dashboard (chỉ môi trường dev)
-        if (app.Environment.IsDevelopment())
-        {
-            app.UseHangfireDashboard("/hangfire");
+                    Id = Guid.NewGuid(),
+                    UserName = "author",
+                    Email = "author@culinaryblog.com",
+                    DisplayName = "Tác giả Demo",
+                    EmailConfirmed = true,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    Roles = ["Author"]
+                };
+                author.PasswordHash = passwordHasher.HashPassword(author, "Author@123");
+                await dbContext.Users.AddAsync(author);
+                await dbContext.SaveChangesAsync();
+                Log.Information("Successfully seeded Author user author@culinaryblog.com");
+            }
         }
+        catch (Exception initEx)
+        {
+            Log.Warning(initEx, "User seed skipped: {Message}", initEx.Message);
+        }
+    }
 
-        // Serilog request logging
-        app.UseSerilogRequestLogging();
+    // ── Middleware pipeline ───────────────────────────────────────────────────
+    // 1. CorrelationId Middleware đặt đầu tiên để sinh/đọc header và gắn vào LogContext cho toàn bộ request flow
+    app.UseMiddleware<CorrelationIdMiddleware>();
+    app.UseExceptionHandling();
+    app.MapOpenApi();
+    app.MapScalarApiReference();
 
-        app.MapControllers();
+    app.UseCors("Frontend");
 
-        await app.RunAsync();
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.UseRateLimiter();
+
+    // Hangfire Dashboard (chỉ môi trường dev)
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseHangfireDashboard("/hangfire");
+    }
+
+    // 2. Serilog request logging — Structured Logging với đầy đủ properties & cảnh báo Slow Request > 500ms
+    app.UseSerilogRequestLogging(options =>
+    {
+        options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+
+        options.GetLevel = (httpContext, elapsed, ex) =>
+        {
+            if (ex != null || httpContext.Response.StatusCode >= 500)
+            {
+                return LogEventLevel.Error;
+            }
+
+            if (httpContext.Response.StatusCode >= 400)
+            {
+                return LogEventLevel.Warning;
+            }
+
+            if (elapsed > 500)
+            {
+                return LogEventLevel.Warning;
+            }
+
+            return LogEventLevel.Information;
+        };
+
+        options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+        {
+            diagnosticContext.Set("RequestPath", httpContext.Request.Path.Value ?? "/");
+            diagnosticContext.Set("RequestMethod", httpContext.Request.Method);
+            diagnosticContext.Set("StatusCode", httpContext.Response.StatusCode);
+
+            var correlationId = httpContext.Items[CorrelationIdMiddleware.ItemKey]?.ToString()
+                ?? CorrelationIdMiddleware.ResolveCorrelationId(httpContext);
+            diagnosticContext.Set("CorrelationId", correlationId);
+
+            var userId = httpContext.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? httpContext.User?.FindFirstValue("sub");
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                diagnosticContext.Set("UserId", userId);
+            }
+
+            if (Activity.Current != null)
+            {
+                diagnosticContext.Set("TraceId", Activity.Current.TraceId.ToString());
+                diagnosticContext.Set("SpanId", Activity.Current.SpanId.ToString());
+            }
+        };
+    });
+
+    // 3. Custom telemetry metrics recorder middleware
+    app.Use(async (context, next) =>
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            await next(context);
+        }
+        finally
+        {
+            stopwatch.Stop();
+            var telemetry = context.RequestServices.GetService<ICulinaryBlogTelemetry>();
+            telemetry?.RecordHttpRequest(
+                context.Request.Method,
+                context.Request.Path.Value ?? "/",
+                context.Response.StatusCode,
+                stopwatch.Elapsed.TotalMilliseconds);
+        }
+    });
+
+    app.MapCategoryEndpoints();
+    app.MapRecipeEndpoints();
+    CulinaryBlog.Api.Endpoints.Sitemap.SitemapEndpoints.MapSitemapEndpoints(app);
+    app.MapControllers();
+
+    // ── Health Check Endpoints (Task 4 - Võ Hùng Mạnh) ─────────────────────────
+    // 1. /health - Tổng quan toàn bộ dependency (PostgreSQL, Redis, MinIO)
+    app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        ResponseWriter = CulinaryBlog.Infrastructure.HealthChecks.HealthCheckResponseWriter.WriteResponse
+    });
+
+    // 2. /health/live - Liveness: Chỉ xác nhận process/app đang sống, không phụ thuộc external dependencies
+    app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("live"),
+        ResponseWriter = CulinaryBlog.Infrastructure.HealthChecks.HealthCheckResponseWriter.WriteResponse
+    });
+
+    // 3. /health/ready - Readiness: Kiểm tra dependency bắt buộc tiếp nhận traffic (PostgreSQL + Redis)
+    app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready"),
+        ResponseWriter = CulinaryBlog.Infrastructure.HealthChecks.HealthCheckResponseWriter.WriteResponse
+    });
+
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
+
+public partial class Program
+{
+}
+
+namespace CulinaryBlog.API
+{
+    public class ApiEntryPoint
+    {
     }
 }
