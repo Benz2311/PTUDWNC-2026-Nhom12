@@ -6,13 +6,13 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState,
 } from "react";
 import type { ReactNode } from "react";
 import { authApi } from "@/lib/api/auth";
 import { authStorage } from "@/lib/auth-storage";
 import { useAuthStore } from "@/lib/auth-store";
 import type {
+  ChangePasswordRequest,
   LoginRequest,
   RegisterRequest,
   UpdateProfileRequest,
@@ -25,25 +25,32 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (request: LoginRequest) => Promise<void>;
+  googleLogin: (idToken: string) => Promise<void>;
   register: (request: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (request: UpdateProfileRequest) => Promise<User>;
+  changePassword: (request: ChangePasswordRequest) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const user = useAuthStore((state) => state.user);
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const isLoading = useAuthStore((state) => state.isLoading);
+  const setTokens = useAuthStore((state) => state.setTokens);
+  const setUser = useAuthStore((state) => state.setUser);
+  const clear = useAuthStore((state) => state.clear);
+  const setLoading = useAuthStore((state) => state.setLoading);
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
+      useAuthStore.getState().hydrate();
       const token = authStorage.getAccessToken();
       if (!token) {
-        setIsLoading(false);
+        setLoading(false);
         return;
       }
 
@@ -51,20 +58,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const me = await authApi.getMe();
         if (!cancelled) {
           setUser(me);
-          setAccessToken(token);
-          useAuthStore.getState().setTokens(token, authStorage.getRefreshToken());
-          useAuthStore.getState().setUser(me);
+          setTokens(token, authStorage.getRefreshToken());
         }
       } catch {
         if (!cancelled) {
-          authStorage.clear();
-          setUser(null);
-          setAccessToken(null);
-          useAuthStore.getState().clear();
+          clear();
         }
       } finally {
         if (!cancelled) {
-          setIsLoading(false);
+          setLoading(false);
         }
       }
     })();
@@ -72,57 +74,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [clear, setLoading, setTokens, setUser]);
 
   useEffect(() => {
     const handleSessionExpired = () => {
-      setUser(null);
-      setAccessToken(null);
-      useAuthStore.getState().clear();
+      clear();
     };
 
     window.addEventListener("auth:session-expired", handleSessionExpired);
     return () =>
       window.removeEventListener("auth:session-expired", handleSessionExpired);
-  }, []);
+  }, [clear]);
 
   const login = useCallback(async (request: LoginRequest) => {
     const response = await authApi.login(request);
-    authStorage.setTokens(response.accessToken, response.refreshToken);
-    setAccessToken(response.accessToken);
+    setTokens(response.accessToken, response.refreshToken);
     setUser(response.user);
-    useAuthStore.getState().setTokens(response.accessToken, response.refreshToken);
-    useAuthStore.getState().setUser(response.user);
-  }, []);
+  }, [setTokens, setUser]);
+
+  const googleLogin = useCallback(async (idToken: string) => {
+    const response = await authApi.googleLogin(idToken);
+    setTokens(response.accessToken, response.refreshToken);
+    setUser(response.user);
+  }, [setTokens, setUser]);
 
   const register = useCallback(async (request: RegisterRequest) => {
     const response = await authApi.register(request);
-    authStorage.setTokens(response.accessToken, response.refreshToken);
-    setAccessToken(response.accessToken);
+    setTokens(response.accessToken, response.refreshToken);
     setUser(response.user);
-    useAuthStore.getState().setTokens(response.accessToken, response.refreshToken);
-    useAuthStore.getState().setUser(response.user);
-  }, []);
+  }, [setTokens, setUser]);
 
   const logout = useCallback(async () => {
     const refreshToken = authStorage.getRefreshToken();
     try {
       if (refreshToken) {
-        await authApi.revoke(refreshToken);
+        await authApi.logout(refreshToken);
       }
     } finally {
-      authStorage.clear();
-      setUser(null);
-      setAccessToken(null);
-      useAuthStore.getState().clear();
+      clear();
     }
-  }, []);
+  }, [clear]);
 
   const updateProfile = useCallback(async (request: UpdateProfileRequest) => {
     const updated = await authApi.updateProfile(request);
     setUser(updated);
-    useAuthStore.getState().setUser(updated);
     return updated;
+  }, [setUser]);
+
+  const changePassword = useCallback(async (request: ChangePasswordRequest) => {
+    await authApi.changePassword(request);
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -132,11 +132,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: Boolean(user && accessToken),
       isLoading,
       login,
+      googleLogin,
       register,
       logout,
       updateProfile,
+      changePassword,
     }),
-    [user, accessToken, isLoading, login, register, logout, updateProfile]
+    [user, accessToken, isLoading, login, googleLogin, register, logout, updateProfile, changePassword]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

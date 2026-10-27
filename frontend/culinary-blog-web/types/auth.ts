@@ -5,7 +5,7 @@ import type { ProblemDetails, ApiErrorResponse } from "./api";
  */
 
 /** Role hợp lệ trong hệ thống (RoleType enum của Backend). */
-export type RoleType = "Guest" | "Author" | "Admin";
+export type RoleType = "User" | "Author" | "Admin";
 
 /**
  * User — khớp `UserResponse` (Backend `UserResponse` DTO).
@@ -86,6 +86,16 @@ export interface GoogleLoginRequest {
 
 export interface ForgotPasswordRequest {
   email: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
 }
 
 /**

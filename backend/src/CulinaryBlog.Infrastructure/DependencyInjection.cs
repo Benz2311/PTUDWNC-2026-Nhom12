@@ -112,19 +112,26 @@ public static class DependencyInjection
         services.AddSingleton<IStorageService, S3StorageService>();
 
         // ── Background Jobs — Hangfire + PostgreSQL ───────────────────────────
-        services.AddHangfire(cfg => cfg
-            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-            .UseSimpleAssemblyNameTypeSerializer()
-            .UseRecommendedSerializerSettings()
-            .UsePostgreSqlStorage(
-                configuration.GetConnectionString("DefaultConnection"),
-                new PostgreSqlStorageOptions
-                {
-                    SchemaName = "hangfire"
-                }));
+        var isTesting = string.Equals(
+            configuration["ASPNETCORE_ENVIRONMENT"],
+            "Testing",
+            StringComparison.OrdinalIgnoreCase);
+        if (!isTesting)
+        {
+            services.AddHangfire(cfg => cfg
+                .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+                .UseSimpleAssemblyNameTypeSerializer()
+                .UseRecommendedSerializerSettings()
+                .UsePostgreSqlStorage(
+                    configuration.GetConnectionString("DefaultConnection"),
+                    new PostgreSqlStorageOptions
+                    {
+                        SchemaName = "hangfire"
+                    }));
 
-        services.AddHangfireServer();
-        services.AddScoped<IBackgroundJobService, HangfireJobService>();
+            services.AddHangfireServer();
+            services.AddScoped<IBackgroundJobService, HangfireJobService>();
+        }
         services.AddHttpClient();
         services.AddScoped<IImageResizeJob, ImageResizeJob>();
 

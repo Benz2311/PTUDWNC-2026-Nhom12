@@ -300,6 +300,8 @@ public static class CategoryDataSeeder
                 UserName = "culinary-demo",
                 DisplayName = "Bếp Trưởng Culinary",
                 Email = "demo@culinaryblog.local",
+                NormalizedUserName = "CULINARY-DEMO",
+                NormalizedEmail = "DEMO@CULINARYBLOG.LOCAL",
                 PasswordHash = "seeded-demo-password"
             };
 

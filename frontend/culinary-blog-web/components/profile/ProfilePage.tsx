@@ -21,6 +21,7 @@ import { applyFieldErrors } from "@/components/auth/form-errors";
 import { authApi } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import type { User } from "@/types/auth";
+import ChangePasswordCard from "@/components/profile/ChangePasswordCard";
 
 const profileSchema = z.object({
   displayName: z
@@ -588,6 +589,7 @@ export default function ProfilePage({ initialUser }: ProfilePageProps) {
           </button>
         </div>
       </div>
+      <ChangePasswordCard />
     </div>
   );
 }

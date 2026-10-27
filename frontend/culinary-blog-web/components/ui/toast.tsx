@@ -38,7 +38,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const push = useCallback((type: ToastType, message: string) => {
-    const id = ++nextToastId;
+    nextToastId += 1;
+    const id = nextToastId;
     setToasts((prev) => [...prev, { id, type, message }]);
 
     window.setTimeout(() => {

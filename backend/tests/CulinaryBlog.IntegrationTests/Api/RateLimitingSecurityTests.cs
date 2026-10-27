@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using CulinaryBlog.Application;
 using CulinaryBlog.Infrastructure;
@@ -21,7 +22,7 @@ namespace CulinaryBlog.IntegrationTests.Api;
 /// Factory với rate limit thấp để kiểm thử 429 (NFR-SEC-003).
 /// Giữ môi trường Testing để skip Hangfire/PostgreSQL nhưng hạ limit qua in-memory config (factory-local, không ảnh hưởng test khác).
 /// </summary>
-public class RateLimitTestWebApplicationFactory : WebApplicationFactory<CulinaryBlog.Api.Program>
+public class RateLimitTestWebApplicationFactory : WebApplicationFactory<global::Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -48,6 +49,12 @@ public class RateLimitTestWebApplicationFactory : WebApplicationFactory<Culinary
             {
                 services.Remove(descriptor);
             }
+            services
+                .Where(descriptor => descriptor.ServiceType.IsGenericType
+                    && descriptor.ServiceType.GetGenericTypeDefinition()
+                        == typeof(Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptionsConfiguration<>))
+                .ToList()
+                .ForEach(descriptor => services.Remove(descriptor));
 
             services.AddDbContext<ApplicationDbContext>(options =>
             {
@@ -65,12 +72,6 @@ public class RateLimitTestWebApplicationFactory : WebApplicationFactory<Culinary
         });
 
         builder.UseEnvironment("Testing");
-    }
-
-    protected override IHost CreateHost(IHostBuilder builder)
-    {
-        builder.UseEnvironment("Testing");
-        return base.CreateHost(builder);
     }
 
     private static string GetProjectPath(string projectName)
