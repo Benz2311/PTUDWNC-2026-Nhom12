@@ -31,7 +31,4 @@ public interface IAuthService
     Task<UserResponse> UpdateProfileAsync(string userId, UpdateProfileRequest request);
 
     Task<bool> UpdateUserStatusAsync(Guid adminUserId, Guid targetUserId, bool isActive);
-
-    Task<(IReadOnlyList<UserResponse> Items, int TotalCount)> GetUsersAsync(
-        int page, int pageSize, string? keyword, bool? isActive);
 }

@@ -12,6 +12,9 @@ using ApplicationValidationException = CulinaryBlog.Application.Exceptions.Valid
 
 namespace CulinaryBlog.Api.Middleware;
 
+/// <summary>
+/// Middleware xử lý ngoại lệ tập trung (Global Exception Handling) theo chuẩn RFC 7807 Problem Details.
+/// </summary>
 public sealed class ExceptionHandlingMiddleware
 {
     private readonly RequestDelegate _next;
@@ -50,6 +53,35 @@ public sealed class ExceptionHandlingMiddleware
 
         switch (exception)
         {
+            // Storage exceptions
+            case StorageUnavailableException storageUnavailableException:
+                _logger.LogWarning(
+                    "Storage unavailable: {Method} {Path} - TraceId: {TraceId}, Message: {Message}",
+                    method, path, traceId, storageUnavailableException.Message);
+
+                context.Response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+                return WriteProblemDetailsAsync(
+                    context,
+                    HttpStatusCode.ServiceUnavailable,
+                    "Service Unavailable",
+                    storageUnavailableException.Message,
+                    path,
+                    traceId);
+
+            case StorageException storageException:
+                _logger.LogError(storageException,
+                    "Storage error: {Method} {Path} - TraceId: {TraceId}, Message: {Message}",
+                    method, path, traceId, storageException.Message);
+
+                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                return WriteProblemDetailsAsync(
+                    context,
+                    HttpStatusCode.InternalServerError,
+                    "STORAGE_ERROR",
+                    "Đã xảy ra sự cố trong quá trình lưu trữ tệp tin.",
+                    path,
+                    traceId);
+
             // Domain exceptions (RFC 7807): ConcurrencyConflictException → 409,
             // NotFoundException → 404, UnauthorizedAuthException → 401, ConflictException → 409
             case BaseDomainException domainException:
@@ -88,7 +120,9 @@ public sealed class ExceptionHandlingMiddleware
                     context,
                     applicationValidationException.Errors,
                     path,
-                    traceId);
+                    traceId,
+                    HttpStatusCode.UnprocessableEntity,
+                    "Validation Failed");
 
             // Application-layer not found / forbidden → 404 / 403
             case ApplicationNotFoundException applicationNotFoundException:
@@ -170,15 +204,17 @@ public sealed class ExceptionHandlingMiddleware
         HttpContext context,
         IDictionary<string, string[]> errors,
         string path,
-        string traceId)
+        string traceId,
+        HttpStatusCode statusCode = HttpStatusCode.BadRequest,
+        string title = "VALIDATION_ERROR")
     {
-        context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+        context.Response.StatusCode = (int)statusCode;
 
         var problemDetails = new ValidationProblemDetails(errors)
         {
-            Type = "https://httpstatuses.com/400",
-            Title = "VALIDATION_ERROR",
-            Status = (int)HttpStatusCode.BadRequest,
+            Type = $"https://httpstatuses.com/{(int)statusCode}",
+            Title = title,
+            Status = (int)statusCode,
             Detail = "One or more validation errors occurred.",
             Instance = path,
         };
@@ -216,6 +252,7 @@ public sealed class ExceptionHandlingMiddleware
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = false,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         };
 
         return context.Response.WriteAsync(JsonSerializer.Serialize(value, options));

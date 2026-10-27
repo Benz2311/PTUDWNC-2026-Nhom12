@@ -10,6 +10,29 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
     {
         builder.ToTable("Users");
 
+        builder.HasKey(x => x.Id);
+
+        builder.Property(x => x.Id)
+            .ValueGeneratedOnAdd();
+
+        builder.Property(x => x.UserName)
+            .IsRequired()
+            .HasMaxLength(100);
+
+        builder.HasIndex(x => x.UserName)
+            .IsUnique();
+
+        builder.Property(x => x.Email)
+            .IsRequired()
+            .HasMaxLength(255);
+
+        builder.HasIndex(x => x.Email)
+            .IsUnique();
+
+        builder.Property(x => x.PasswordHash)
+            .IsRequired()
+            .HasMaxLength(500);
+
         builder.Property(x => x.DisplayName)
             .IsRequired()
             .HasMaxLength(150);
@@ -19,6 +42,10 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
 
         builder.Property(x => x.Bio)
             .HasMaxLength(1000);
+
+        builder.Property(x => x.EmailConfirmed)
+            .IsRequired()
+            .HasDefaultValue(false);
 
         builder.Property(x => x.IsActive)
             .IsRequired()
@@ -42,4 +69,4 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
             .HasForeignKey(x => x.UserId)
             .OnDelete(DeleteBehavior.Cascade);
     }
-}
+}

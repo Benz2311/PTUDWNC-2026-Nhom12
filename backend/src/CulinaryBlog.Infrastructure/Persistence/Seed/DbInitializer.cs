@@ -16,16 +16,23 @@ public static class DbInitializer
     {
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<ApplicationUser>>();
 
         logger?.LogInformation("Starting database initialization...");
 
         // Apply pending migrations
-        await context.Database.MigrateAsync(cancellationToken);
-        logger?.LogInformation("Database migrations applied.");
+        try
+        {
+            await context.Database.MigrateAsync(cancellationToken);
+            logger?.LogInformation("Database migrations applied.");
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "DbInitializer migration skipped.");
+        }
 
         // Seed Admin User
-        await SeedAdminUserAsync(userManager, logger, cancellationToken);
+        await SeedAdminUserAsync(context, passwordHasher, logger, cancellationToken);
 
         // Seed Categories
         await SeedCategoriesAsync(context, logger, cancellationToken);
@@ -34,7 +41,8 @@ public static class DbInitializer
     }
 
     private static async Task SeedAdminUserAsync(
-        UserManager<ApplicationUser> userManager,
+        ApplicationDbContext context,
+        IPasswordHasher<ApplicationUser> passwordHasher,
         ILogger? logger,
         CancellationToken cancellationToken)
     {
@@ -42,7 +50,7 @@ public static class DbInitializer
         const string adminUserName = "admin";
         const string adminPassword = "Admin@123";
 
-        var existingAdmin = await userManager.FindByEmailAsync(adminEmail);
+        var existingAdmin = await context.Users.FirstOrDefaultAsync(u => u.Email == adminEmail, cancellationToken);
         if (existingAdmin is not null)
         {
             logger?.LogInformation("Admin user already exists: {Email}", adminEmail);
@@ -60,17 +68,11 @@ public static class DbInitializer
             CreatedAt = DateTime.UtcNow,
             Roles = ["Admin", "Author"]
         };
+        admin.PasswordHash = passwordHasher.HashPassword(admin, adminPassword);
 
-        var result = await userManager.CreateAsync(admin, adminPassword);
-        if (result.Succeeded)
-        {
-            logger?.LogInformation("Created admin user: {Email}", adminEmail);
-        }
-        else
-        {
-            logger?.LogError("Failed to create admin user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
-            throw new InvalidOperationException($"Failed to create admin user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
-        }
+        await context.Users.AddAsync(admin, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+        logger?.LogInformation("Created admin user: {Email}", adminEmail);
     }
 
     private static async Task SeedCategoriesAsync(

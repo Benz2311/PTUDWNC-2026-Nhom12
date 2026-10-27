@@ -28,38 +28,50 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
     public DbSet<RecipeStep> RecipeSteps => Set<RecipeStep>();
     public DbSet<RecipeImage> RecipeImages => Set<RecipeImage>();
+    public DbSet<RecipeAuditLog> RecipeAuditLogs => Set<RecipeAuditLog>();
+    public DbSet<RecipeSlugHistory> RecipeSlugHistories => Set<RecipeSlugHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        var isInMemory = Database.ProviderName?.Contains("InMemory") == true;
-
-        if (!isInMemory)
-        {
-            // Đăng ký PostgreSQL extensions phục vụ tìm kiếm tiếng Việt và fuzzy fallback theo SRS v1.2.0
-            modelBuilder.HasPostgresExtension("unaccent");
-            modelBuilder.HasPostgresExtension("pg_trgm");
-        }
+        // Đăng ký PostgreSQL extensions phục vụ tìm kiếm tiếng Việt và fuzzy fallback theo SRS v1.2.0
+        modelBuilder.HasPostgresExtension("unaccent");
+        modelBuilder.HasPostgresExtension("pg_trgm");
 
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(ApplicationDbContext).Assembly);
 
-        if (!isInMemory)
+        modelBuilder.Entity<Recipe>(entity =>
         {
-            modelBuilder.Entity<Recipe>(entity =>
-            {
-                entity.OwnsOne(r => r.Nutrition);
+            entity.OwnsOne(r => r.Nutrition);
 
-                // Cấu hình Shadow Property SearchVectorFts kiểu tsvector và ánh xạ vào cột "SearchVector"
-                // Tránh xung đột với CLR property [NotMapped] string? SearchVector trên Recipe.cs của Domain
-                entity.Property<NpgsqlTsVector>("SearchVectorFts")
-                    .HasColumnName("SearchVector")
-                    .HasColumnType("tsvector");
+            // Cấu hình Shadow Property SearchVectorFts kiểu tsvector và ánh xạ vào cột "SearchVector"
+            // Tránh xung đột với CLR property [NotMapped] string? SearchVector trên Recipe.cs của Domain
+            entity.Property<NpgsqlTsVector>("SearchVectorFts")
+                .HasColumnName("SearchVector")
+                .HasColumnType("tsvector");
 
-                entity.HasIndex("SearchVectorFts")
-                    .HasMethod("GIN");
-            });
-        }
+            entity.Property(x => x.xmin).IsRowVersion();
+
+            entity.HasIndex("SearchVectorFts")
+                .HasMethod("GIN");
+        });
+
+        modelBuilder.Entity<RecipeSlugHistory>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Slug).HasMaxLength(220).IsRequired();
+            entity.HasIndex(x => x.Slug);
+            entity.HasIndex(x => new { x.RecipeId, x.Slug }).IsUnique();
+            entity.HasOne<Recipe>().WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RecipeAuditLog>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Action).HasMaxLength(40).IsRequired();
+            entity.HasIndex(x => new { x.RecipeId, x.CreatedAt });
+        });
     }
 }

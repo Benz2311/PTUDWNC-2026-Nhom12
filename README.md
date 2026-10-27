@@ -296,6 +296,409 @@
 - Trước khi tạo Pull Request và Merge vào nhánh chính, phải đảm bảo Build Backend, Build Frontend và toàn bộ kiểm thử hiện có của dự án đều vượt qua thành công.
 ---
 
+---
+
+---
+
+# Bữa 5 - Hoàn thiện bảo mật, tài liệu API và nền tảng Front-end
+
+**Mục tiêu:** Hoàn thành các cấu hình bảo mật gồm CORS, Rate Limiting và Authentication/Authorization; hoàn thiện tài liệu đặc tả API và API Versioning; đồng thời xây dựng môi trường, cấu trúc dự án Front-end, cài đặt các thư viện cần thiết và các kiểu dữ liệu TypeScript phục vụ ứng dụng.
+
+---
+
+## Nguyễn Văn Quốc - Authentication / CORS / User Types
+
+- Cấu hình và hoàn thiện JWT Authentication cho Backend.
+- Thiết lập Issuer, Audience, Signing Key và thời hạn Access Token.
+- Hoàn thiện cơ chế Authorization theo các vai trò `User`, `Author` và `Admin`.
+- Kiểm tra các trường hợp `401 Unauthorized` và `403 Forbidden`.
+- Cấu hình CORS cho các API thuộc phạm vi Authentication/User.
+- Kiểm tra Front-end có thể gọi các API đăng ký, đăng nhập và lấy thông tin người dùng.
+- Xây dựng các TypeScript Types phục vụ module người dùng và xác thực gồm:
+  - `User`
+  - `AuthUser`
+  - `LoginRequest`
+  - `RegisterRequest`
+  - `AuthResponse`
+  - `RefreshTokenRequest`
+- Bảo đảm các Types phía Front-end khớp với DTO/Response của Backend.
+- Kiểm thử toàn bộ phần Authentication/Authorization và kết nối Front-end với Auth API.
+
+---
+
+## Lê Thị Ánh Nhung - Rate Limiting / Front-end Environment / Category Types
+
+- Cấu hình Rate Limiting bằng cơ chế Rate Limiter của ASP.NET Core.
+- Thiết lập policy giới hạn request cho các API thông thường.
+- Kiểm tra trường hợp vượt giới hạn request trả về `429 Too Many Requests`.
+- Khởi tạo và cấu hình môi trường phát triển Front-end bằng Next.js và TypeScript.
+- Thiết lập các file cấu hình:
+  - `package.json`
+  - `tsconfig.json`
+  - `next.config.*`
+  - ESLint
+  - `.env`
+  - `.env.example`
+- Thiết lập biến `NEXT_PUBLIC_API_URL` để Front-end kết nối Backend.
+- Xây dựng các TypeScript Types thuộc phạm vi Category gồm:
+  - `Category`
+  - `CategoryDetail`
+  - `CategoryListItem`
+  - `CategoryRequest`
+- Cài đặt các thư viện cơ bản cần thiết để chạy dự án Front-end.
+- Kiểm tra Front-end khởi động thành công và có thể gọi Backend API.
+
+---
+
+## Phạm Nguyễn Ngọc Phước - API Documentation / Recipe Types / Front-end Libraries
+
+- Cấu hình OpenAPI để sinh tài liệu đặc tả API.
+- Cài đặt và cấu hình Scalar hoặc công cụ API Documentation được sử dụng trong dự án.
+- Cấu hình Bearer Authentication trong API Documentation.
+- Kiểm tra tài liệu API hiển thị đầy đủ HTTP Method, Route, Parameter, Request và Response.
+- Thử nghiệm Public API và Protected API trực tiếp từ giao diện API Documentation.
+- Cài đặt các thư viện Front-end cần thiết cho:
+  - gọi API;
+  - validation;
+  - quản lý form;
+  - giao diện;
+  - kiểm thử.
+- Phân loại Dependency và Dev Dependency trong `package.json`.
+- Xây dựng các TypeScript Types thuộc phạm vi Recipe gồm:
+  - `Recipe`
+  - `RecipeSummary`
+  - `RecipeDetail`
+  - `RecipeIngredient`
+  - `RecipeNutrition`
+  - `RecipeStatus`
+  - `DifficultyLevel`
+- Bảo đảm các Types Recipe khớp với dữ liệu Backend trả về.
+- Kiểm tra quá trình cài Dependency và build Front-end.
+
+---
+
+## Võ Hùng Mạnh - API Versioning / Front-end Structure / Step-Image-Search Types
+
+- Thiết lập và hoàn thiện API Versioning cho hệ thống.
+- Chuẩn hóa các Business API theo định dạng `/api/v1/...`.
+- Kiểm tra các endpoint sử dụng version thống nhất.
+- Xây dựng cấu trúc dự án Front-end gồm các thư mục:
+  - `app/`
+  - `components/`
+  - `hooks/`
+  - `lib/`
+  - `types/`
+  - `public/`
+- Xây dựng khu vực API Client và các thành phần dùng chung phía Front-end.
+- Xây dựng các TypeScript Types thuộc phạm vi Step, Image và Search gồm:
+  - `RecipeStep`
+  - `RecipeImage`
+  - `SearchRequest`
+  - `SearchResult`
+  - `Pagination`
+  - `ApiResponse`
+  - `ApiError`
+- Đối chiếu các Types với DTO/Response thật của Backend.
+- Kiểm tra việc import và tái sử dụng các Types trong Front-end.
+- Kiểm tra TypeScript compile không phát sinh lỗi.
+- Chạy `npm install`, `npm run lint` và `npm run build` để xác nhận nền tảng Front-end hoạt động.
+
+# Bữa 6 - Hoàn thiện nền tảng Front-end, tiện ích dùng chung và giao diện tĩnh
+
+**Mục tiêu:** Hoàn thiện các lớp tiện ích phục vụ xử lý lỗi và gọi API; cài đặt thư viện hỗ trợ thiết kế giao diện; xây dựng store quản lý trạng thái; hoàn thiện giao diện tĩnh, các component dùng chung và bố cục tổng thể cho Blog App nhằm chuẩn bị nền tảng cho các chức năng nghiệp vụ ở Bữa 7 và Bữa 8.
+
+---
+
+## Nguyễn Văn Quốc - Auth Utilities / Auth Store / Error Handling
+
+- Rà soát và hoàn thiện các lớp tiện ích phía Front-end phục vụ Authentication, quản lý phiên đăng nhập và xử lý lỗi trả về từ Backend.
+- Xây dựng cơ chế chuẩn hóa lỗi API theo định dạng RFC 7807 `ProblemDetails`, hỗ trợ xử lý thống nhất các trường hợp `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found`, `409 Conflict`, `422 Unprocessable Entity` và lỗi kết nối mạng.
+- Hoàn thiện các hàm tiện ích dùng cho luồng đăng nhập, đăng ký, đăng xuất, refresh token và lấy thông tin người dùng hiện tại, bảo đảm các page và component không tự xử lý request theo nhiều cách khác nhau.
+- Xây dựng `auth-store.ts` để quản lý trạng thái xác thực toàn cục, bao gồm thông tin người dùng hiện tại, trạng thái đăng nhập, vai trò, trạng thái loading và các thao tác cập nhật hoặc xóa thông tin người dùng khi đăng nhập, đăng xuất hoặc cập nhật hồ sơ.
+- Tích hợp `auth-store.ts` với API Client hiện có, không hard-code token hoặc trạng thái Authentication trong từng component.
+- Chuẩn bị cơ chế Protected Route hoặc kiểm tra quyền truy cập cho các page yêu cầu đăng nhập và các page dành riêng cho Author/Admin.
+- Xây dựng và tái sử dụng các trạng thái Loading, Error Alert và Success Message cho các form Authentication.
+- Kiểm tra các TypeScript Types thuộc Auth đã xây dựng ở Bữa 5 được import và sử dụng thống nhất, không tạo thêm các interface trùng lặp.
+- Kiểm thử các tình huống đăng nhập thành công, sai thông tin đăng nhập, token hết hạn, request không đủ quyền và lỗi Backend nhằm bảo đảm utility và store hoạt động ổn định.
+- Chạy TypeScript compile, lint và production build để xác nhận phần Auth Utilities và Auth Store không phát sinh lỗi.
+
+---
+
+## Lê Thị Ánh Nhung - UI Library / Shared Components / Global Layout
+
+- Cài đặt và cấu hình thư viện hỗ trợ thiết kế giao diện cho Front-end, ưu tiên `shadcn/ui` hoặc thư viện UI được nhóm thống nhất sử dụng trong toàn bộ Blog App.
+- Thiết lập các component giao diện cơ bản như Button, Input, Textarea, Select, Dialog, Alert, Badge, Card, Skeleton và Dropdown Menu phục vụ các màn hình nghiệp vụ ở những bữa tiếp theo.
+- Xây dựng các component dùng chung gồm `Header`, `Footer`, `Sidebar`, `Pagination`, `LoadingSpinner`, `LoadingSkeleton`, `ErrorState`, `EmptyState` và `ConfirmDialog`.
+- Thiết kế `Header` hiển thị Logo/Tên Blog, liên kết Trang chủ, danh mục, khu vực tìm kiếm, các nút đăng nhập/đăng ký hoặc menu người dùng tùy theo trạng thái Authentication.
+- Thiết kế `Footer` hiển thị thông tin dự án, liên kết điều hướng chính, thông tin nhóm và nội dung bản quyền cần thiết.
+- Xây dựng `Sidebar` dùng chung cho các trang Public, chuẩn bị khu vực hiển thị danh sách Category và các liên kết điều hướng liên quan.
+- Hoàn thiện component `Pagination` có khả năng nhận trang hiện tại, tổng số trang và callback hoặc URL chuyển trang để tái sử dụng cho Recipe List, Category, Search và Admin List.
+- Hoàn thiện bố cục tổng thể của Blog App bằng Next.js Layout với Header phía trên, vùng nội dung chính, Sidebar ở các trang cần thiết và Footer phía dưới.
+- Thiết kế giao diện tĩnh responsive cho Desktop, Tablet và Mobile; chuẩn hóa spacing, typography, container, card và grid để các thành viên khác sử dụng thống nhất.
+- Chuẩn bị giao diện tĩnh cho Trang chủ, Category và các màn hình Public mà chưa gắn business logic hoặc dữ liệu thật.
+- Không hard-code dữ liệu Recipe/Category trực tiếp trong Shared Components và không can thiệp logic nghiệp vụ của module thành viên khác.
+- Kiểm tra khả năng tái sử dụng Shared Components và chạy TypeScript compile, lint, production build sau khi hoàn thiện UI Foundation.
+
+---
+
+## Phạm Nguyễn Ngọc Phước - API Utilities / Recipe Shared Components
+
+- Rà soát và hoàn thiện các lớp tiện ích dùng chung để gọi API phía Front-end, tiếp tục sử dụng API Client đã được xây dựng ở Bữa 5 thay vì tạo một client mới.
+- Chuẩn hóa các hàm gọi API cho các phương thức `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, đồng thời hỗ trợ xử lý query string, pagination parameter, filter parameter, request body và response mapping.
+- Hoàn thiện khu vực `lib/api/recipes.ts` để các page và component Recipe có thể sử dụng chung các hàm truy vấn và thao tác dữ liệu.
+- Xây dựng các component Recipe dùng chung gồm `RecipeCard`, `RecipeList`, `RecipeMeta`, `RecipeStatusBadge`, `DifficultyBadge` và `RecipeTimeInfo`.
+- Thiết kế `RecipeCard` với các khu vực hiển thị ảnh đại diện, tên công thức, danh mục, tác giả, độ khó, thời gian nấu và ngày xuất bản để tái sử dụng tại Trang chủ, Category và Search.
+- Xây dựng giao diện tĩnh cho Recipe Detail với các khu vực tiêu đề, ảnh đại diện, thông tin cơ bản, nguyên liệu, dinh dưỡng, các bước thực hiện và thư viện ảnh.
+- Xây dựng giao diện tĩnh cho Recipe Form phục vụ Bữa 8 gồm Basic Information, Ingredient, Nutrition, khu vực trạng thái Recipe, khu vực tích hợp `StepEditor` và `ImageManager`.
+- Không triển khai business logic Create/Edit Recipe đầy đủ ở Bữa 6 và không chỉnh sửa logic bên trong `StepEditor` hoặc `ImageManager` thuộc Võ Hùng Mạnh.
+- Bảo đảm các Recipe Shared Components nhận dữ liệu thông qua props hoặc state thích hợp, không hard-code dữ liệu nghiệp vụ.
+- Kiểm tra các component sử dụng đúng Recipe Types đã xây dựng ở Bữa 5 và không phát sinh type trùng lặp.
+- Kiểm tra khả năng import và tái sử dụng các component Recipe trong nhiều page khác nhau.
+- Chạy TypeScript compile, lint và production build sau khi hoàn thiện API Utilities và Recipe Shared Components.
+
+---
+
+## Võ Hùng Mạnh - Step / Image / Search Utilities, State & Shared Components
+
+- Rà soát và hoàn thiện các utility và API Client thuộc phạm vi Step, Image và Search trong `lib/api/steps.ts`, `lib/api/images.ts` và `lib/api/search.ts`, bảo đảm sử dụng chung API Client và biến môi trường `NEXT_PUBLIC_API_URL`.
+- Hoàn thiện xử lý `multipart/form-data` cho chức năng upload ảnh, bảo đảm Browser/Axios tự sinh multipart boundary và không hard-code `Content-Type` sai cách.
+- Xây dựng state/store cần thiết cho Search, quản lý từ khóa, filter, sort, page, trạng thái loading và trạng thái lỗi.
+- Chuẩn bị state quản lý Step trong quá trình chỉnh sửa Recipe, bao gồm danh sách Step, thêm mới, cập nhật, xóa và thay đổi thứ tự.
+- Chuẩn bị state quản lý Image bao gồm danh sách ảnh, preview, upload progress, ảnh Primary và trạng thái upload/delete.
+- Xây dựng các component dùng chung thuộc phạm vi phụ trách gồm `SearchBox`, `SearchLoadingState`, `SearchEmptyState`, `SearchErrorState`, `StepItem`, `ImagePreview` và `ImageUploadButton`.
+- Thiết kế `SearchBox` hỗ trợ nhập từ khóa, submit bằng Enter hoặc nút Search, kiểm tra độ dài từ khóa và hiển thị validation error.
+- Xây dựng giao diện tĩnh cơ bản cho Step Editor và Image Manager nhằm chuẩn bị cho việc tích hợp đầy đủ tại Bữa 8.
+- Bảo đảm các component Step/Image/Search có thể nhận dữ liệu và handler thông qua props hoặc state, không phụ thuộc trực tiếp vào RecipeForm.
+- Kiểm tra việc tái sử dụng các TypeScript Types gồm `RecipeStep`, `RecipeImage`, `SearchRequest`, `SearchResult` và `Pagination`.
+- Không can thiệp business logic Recipe Basic Information, Ingredient hoặc Nutrition thuộc Phạm Nguyễn Ngọc Phước.
+- Chạy TypeScript compile, lint và production build để xác nhận Step/Image/Search Utilities, State và Shared Components hoạt động đúng.
+
+---
+
+## Quy ước tích hợp Bữa 6
+
+- Mỗi thành viên chỉ thực hiện đúng phần nền tảng Front-end và Shared Component đã được phân công, không tự ý viết lại hoặc thay thế phần của thành viên khác.
+- Nguyễn Văn Quốc chịu trách nhiệm `auth-store.ts`, các tiện ích Authentication, xử lý lỗi API và trạng thái xác thực toàn cục.
+- Lê Thị Ánh Nhung chịu trách nhiệm thư viện UI dùng chung, `Header`, `Footer`, `Sidebar`, `Pagination`, `Loading`, `Error`, `Empty State` và bố cục Layout tổng thể.
+- Phạm Nguyễn Ngọc Phước chịu trách nhiệm API Utilities liên quan Recipe và các Recipe Shared Components như `RecipeCard`, `RecipeList`, `RecipeMeta`, `RecipeStatusBadge`, `DifficultyBadge`.
+- Võ Hùng Mạnh chịu trách nhiệm utility/state/component thuộc Step, Image và Search, bao gồm `SearchBox`, Step state, Image state và các component hỗ trợ upload/preview.
+- Chỉ sử dụng một API Client chung cho toàn bộ Front-end; không tạo thêm API Client riêng trong từng module nếu chức năng đã được hỗ trợ.
+- Chỉ sử dụng một thư viện UI chính được nhóm thống nhất; không tự ý cài nhiều UI framework gây xung đột style hoặc dependency.
+- Shared Component phải được thiết kế để tái sử dụng, ưu tiên nhận dữ liệu qua props hoặc state thay vì hard-code dữ liệu nghiệp vụ.
+- Không hard-code Backend URL trong component; toàn bộ API phải sử dụng biến môi trường và API Client chung đã được thiết lập từ Bữa 5.
+- Không viết business logic Recipe vào Shared Layout, không viết Auth logic vào Category component và không đưa logic Step/Image vào Recipe Basic Information.
+- Khi cần sử dụng component của thành viên khác, chỉ import và truyền props/callback; không chỉnh sửa logic bên trong component nếu chưa thống nhất.
+- Các TypeScript Types đã xây dựng ở Bữa 5 phải được tái sử dụng, không tạo interface trùng lặp với cùng ý nghĩa.
+- Không commit các file `.env`, file log runtime, `node_modules`, `.next`, file build/cache hoặc dữ liệu cục bộ của máy cá nhân.
+- Trước khi tạo Pull Request hoặc Merge phải chạy `npm install`, TypeScript compile, lint và production build, đồng thời kiểm tra không phát sinh lỗi mới do Shared Component hoặc Store gây ra.
+
+---
+
+# Bữa 7 - Hoàn thiện chức năng người dùng và các trang Public chính
+
+**Mục tiêu:** Hoàn thiện các chức năng Authentication và Profile; xây dựng các trang Public chính của Blog App gồm Trang chủ, Danh mục, Chi tiết công thức và Tìm kiếm; kết nối giao diện với API thật và hoàn thiện đầy đủ các trạng thái Loading, Error, Empty, Filter và Pagination cần thiết.
+
+---
+
+## Nguyễn Văn Quốc - Authentication / Password / Profile
+
+- Hoàn thiện chức năng Đăng ký tài khoản với form Register gồm Username, Email, Password, Confirm Password và các trường hồ sơ ban đầu nếu Backend hỗ trợ.
+- Thực hiện validation phía Client theo đúng yêu cầu Backend, bao gồm định dạng Email, độ mạnh Password và xác nhận Password.
+- Hoàn thiện chức năng Đăng nhập bằng Email/Username và Password, tích hợp với JWT Authentication và `auth-store.ts`.
+- Xử lý đầy đủ các trạng thái đăng nhập thành công, sai thông tin đăng nhập, tài khoản bị vô hiệu hóa, email chưa xác thực và lỗi Backend.
+- Hoàn thiện chức năng Đăng xuất, gọi API Logout, xóa trạng thái Authentication và điều hướng người dùng về trang phù hợp.
+- Hoàn thiện chức năng Đổi mật khẩu với các trường mật khẩu hiện tại, mật khẩu mới và xác nhận mật khẩu mới.
+- Hoàn thiện chức năng Quên mật khẩu, xây dựng form nhập Email để yêu cầu Reset Password và xử lý response theo đúng cơ chế chống User Enumeration của Backend.
+- Xây dựng màn hình Reset Password nếu Backend sử dụng Reset Token và hoàn thiện luồng thay đổi mật khẩu thông qua token.
+- Hoàn thiện trang Profile hiển thị Avatar, Username, Email, DisplayName, Bio, Roles và trạng thái tài khoản.
+- Xây dựng form Update Profile cho phép cập nhật DisplayName, AvatarUrl và Bio theo đúng API; không cho phép chỉnh Email hoặc Username nếu SRS không cho phép.
+- Đồng bộ thông tin Profile mới vào `auth-store.ts` ngay sau khi cập nhật thành công.
+- Hoàn thiện Protected Route cho Profile và các màn hình yêu cầu Authentication hoặc Role.
+- Xử lý Loading, Error, Success Message và Redirect thống nhất trên toàn bộ các màn hình Auth.
+- Kiểm thử toàn bộ các luồng Register, Login, Logout, Change Password, Forgot Password, Reset Password, Get Profile và Update Profile.
+
+---
+
+## Lê Thị Ánh Nhung - Home / Category / Public Layout Integration
+
+- Hoàn thiện Trang chủ của Blog App bằng cách tích hợp Header, Footer, Sidebar và Main Content từ các Shared Components đã xây dựng ở Bữa 6.
+- Sidebar của Trang chủ hiển thị danh sách Category lấy từ API thật, không sử dụng dữ liệu hard-code.
+- Main Content hiển thị danh sách Recipe Published mới nhất bằng `RecipeCard`, hỗ trợ page, pageSize và sắp xếp phù hợp theo API.
+- Hoàn thiện các section Category nổi bật hoặc Recipe mới nếu API hiện tại cung cấp dữ liệu tương ứng.
+- Xây dựng trang xem danh sách tất cả Category, hiển thị tên danh mục, hình ảnh, mô tả và `recipeCount`.
+- Hoàn thiện trang Category Detail theo slug, hiển thị thông tin Category và danh sách Recipe thuộc Category.
+- Tích hợp Pagination cho danh sách Recipe trên Trang chủ và Category Detail.
+- Hoàn thiện liên kết điều hướng từ Category Sidebar/Category Card đến trang Category Detail và từ Recipe Card đến Recipe Detail.
+- Tái sử dụng các Shared Components Loading Skeleton, Error State, Empty State và Pagination thay vì viết riêng cho từng màn hình.
+- Bảo đảm Trang chủ và Category hoạt động responsive trên Desktop, Tablet và Mobile.
+- Kiểm tra người dùng chưa đăng nhập vẫn có thể truy cập Trang chủ, danh sách Category và các Recipe Published.
+- Không hard-code dữ liệu Category hoặc Recipe trong UI.
+- Kiểm thử việc tải Trang chủ, danh sách Category, Category Detail, Pagination, Empty State và API Error State.
+
+---
+
+## Phạm Nguyễn Ngọc Phước - Recipe Detail Page
+
+- Hoàn thiện trang xem chi tiết công thức theo Slug bằng API `GET /api/v1/recipes/{slug}`.
+- Hiển thị đầy đủ các thông tin cơ bản gồm Title, Description, Content, Author, Category, Difficulty, PrepTimeMinutes, CookTimeMinutes, Servings và PublishedAt.
+- Hiển thị ảnh Primary của Recipe ở vị trí nổi bật và hiển thị bộ sưu tập ảnh phụ theo thứ tự nếu Recipe có nhiều hình ảnh.
+- Hiển thị danh sách Ingredient đúng theo `OrderIndex`, bao gồm Name, Quantity, Unit và Notes.
+- Hiển thị thông tin Nutrition gồm Calories, Protein, Carbohydrates, Fat, Fiber và Sodium nếu Recipe có dữ liệu dinh dưỡng.
+- Hiển thị các bước thực hiện đúng theo `StepNumber`, kèm Title, Description, TimerMinutes và Image nếu có.
+- Tái sử dụng các component Step/Image thuộc Võ Hùng Mạnh ở chế độ hiển thị phù hợp mà không sửa logic nội bộ của các component.
+- Hiển thị thông tin tác giả, Category và các liên kết điều hướng liên quan.
+- Xử lý trường hợp Recipe không tồn tại bằng giao diện `404 Not Found` thích hợp.
+- Xử lý quyền truy cập đối với Draft hoặc Archived đúng theo Backend, chỉ cho Author sở hữu hoặc Admin xem khi hệ thống yêu cầu.
+- Tái sử dụng Loading Skeleton, Error State và Empty State dùng chung.
+- Hoàn thiện responsive layout cho Recipe Detail.
+- Không triển khai chức năng Create/Edit Recipe trong Bữa 7.
+- Kiểm thử Recipe Detail với Recipe Published, Recipe có/không có ảnh, Recipe có nhiều Step/Ingredient, Recipe không tồn tại và Recipe không đủ quyền xem.
+
+---
+
+## Võ Hùng Mạnh - Recipe Search
+
+- Hoàn thiện chức năng tìm kiếm công thức và route `/search`, kết nối trực tiếp với API `GET /api/v1/recipes/search`.
+- Hoàn thiện `SearchBox` cho phép nhập từ khóa, submit bằng Enter hoặc nút Search, validation độ dài từ khóa và đồng bộ từ khóa với URL query parameter nếu cấu trúc ứng dụng sử dụng.
+- Hoàn thiện các bộ lọc Search theo đúng Backend hỗ trợ, bao gồm Category, Difficulty, Max Cook Time và các filter thực tế khác nếu có.
+- Hoàn thiện cơ chế sắp xếp kết quả theo độ liên quan, thời gian xuất bản mới nhất, thời gian nấu hoặc các tiêu chí Backend hỗ trợ.
+- Tích hợp Pagination cho kết quả tìm kiếm và giữ đúng query/filter/sort/page khi người dùng chuyển trang.
+- Hiển thị kết quả tìm kiếm bằng Search Result Card hoặc `RecipeCard` dùng chung.
+- Xử lý đầy đủ các trạng thái Loading, Empty, Error và Search Result.
+- Đồng bộ Search State với URL để người dùng reload trang vẫn giữ lại từ khóa và filter nếu kiến trúc hiện tại hỗ trợ.
+- Không gửi request khi từ khóa không hợp lệ hoặc chưa đạt độ dài tối thiểu.
+- Kiểm thử tìm kiếm tiếng Việt không dấu với trường hợp `"pho bo"` và xác nhận có thể tìm thấy Recipe `"Phở bò"` khi Backend và dữ liệu hiện tại hỗ trợ.
+- Kiểm thử Search với nhiều trang kết quả, nhiều Category, filter và sort khác nhau.
+- Hoàn thiện responsive cho Search UI và bảo đảm Recipe Published có thể được tìm kiếm mà không cần đăng nhập.
+
+---
+
+## Quy ước tích hợp Bữa 7
+
+- Nguyễn Văn Quốc chịu trách nhiệm toàn bộ Authentication, Password, Profile và Protected Route.
+- Lê Thị Ánh Nhung chịu trách nhiệm Trang chủ, danh sách Category, Category Detail và việc tích hợp Public Layout trên các page thuộc phạm vi của mình.
+- Phạm Nguyễn Ngọc Phước chịu trách nhiệm Recipe Detail Page và cách trình bày thông tin Recipe, Ingredient và Nutrition.
+- Võ Hùng Mạnh chịu trách nhiệm toàn bộ chức năng Search, Search State, Search Result, Filter, Sort và Pagination của trang tìm kiếm.
+- Các page phải kết nối trực tiếp với API thật; không sử dụng dữ liệu mock hoặc hard-code để thay thế dữ liệu nghiệp vụ trong bản hoàn thiện.
+- Trang chủ chỉ hiển thị Recipe Published và Category public theo dữ liệu API; không tự truy cập hoặc hiển thị Draft/Archived trái quyền.
+- Trang Recipe Detail có thể sử dụng Step/Image component của Võ Hùng Mạnh nhưng Phạm Nguyễn Ngọc Phước không được thay đổi logic nội bộ của các component đó.
+- `SearchBox` có thể xuất hiện trong `Header` do Lê Thị Ánh Nhung phụ trách Layout, nhưng logic Search, validation từ khóa và điều hướng kết quả thuộc Võ Hùng Mạnh.
+- Các component `Header`, `Footer`, `Sidebar`, `Pagination`, `Loading`, `Error`, `Empty State` từ Bữa 6 phải được tái sử dụng, không tạo phiên bản riêng cho từng page nếu không thực sự cần thiết.
+- Auth State phải lấy từ `auth-store.ts`; không tự tạo state đăng nhập riêng tại từng page.
+- Tất cả route yêu cầu đăng nhập hoặc Role phải kiểm tra quyền truy cập thống nhất bằng cơ chế Protected Route hoặc guard chung.
+- Các lỗi từ API phải hiển thị theo chuẩn xử lý lỗi chung đã được xây dựng ở Bữa 6, không tự hiển thị thông báo theo nhiều định dạng khác nhau.
+- Các thao tác Filter, Sort và Pagination phải giữ đúng query parameter để người dùng có thể reload hoặc quay lại trang mà không làm mất trạng thái khi kiến trúc hiện tại hỗ trợ.
+- Không sửa hoặc ghi đè phần nghiệp vụ của thành viên khác khi chỉ cần tích hợp UI.
+- Trước khi Merge phải kiểm tra Register, Login, Logout, Profile, Home, Category, Recipe Detail và Search hoạt động trên cùng một Front-end mà không xung đột route hoặc state.
+- Phải chạy TypeScript compile, lint, frontend build và kiểm tra các API chính trước khi tạo Pull Request.
+
+---
+
+# Bữa 8 - Hoàn thiện quản lý Recipe, Upload Image, Admin và Logging
+
+**Mục tiêu:** Hoàn thiện các chức năng nâng cao gồm upload ảnh, tạo/cập nhật và quản lý vòng đời Recipe, quản trị người dùng, Category, Logging và các chức năng còn thiếu theo SRS; tích hợp đầy đủ các module trước khi thực hiện tổng kiểm thử toàn hệ thống.
+
+---
+
+## Nguyễn Văn Quốc - Admin User Management / Auth Completion
+
+- Hoàn thiện trang danh sách người dùng dành cho Admin, kết nối trực tiếp với API quản trị User.
+- Hiển thị các thông tin người dùng gồm Id, UserName, Email, DisplayName, Role, IsActive và CreatedAt.
+- Hỗ trợ phân biệt các vai trò Admin, Author và User theo dữ liệu Backend.
+- Hoàn thiện Search, Filter và Pagination cho danh sách người dùng nếu API hỗ trợ.
+- Xây dựng giao diện xem thông tin chi tiết người dùng hoặc Dialog hiển thị các thông tin cần thiết.
+- Hoàn thiện thao tác kích hoạt và vô hiệu hóa tài khoản, hiển thị Confirmation Dialog trước các thao tác có ảnh hưởng đến người dùng.
+- Bảo đảm Admin không thể tự vô hiệu hóa chính mình theo đúng quy tắc Backend.
+- Xử lý và hiển thị chính xác các lỗi `403 Forbidden`, `404 Not Found`, `409 Conflict` từ API.
+- Kiểm tra việc thu hồi token hoặc buộc đăng xuất đối với tài khoản bị vô hiệu hóa nếu Backend đã triển khai.
+- Rà soát toàn bộ các chức năng Authentication đã hoàn thiện ở Bữa 7 gồm Register, Login, Logout, Refresh Token, Change Password, Forgot Password và Profile.
+- Hoàn thiện các chức năng Auth/User còn thiếu theo SRS thuộc phạm vi Nguyễn Văn Quốc.
+- Kiểm thử Role-based Authorization giữa Admin, Author và User.
+- Bảo đảm người không có quyền Admin không thể truy cập trang quản lý người dùng.
+
+---
+
+## Lê Thị Ánh Nhung - Category Completion / Home & Layout Finalization
+
+- Hoàn thiện các chức năng Category còn thiếu theo SRS, bao gồm giao diện quản lý Category dành cho Admin.
+- Xây dựng và hoàn thiện chức năng tạo Category với các trường Name, Description, ImageUrl, OrderIndex và các trường Backend thực tế yêu cầu.
+- Xây dựng chức năng cập nhật Category và đồng bộ dữ liệu mới trên UI sau khi thao tác thành công.
+- Xây dựng chức năng xóa Category, hiển thị Confirmation Dialog và xử lý lỗi `409 Conflict` khi Category vẫn còn Recipe liên kết.
+- Rà soát Category List và Category Detail sau khi Recipe Create/Edit được tích hợp, bảo đảm `recipeCount` được cập nhật đúng.
+- Rà soát Trang chủ sau khi các chức năng Recipe hoàn thiện, kiểm tra danh sách Recipe mới, Sidebar Category, Pagination, Header và Footer.
+- Hoàn thiện giao diện tổng thể Blog App về responsive, spacing, typography, card layout và mobile navigation.
+- Rà soát các Shared Components gồm Header, Footer, Sidebar, Pagination, Loading, Error và Empty State để bảo đảm cách hiển thị thống nhất giữa các page.
+- Hoàn thiện các chức năng Category, Recipe Read hoặc Dashboard còn thiếu theo SRS thuộc phạm vi Lê Thị Ánh Nhung.
+- Không can thiệp business logic Recipe Create/Edit thuộc Phạm Nguyễn Ngọc Phước.
+- Kiểm thử Category CRUD, Home, Layout và responsive sau khi tích hợp toàn hệ thống.
+
+---
+
+## Phạm Nguyễn Ngọc Phước - Recipe Create / Update / Lifecycle
+
+- Hoàn thiện trang tạo mới Recipe và trang cập nhật Recipe, kết nối trực tiếp với các API ghi dữ liệu của Backend.
+- Xây dựng Recipe Form đầy đủ với các trường Title, Description, Content, Category, PrepTimeMinutes, CookTimeMinutes, Servings và Difficulty.
+- Tích hợp `IngredientEditor` cho phép thêm, sửa, xóa và sắp xếp nguyên liệu, hỗ trợ Name, Quantity, Unit, Notes và OrderIndex.
+- Tích hợp `NutritionEditor` cho phép nhập và cập nhật Calories, Protein, Carbohydrates, Fat, Fiber và Sodium.
+- Thực hiện luồng tạo Recipe ở trạng thái Draft và cập nhật Recipe Draft.
+- Hoàn thiện các thao tác chuyển trạng thái Recipe gồm Draft → Published, Published → Unpublished nếu Backend hỗ trợ, Published → Archived, Archived → Unarchive và Recipe → Deleted.
+- Hiển thị trạng thái hiện tại của Recipe bằng Status Badge và cập nhật giao diện ngay sau khi thao tác trạng thái thành công.
+- Kiểm tra đầy đủ điều kiện Publish như Category hợp lệ, có ít nhất một Ingredient, có ít nhất một Step và Author đã xác thực Email nếu SRS yêu cầu.
+- Tích hợp `StepEditor` của Võ Hùng Mạnh vào Recipe Form mà không thay đổi logic nội bộ của component.
+- Tích hợp `ImageManager` của Võ Hùng Mạnh vào Recipe Form theo nguyên tắc Phước chịu trách nhiệm bố trí layout, Mạnh chịu trách nhiệm logic Step/Image.
+- Hoàn thiện Confirmation Dialog cho các thao tác Delete, Publish, Archive, Purge hoặc các thao tác nguy hiểm khác.
+- Hoàn thiện xử lý Optimistic Concurrency bằng ETag/`If-Match` nếu Backend đang sử dụng, hiển thị lỗi `409 Conflict` khi dữ liệu bị cập nhật đồng thời.
+- Hoàn thiện các action tại My Recipes gồm Edit, Publish, Archive và Delete.
+- Rà soát các chức năng Restore/Purge dành cho Admin nếu thuộc phạm vi SRS và API đã triển khai.
+- Hoàn thiện các chức năng Recipe, Ingredient và Nutrition còn thiếu theo SRS.
+- Kiểm thử toàn bộ vòng đời Recipe gồm Create, Save Draft, Edit, Publish, Archive, Delete và Restore/Purge nếu có.
+
+---
+
+## Võ Hùng Mạnh - Image Upload / Step Integration / Logging / Observability
+
+- Hoàn thiện tính năng Upload Image cho Recipe, kết nối ImageManager với API upload ảnh thật và xử lý `multipart/form-data` đúng chuẩn.
+- Hỗ trợ chọn file bằng File Picker, Drag & Drop nếu component có, hiển thị Preview trước khi upload và Upload Progress nếu API Client hỗ trợ.
+- Thực hiện Client Validation trước khi upload dựa trên giới hạn dung lượng tối đa 5 MB và các định dạng file thực tế Backend đang hỗ trợ.
+- Hoàn thiện ImageManager cho phép upload ảnh, cập nhật AltText, thay đổi OrderIndex, đặt ảnh làm Primary và xóa ảnh.
+- Tự động refresh danh sách ảnh sau các mutation và cập nhật trạng thái Primary trên UI ngay sau thao tác Set Primary.
+- Xử lý lỗi Object Storage/MinIO, bao gồm `503 Service Unavailable`, upload thất bại, file không hợp lệ và các lỗi kết nối.
+- Hoàn thiện chức năng upload ảnh cho Recipe Step nếu Backend hỗ trợ endpoint tương ứng.
+- Hoàn thiện `StepEditor` khi tích hợp thật với API, hỗ trợ Add Step, Update Step, Delete Step, Reorder Step, TimerMinutes và Step Image.
+- Kiểm tra `StepNumber` được cập nhật chính xác sau khi xóa hoặc thay đổi thứ tự Step.
+- Bảo đảm `StepEditor` và `ImageManager` hoạt động ổn định khi được nhúng vào Recipe Form của Phạm Nguyễn Ngọc Phước.
+- Không thay đổi business logic Recipe Basic Information, Ingredient hoặc Nutrition.
+- Hoàn thiện Structured Logging bằng Serilog và ghi log cho các sự kiện quan trọng như lỗi request, lỗi upload ảnh, lỗi MinIO, lỗi Search, lỗi Background Job và exception hệ thống.
+- Bổ sung `CorrelationId` vào log để hỗ trợ truy vết request và ghi thông tin UserId/UserName khi request đã được xác thực nếu kiến trúc hiện tại hỗ trợ.
+- Kiểm tra cơ chế Slow Request Logging và cảnh báo khi thời gian xử lý vượt ngưỡng cấu hình.
+- Rà soát và hoàn thiện Health Check tại `/health`, `/health/live` và `/health/ready` theo cấu hình thực tế của hệ thống.
+- Rà soát OpenTelemetry Tracing & Metrics cho HTTP Request, EF Core và các dependency phù hợp.
+- Kiểm tra Thumbnail Background Job sau khi upload ảnh và bảo đảm các URL Medium/Thumbnail được cập nhật đúng.
+- Rà soát và hoàn thiện các chức năng còn thiếu theo SRS trong phạm vi Step, Image, Search, File Storage, Logging và Observability.
+- Kiểm thử tích hợp toàn bộ Upload Image, Set Primary, Delete Image, Step CRUD, Reorder, Search, Logging, Health Check và Background Job.
+
+---
+
+## Quy ước tích hợp Bữa 8
+
+- Nguyễn Văn Quốc tiếp tục chịu trách nhiệm Auth/User/Admin User Management và toàn bộ các kiểm tra phân quyền liên quan người dùng.
+- Lê Thị Ánh Nhung tiếp tục chịu trách nhiệm Category, Home, Shared Layout và hoàn thiện giao diện tổng thể của Blog App.
+- Phạm Nguyễn Ngọc Phước chịu trách nhiệm Recipe Create/Edit, Ingredient, Nutrition và toàn bộ vòng đời Recipe.
+- Võ Hùng Mạnh chịu trách nhiệm Step, Image, Upload, Search, File Storage, Logging và Observability.
+- `RecipeForm` chính thuộc Phạm Nguyễn Ngọc Phước; `StepEditor` và `ImageManager` thuộc Võ Hùng Mạnh.
+- Khi tích hợp `StepEditor` và `ImageManager` vào Recipe Form, Phạm Nguyễn Ngọc Phước chỉ chịu trách nhiệm bố trí Layout, truyền Recipe ID, dữ liệu và callback cần thiết; không chỉnh sửa logic Step/Image bên trong.
+- Võ Hùng Mạnh không chỉnh sửa Recipe Basic Information, Ingredient hoặc Nutrition trừ khi cần thay đổi interface tích hợp đã được cả hai thống nhất.
+- Mọi thao tác Create, Update, Delete, Publish, Archive, Restore, Purge, Upload hoặc Set Primary phải cập nhật State hoặc kích hoạt refresh/query invalidation để UI hiển thị dữ liệu mới nhất.
+- Chỉ sử dụng đúng API endpoint và DTO đã được Backend công bố; không tự tạo payload khác với hợp đồng API.
+- Upload Image phải sử dụng API Client chung và `multipart/form-data` đúng chuẩn; không hard-code Content-Type multipart boundary.
+- Validation phía Client chỉ nhằm cải thiện trải nghiệm người dùng; Backend vẫn là nơi quyết định cuối cùng đối với dung lượng file, định dạng file, quyền truy cập và business rule.
+- Logging, Health Check và Observability là thành phần hạ tầng; không xây dựng UI riêng nếu SRS không yêu cầu.
+- Không commit file `.env`, secret, log runtime, `bin/`, `obj/`, `.next/`, `node_modules` hoặc file build/cache.
+- Không đưa UI hoặc source code cũ ngoài phạm vi hiện tại vào branch tích hợp.
+- Không tự ý thay đổi vai trò ownership của module khi chưa có thống nhất của nhóm.
+- Trước khi Merge phải kiểm thử tối thiểu các luồng Admin User Management, Category CRUD, Create/Edit Recipe, Draft/Publish/Archive/Delete, Upload Image, Set Primary, Step CRUD/Reorder, Search, Logging và Health Check.
+- Trước khi tạo Pull Request hoặc Merge vào `main` phải bảo đảm Backend build, Backend tests, `npm install`, TypeScript compile, lint và Frontend production build đều thành công.
+
 # Cài đặt PostgreSQL bằng Docker
 
 Project sử dụng **PostgreSQL 16** chạy bằng Docker.

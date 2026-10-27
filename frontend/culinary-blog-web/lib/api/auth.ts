@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { apiClient, unwrapData } from "./client";
 import type {
   AuthResponse,
   ForgotPasswordRequest,
@@ -7,47 +7,37 @@ import type {
   UpdateProfileRequest,
   User,
 } from "@/types/auth";
+import type { ApiResponse } from "@/types/api";
 
-/**
- * Auth API — tương ứng với AuthController (Backend):
- * POST   /api/v1/auth/login              Đăng nhập
- * POST   /api/v1/auth/register           Đăng ký
- * GET    /api/v1/auth/me                 Thông tin người dùng hiện tại
- * PATCH  /api/v1/auth/me                 Cập nhật profile
- * POST   /api/v1/auth/refresh            Làm mới access token (Token Rotation)
- * POST   /api/v1/auth/revoke             Thu hồi refresh token (đăng xuất)
- * POST   /api/v1/auth/email/resend       Gửi lại email xác thực
- * POST   /api/v1/auth/email/confirm      Xác thực email (userId + token)
- */
 export const authApi = {
   async login(request: LoginRequest): Promise<AuthResponse> {
-    const { data } = await apiClient.post<AuthResponse>("/auth/login", request);
-    return data;
+    const response = await apiClient.post<ApiResponse<AuthResponse>>("/auth/login", request);
+    return unwrapData(response);
   },
 
   async register(request: RegisterRequest): Promise<AuthResponse> {
-    const { data } = await apiClient.post<AuthResponse>(
+    const response = await apiClient.post<ApiResponse<AuthResponse>>(
       "/auth/register",
       request
     );
-    return data;
+    return unwrapData(response);
   },
 
   async getMe(): Promise<User> {
-    const { data } = await apiClient.get<User>("/auth/me");
-    return data;
+    const response = await apiClient.get<ApiResponse<User>>("/auth/me");
+    return unwrapData(response);
   },
 
   async updateProfile(request: UpdateProfileRequest): Promise<User> {
-    const { data } = await apiClient.patch<User>("/auth/me", request);
-    return data;
+    const response = await apiClient.patch<ApiResponse<User>>("/auth/me", request);
+    return unwrapData(response);
   },
 
   async refreshToken(refreshToken: string): Promise<AuthResponse> {
-    const { data } = await apiClient.post<AuthResponse>("/auth/refresh", {
+    const response = await apiClient.post<ApiResponse<AuthResponse>>("/auth/refresh", {
       refreshToken,
     });
-    return data;
+    return unwrapData(response);
   },
 
   async revoke(refreshToken: string): Promise<void> {
@@ -58,8 +48,8 @@ export const authApi = {
     await apiClient.post("/auth/email/resend", { email });
   },
 
-  async confirmEmail(token: string): Promise<void> {
-    await apiClient.post("/auth/email/confirm", { token });
+  async confirmEmail(userId: string, token: string): Promise<void> {
+    await apiClient.post("/auth/email/confirm", { userId, token });
   },
 
   async forgotPassword(request: ForgotPasswordRequest): Promise<void> {

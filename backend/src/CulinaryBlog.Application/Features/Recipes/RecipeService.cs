@@ -7,6 +7,11 @@ using CulinaryBlog.Domain.Enums;
 using CulinaryBlog.Domain.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using ReadRecipeRepo = CulinaryBlog.Application.Contracts.Persistence.IRecipeRepository;
+using RecipeImageDto = CulinaryBlog.Application.DTOs.RecipeImageDto;
+using RecipeIngredientDto = CulinaryBlog.Application.DTOs.RecipeIngredientDto;
+using RecipeDetailDto = CulinaryBlog.Application.DTOs.RecipeDetailDto;
+using RecipeNutritionDto = CulinaryBlog.Application.DTOs.RecipeNutritionDto;
+using RecipeStepDto = CulinaryBlog.Application.DTOs.RecipeStepDto;
 using WriteRecipeRepo = CulinaryBlog.Application.Interfaces.IRecipeRepository;
 
 namespace CulinaryBlog.Application.Features.Recipes;
@@ -134,12 +139,24 @@ public sealed class RecipeService : IRecipeService
             SortDescending = query.SortDescending
         };
 
-        return await _recipeReadRepository.GetPublishedAsync(query.Page, query.PageSize, options, cancellationToken);
+        return await _recipeReadRepository.GetListAsync(query.Page, query.PageSize, options, cancellationToken);
     }
 
     public Task<PagedResultDto<RecipeListItemDto>> SearchRecipesAsync(RecipeSearchQueryDto query, CancellationToken cancellationToken = default)
     {
-        return _recipeReadRepository.SearchFullTextAsync(query, cancellationToken);
+        var options = new RecipeListOptions
+        {
+            Search = query.Search,
+            CategoryId = query.CategoryId,
+            CategorySlug = query.CategorySlug,
+            Difficulty = query.Difficulty,
+            MaxTotalTimeMinutes = query.MaxTotalTimeMinutes,
+            MaxCookTimeMinutes = query.MaxCookTimeMinutes,
+            SortBy = Enum.TryParse<RecipeSortField>(query.SortBy, true, out var sortField) ? sortField : RecipeSortField.PublishedAt,
+            SortDescending = query.SortDescending
+        };
+
+        return _recipeReadRepository.GetListAsync(query.Page, query.PageSize, options, cancellationToken);
     }
 
     public async Task<RecipeDetailDto> UpdateAsync(Guid id, UpdateRecipeDto dto, Guid authorId, CancellationToken cancellationToken = default)

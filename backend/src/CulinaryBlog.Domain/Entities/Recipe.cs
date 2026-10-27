@@ -65,5 +65,18 @@ public class Recipe : BaseEntity
     public ICollection<RecipeImage> Images { get; set; }
         = new List<RecipeImage>();
 
+    public string? CoverImageUrl { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
+
+    public uint xmin { get; set; }
+
     public RecipeNutrition Nutrition { get; set; } = new();
+
+    public void SoftDelete()
+    {
+        IsDeleted = true;
+        DeletedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }
