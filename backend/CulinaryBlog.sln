@@ -11,7 +11,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CulinaryBlog.Application", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CulinaryBlog.Infrastructure", "src\CulinaryBlog.Infrastructure\CulinaryBlog.Infrastructure.csproj", "{FFD38E2A-0DE6-419E-BDD6-4C824273D627}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CulinaryBlog.API", "src\CulinaryBlog.API\CulinaryBlog.API.csproj", "{9A175518-BEA9-4C40-A189-DCB63AC9A04A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CulinaryBlog.API", "src\CulinaryBlog.Api\CulinaryBlog.API.csproj", "{9A175518-BEA9-4C40-A189-DCB63AC9A04A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject

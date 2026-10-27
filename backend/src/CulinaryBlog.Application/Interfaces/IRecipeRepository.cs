@@ -1,3 +1,4 @@
+using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Domain.Entities;
 
 namespace CulinaryBlog.Application.Interfaces;

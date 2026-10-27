@@ -98,71 +98,78 @@ try
     var app = builder.Build();
 
     // ── Migrate + Seed ────────────────────────────────────────────────────────
-    using (var scope = app.Services.CreateScope())
+    if (!app.Environment.IsEnvironment("Testing"))
     {
-        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        try
+        using (var scope = app.Services.CreateScope())
         {
-            await dbContext.Database.MigrateAsync();
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Database migration skipped or tables already exist.");
-        }
-
-        try
-        {
-            await CategoryDataSeeder.SeedAsync(dbContext, targetCount: 20);
-        }
-        catch (Exception seedEx)
-        {
-            Log.Warning(seedEx, "Seeding skipped: {Message}", seedEx.Message);
-        }
-
-        try
-        {
-            var passwordHasher = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.IPasswordHasher<ApplicationUser>>();
-            if (!await dbContext.Users.AnyAsync(u => u.Email == "admin@culinaryblog.com"))
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            try
             {
-                var admin = new ApplicationUser
-                {
-                    Id = Guid.NewGuid(),
-                    UserName = "admin",
-                    Email = "admin@culinaryblog.com",
-                    DisplayName = "Quản trị viên",
-                    EmailConfirmed = true,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow,
-                    Roles = ["Admin", "Author"]
-                };
-                admin.PasswordHash = passwordHasher.HashPassword(admin, "Admin@123");
-                await dbContext.Users.AddAsync(admin);
-                await dbContext.SaveChangesAsync();
-                Log.Information("Successfully seeded Admin user admin@culinaryblog.com");
+                await dbContext.Database.MigrateAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Database migration skipped or tables already exist.");
             }
 
-            if (!await dbContext.Users.AnyAsync(u => u.Email == "author@culinaryblog.com"))
+            try
             {
-                var author = new ApplicationUser
-                {
-                    Id = Guid.NewGuid(),
-                    UserName = "author",
-                    Email = "author@culinaryblog.com",
-                    DisplayName = "Tác giả Demo",
-                    EmailConfirmed = true,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow,
-                    Roles = ["Author"]
-                };
-                author.PasswordHash = passwordHasher.HashPassword(author, "Author@123");
-                await dbContext.Users.AddAsync(author);
-                await dbContext.SaveChangesAsync();
-                Log.Information("Successfully seeded Author user author@culinaryblog.com");
+                await CategoryDataSeeder.SeedAsync(dbContext, targetCount: 20);
             }
-        }
-        catch (Exception initEx)
-        {
-            Log.Warning(initEx, "User seed skipped: {Message}", initEx.Message);
+            catch (Exception seedEx)
+            {
+                Log.Warning(seedEx, "Seeding skipped: {Message}", seedEx.Message);
+            }
+
+            try
+            {
+                var passwordHasher = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.IPasswordHasher<ApplicationUser>>();
+                if (!await dbContext.Users.AnyAsync(u => u.Email == "admin@culinaryblog.com"))
+                {
+                    var admin = new ApplicationUser
+                    {
+                        Id = Guid.NewGuid(),
+                        UserName = "admin",
+                        Email = "admin@culinaryblog.com",
+                        NormalizedUserName = "ADMIN",
+                        NormalizedEmail = "ADMIN@CULINARYBLOG.COM",
+                        DisplayName = "Quản trị viên",
+                        EmailConfirmed = true,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        Roles = ["Admin", "Author"]
+                    };
+                    admin.PasswordHash = passwordHasher.HashPassword(admin, "Admin@123");
+                    await dbContext.Users.AddAsync(admin);
+                    await dbContext.SaveChangesAsync();
+                    Log.Information("Successfully seeded Admin user admin@culinaryblog.com");
+                }
+
+                if (!await dbContext.Users.AnyAsync(u => u.Email == "author@culinaryblog.com"))
+                {
+                    var author = new ApplicationUser
+                    {
+                        Id = Guid.NewGuid(),
+                        UserName = "author",
+                        Email = "author@culinaryblog.com",
+                        NormalizedUserName = "AUTHOR",
+                        NormalizedEmail = "AUTHOR@CULINARYBLOG.COM",
+                        DisplayName = "Tác giả Demo",
+                        EmailConfirmed = true,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        Roles = ["Author"]
+                    };
+                    author.PasswordHash = passwordHasher.HashPassword(author, "Author@123");
+                    await dbContext.Users.AddAsync(author);
+                    await dbContext.SaveChangesAsync();
+                    Log.Information("Successfully seeded Author user author@culinaryblog.com");
+                }
+            }
+            catch (Exception initEx)
+            {
+                Log.Warning(initEx, "User seed skipped: {Message}", initEx.Message);
+            }
         }
     }
 

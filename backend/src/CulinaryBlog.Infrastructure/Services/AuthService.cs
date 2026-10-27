@@ -63,6 +63,7 @@ public class AuthService : IAuthService
         RegisterRequest request,
         string? ipAddress = null)
     {
+        ValidatePassword(request.Password);
         var userName = request.UserName.Trim();
         var email = request.Email.Trim().ToLowerInvariant();
 
@@ -85,6 +86,8 @@ public class AuthService : IAuthService
             Id = Guid.NewGuid(),
             UserName = userName,
             Email = email,
+            NormalizedUserName = userName.ToUpperInvariant(),
+            NormalizedEmail = email.ToUpperInvariant(),
             DisplayName = string.IsNullOrWhiteSpace(request.DisplayName)
                 ? userName
                 : request.DisplayName.Trim(),
@@ -133,7 +136,9 @@ public class AuthService : IAuthService
         }
 
         // Skip email confirmation check in Development environment for testing
-        if (!string.Equals(_environment.EnvironmentName, Environments.Development, StringComparison.OrdinalIgnoreCase) && !user.EmailConfirmed)
+        if (!string.Equals(_environment.EnvironmentName, Environments.Development, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(_environment.EnvironmentName, "Testing", StringComparison.OrdinalIgnoreCase)
+            && !user.EmailConfirmed)
         {
             _logger.LogWarning("Login failed: Email not confirmed for user {UserId}", user.Id);
             throw new UnauthorizedAuthException("Email not confirmed. Please check your email to confirm your account.");
@@ -186,11 +191,14 @@ public class AuthService : IAuthService
         if (user is null)
         {
             // Create new user from Google account
+            var generatedUserName = email.Split('@')[0] + "_" + Guid.NewGuid().ToString("N")[..8];
             user = new ApplicationUser
             {
                 Id = Guid.NewGuid(),
-                UserName = email.Split('@')[0] + "_" + Guid.NewGuid().ToString("N")[..8],
+                UserName = generatedUserName,
                 Email = email,
+                NormalizedUserName = generatedUserName.ToUpperInvariant(),
+                NormalizedEmail = email.ToUpperInvariant(),
                 DisplayName = payload.Name ?? email.Split('@')[0],
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
@@ -275,7 +283,11 @@ public class AuthService : IAuthService
             Email = profile.Email,
             DisplayName = profile.DisplayName,
             AvatarUrl = profile.AvatarUrl,
-            Bio = profile.Bio
+            Bio = profile.Bio,
+            EmailConfirmed = profile.EmailConfirmed,
+            Roles = profile.Roles,
+            IsActive = profile.IsActive,
+            CreatedAt = profile.CreatedAt
         };
     }
 
@@ -354,6 +366,65 @@ public class AuthService : IAuthService
         return ToUserResponse(user);
     }
 
+    public async Task ChangePasswordAsync(string userId, ChangePasswordRequest request)
+    {
+        ValidatePassword(request.NewPassword);
+        var user = await _userRepository.GetByIdAsync(userId)
+            ?? throw new NotFoundException("User not found.");
+
+        if (string.IsNullOrWhiteSpace(user.PasswordHash) ||
+            _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.CurrentPassword)
+                == PasswordVerificationResult.Failed)
+        {
+            throw new UnauthorizedAuthException("Current password is incorrect.");
+        }
+
+        user.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
+        await _userRepository.UpdateAsync(user);
+        await _refreshTokenRepository.RevokeAllForUserAsync(user.Id);
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task ForgotPasswordAsync(ForgotPasswordRequest request)
+    {
+        var user = await _userRepository.GetByEmailAsync(request.Email.Trim().ToLowerInvariant());
+        if (user is null || !user.IsActive)
+        {
+            return;
+        }
+
+        var token = _jwtTokenGenerator.GeneratePasswordResetToken(user, TimeSpan.FromHours(1));
+        var resetUrl = $"{_jwtSettings.Issuer.Replace("api", "").TrimEnd('/')}/reset-password?token={Uri.EscapeDataString(token)}";
+        try
+        {
+            await _emailService.SendAsync(new EmailMessage(
+                user.Email,
+                "Đặt lại mật khẩu CulinaryBlog",
+                $"<p>Chào {user.DisplayName},</p><p><a href='{resetUrl}'>Đặt lại mật khẩu</a></p><p>Liên kết hết hạn sau 1 giờ.</p>"));
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Could not send password reset email for user {UserId}", user.Id);
+        }
+    }
+
+    public async Task ResetPasswordAsync(ResetPasswordRequest request)
+    {
+        ValidatePassword(request.NewPassword);
+        if (!_jwtTokenGenerator.ValidatePasswordResetToken(request.Token, out var userId))
+        {
+            throw new BadRequestException("Invalid or expired password reset token.");
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId)
+            ?? throw new NotFoundException("User not found.");
+
+        user.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
+        await _userRepository.UpdateAsync(user);
+        await _refreshTokenRepository.RevokeAllForUserAsync(user.Id);
+        await _unitOfWork.SaveChangesAsync();
+    }
+
     public async Task<bool> UpdateUserStatusAsync(Guid adminUserId, Guid targetUserId, bool isActive)
     {
         // Prevent admin from deactivating themselves
@@ -406,9 +477,23 @@ public class AuthService : IAuthService
 
             await _emailService.SendAsync(new EmailMessage(user.Email, subject, htmlBody));
         }
+
         catch
         {
             // Log error but don't fail registration
+        }
+    }
+
+    private static void ValidatePassword(string password)
+    {
+        if (password.Length < 8
+            || !password.Any(char.IsUpper)
+            || !password.Any(char.IsLower)
+            || !password.Any(char.IsDigit)
+            || !password.Any(char.IsPunctuation))
+        {
+            throw new BadRequestException(
+                "Password must be at least 8 characters and contain uppercase, lowercase, digit, and special character.");
         }
     }
 
@@ -476,7 +561,11 @@ public class AuthService : IAuthService
             Email = user.Email,
             DisplayName = user.DisplayName,
             AvatarUrl = user.AvatarUrl,
-            Bio = user.Bio
+            Bio = user.Bio,
+            EmailConfirmed = user.EmailConfirmed,
+            Roles = user.Roles ?? [],
+            IsActive = user.IsActive,
+            CreatedAt = user.CreatedAt
         };
     }
 }

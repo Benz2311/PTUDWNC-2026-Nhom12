@@ -33,42 +33,44 @@ public class UserRepository : IUserRepository
 
     public async Task<ApplicationUser?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var lower = email.Trim().ToLowerInvariant();
+        var normalized = email.Trim().ToUpperInvariant();
         return await _db.Users
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Email.ToLower() == lower, cancellationToken);
+            .FirstOrDefaultAsync(x => x.NormalizedEmail == normalized, cancellationToken);
     }
 
     public async Task<ApplicationUser?> GetByUserNameAsync(string userName, CancellationToken cancellationToken = default)
     {
-        var lower = userName.Trim().ToLowerInvariant();
+        var normalized = userName.Trim().ToUpperInvariant();
         return await _db.Users
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.UserName.ToLower() == lower, cancellationToken);
+            .FirstOrDefaultAsync(x => x.NormalizedUserName == normalized, cancellationToken);
     }
 
     public async Task<ApplicationUser?> GetByEmailOrUserNameAsync(string emailOrUserName, CancellationToken cancellationToken = default)
     {
-        var lower = emailOrUserName.Trim().ToLowerInvariant();
+        var normalized = emailOrUserName.Trim().ToUpperInvariant();
         return await _db.Users
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.UserName.ToLower() == lower || x.Email.ToLower() == lower, cancellationToken);
+            .FirstOrDefaultAsync(
+                x => x.NormalizedUserName == normalized || x.NormalizedEmail == normalized,
+                cancellationToken);
     }
 
     public async Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var lower = email.Trim().ToLowerInvariant();
+        var normalized = email.Trim().ToUpperInvariant();
         return await _db.Users
             .AsNoTracking()
-            .AnyAsync(x => x.Email.ToLower() == lower, cancellationToken);
+            .AnyAsync(x => x.NormalizedEmail == normalized, cancellationToken);
     }
 
     public async Task<bool> ExistsByUserNameAsync(string userName, CancellationToken cancellationToken = default)
     {
-        var lower = userName.Trim().ToLowerInvariant();
+        var normalized = userName.Trim().ToUpperInvariant();
         return await _db.Users
             .AsNoTracking()
-            .AnyAsync(x => x.UserName.ToLower() == lower, cancellationToken);
+            .AnyAsync(x => x.NormalizedUserName == normalized, cancellationToken);
     }
 
     public async Task AddAsync(ApplicationUser user, CancellationToken cancellationToken = default)
@@ -93,17 +95,62 @@ public class UserRepository : IUserRepository
                 x.Email,
                 x.DisplayName,
                 x.AvatarUrl,
-                x.Bio))
+                x.Bio,
+                x.EmailConfirmed,
+                x.Roles ?? Array.Empty<string>(),
+                x.IsActive,
+                x.CreatedAt))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task<UserProfileDto?> GetProfileAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<UserProfileDto?> GetProfileAsync(string userId, CancellationToken cancellationToken = default)
     {
         if (Guid.TryParse(userId, out var guid))
         {
-            return GetProfileAsync(guid, cancellationToken);
+            return await GetProfileAsync(guid, cancellationToken);
         }
 
-        return Task.FromResult<UserProfileDto?>(null);
+        return null;
+    }
+
+    public async Task<(IReadOnlyList<UserProfileDto> Items, int TotalCount)> GetUsersAsync(
+        int page, int pageSize, string? keyword, bool? isActive, CancellationToken cancellationToken = default)
+    {
+        var query = _db.Users.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var normalizedKeyword = keyword.Trim().ToUpperInvariant();
+            query = query.Where(x =>
+                x.NormalizedUserName!.Contains(normalizedKeyword) ||
+                x.NormalizedEmail!.Contains(normalizedKeyword) ||
+                x.DisplayName.ToUpper().Contains(normalizedKeyword));
+        }
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(x => x.IsActive == isActive.Value);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(x => x.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new UserProfileDto(
+                x.Id.ToString(),
+                x.UserName,
+                x.Email,
+                x.DisplayName,
+                x.AvatarUrl,
+                x.Bio,
+                x.EmailConfirmed,
+                x.Roles ?? Array.Empty<string>(),
+                x.IsActive,
+                x.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return (items, totalCount);
     }
 }

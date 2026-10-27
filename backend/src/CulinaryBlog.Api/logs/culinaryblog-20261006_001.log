@@ -1,0 +1,181 @@
+2026-10-06 08:15:17.368 +07:00 [INF] Starting CulinaryBlog API
+2026-10-06 08:15:17.616 +07:00 [INF] Starting database initialization...
+2026-10-06 08:15:18.140 +07:00 [WRN] Entity 'Recipe' has a global query filter defined and is the required end of a relationship with the entity 'RecipeImage'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+2026-10-06 08:15:18.143 +07:00 [WRN] Entity 'Recipe' has a global query filter defined and is the required end of a relationship with the entity 'RecipeIngredient'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+2026-10-06 08:15:18.143 +07:00 [WRN] Entity 'Recipe' has a global query filter defined and is the required end of a relationship with the entity 'RecipeStep'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+2026-10-06 08:15:18.620 +07:00 [INF] Database migrations applied.
+2026-10-06 08:15:18.965 +07:00 [INF] Admin user already exists: admin@culinaryblog.com
+2026-10-06 08:15:18.997 +07:00 [INF] Database initialization completed.
+2026-10-06 08:15:19.024 +07:00 [INF] Start installing Hangfire SQL objects...
+2026-10-06 08:15:19.045 +07:00 [INF] Hangfire SQL objects installed.
+2026-10-06 08:15:19.237 +07:00 [ERR] Hosting failed to start
+System.IO.IOException: Failed to bind to address http://127.0.0.1:5000: address already in use.
+ ---> Microsoft.AspNetCore.Connections.AddressInUseException: Only one usage of each socket address (protocol/network address/port) is normally permitted.
+ ---> System.Net.Sockets.SocketException (10048): Only one usage of each socket address (protocol/network address/port) is normally permitted.
+   at System.Net.Sockets.Socket.UpdateStatusAfterSocketErrorAndThrowException(SocketError error, Boolean disconnectOnFailure, String callerName)
+   at System.Net.Sockets.Socket.DoBind(EndPoint endPointSnapshot, SocketAddress socketAddress)
+   at System.Net.Sockets.Socket.Bind(EndPoint localEP)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportOptions.CreateDefaultBoundListenSocket(EndPoint endpoint)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   --- End of inner exception stack trace ---
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportFactory.BindAsync(EndPoint endpoint, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure.TransportManager.BindAsync(EndPoint endPoint, ConnectionDelegate connectionDelegate, EndpointConfig endpointConfig, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.<>c__DisplayClass28_0`1.<<StartAsync>g__OnBind|0>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindEndpointAsync(ListenOptions endpoint, AddressBindContext context, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindEndpointAsync(ListenOptions endpoint, AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.LocalhostListenOptions.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.AddressesStrategy.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.BindAsync(CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.StartAsync[TContext](IHttpApplication`1 application, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Hosting.GenericWebHostService.StartAsync(CancellationToken cancellationToken)
+   at Microsoft.Extensions.Hosting.Internal.Host.<StartAsync>b__14_1(IHostedService service, CancellationToken token)
+   at Microsoft.Extensions.Hosting.Internal.Host.ForeachService[T](IEnumerable`1 services, CancellationToken token, Boolean concurrent, Boolean abortOnFirstException, List`1 exceptions, Func`3 operation)
+2026-10-06 08:15:23.360 +07:00 [FTL] Application terminated unexpectedly
+System.IO.IOException: Failed to bind to address http://127.0.0.1:5000: address already in use.
+ ---> Microsoft.AspNetCore.Connections.AddressInUseException: Only one usage of each socket address (protocol/network address/port) is normally permitted.
+ ---> System.Net.Sockets.SocketException (10048): Only one usage of each socket address (protocol/network address/port) is normally permitted.
+   at System.Net.Sockets.Socket.UpdateStatusAfterSocketErrorAndThrowException(SocketError error, Boolean disconnectOnFailure, String callerName)
+   at System.Net.Sockets.Socket.DoBind(EndPoint endPointSnapshot, SocketAddress socketAddress)
+   at System.Net.Sockets.Socket.Bind(EndPoint localEP)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportOptions.CreateDefaultBoundListenSocket(EndPoint endpoint)
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   --- End of inner exception stack trace ---
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketConnectionListener.Bind()
+   at Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportFactory.BindAsync(EndPoint endpoint, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure.TransportManager.BindAsync(EndPoint endPoint, ConnectionDelegate connectionDelegate, EndpointConfig endpointConfig, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.<>c__DisplayClass28_0`1.<<StartAsync>g__OnBind|0>d.MoveNext()
+--- End of stack trace from previous location ---
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindEndpointAsync(ListenOptions endpoint, AddressBindContext context, CancellationToken cancellationToken)
+   --- End of inner exception stack trace ---
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.BindEndpointAsync(ListenOptions endpoint, AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.LocalhostListenOptions.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.AddressBinder.AddressesStrategy.BindAsync(AddressBindContext context, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.BindAsync(CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerImpl.StartAsync[TContext](IHttpApplication`1 application, CancellationToken cancellationToken)
+   at Microsoft.AspNetCore.Hosting.GenericWebHostService.StartAsync(CancellationToken cancellationToken)
+   at Microsoft.Extensions.Hosting.Internal.Host.<StartAsync>b__14_1(IHostedService service, CancellationToken token)
+   at Microsoft.Extensions.Hosting.Internal.Host.ForeachService[T](IEnumerable`1 services, CancellationToken token, Boolean concurrent, Boolean abortOnFirstException, List`1 exceptions, Func`3 operation)
+   at Microsoft.Extensions.Hosting.Internal.Host.StartAsync(CancellationToken cancellationToken)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync(IHost host, CancellationToken token)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.RunAsync(IHost host, CancellationToken token)
+   at Microsoft.Extensions.Hosting.HostingAbstractionsHostExtensions.Run(IHost host)
+   at Program.<Main>$(String[] args) in D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Api\Program.cs:line 123
+2026-10-06 08:19:39.917 +07:00 [INF] Starting CulinaryBlog API
+2026-10-06 08:19:40.147 +07:00 [INF] Starting database initialization...
+2026-10-06 08:19:40.648 +07:00 [WRN] Entity 'Recipe' has a global query filter defined and is the required end of a relationship with the entity 'RecipeImage'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+2026-10-06 08:19:40.651 +07:00 [WRN] Entity 'Recipe' has a global query filter defined and is the required end of a relationship with the entity 'RecipeIngredient'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+2026-10-06 08:19:40.651 +07:00 [WRN] Entity 'Recipe' has a global query filter defined and is the required end of a relationship with the entity 'RecipeStep'. This may lead to unexpected results when the required entity is filtered out. Either configure the navigation as optional, or define matching query filters for both entities in the navigation. See https://go.microsoft.com/fwlink/?linkid=2131316 for more information.
+2026-10-06 08:19:41.140 +07:00 [INF] Database migrations applied.
+2026-10-06 08:19:41.466 +07:00 [INF] Admin user already exists: admin@culinaryblog.com
+2026-10-06 08:19:41.495 +07:00 [INF] Database initialization completed.
+2026-10-06 08:19:41.525 +07:00 [INF] Start installing Hangfire SQL objects...
+2026-10-06 08:19:41.553 +07:00 [INF] Hangfire SQL objects installed.
+2026-10-06 08:19:41.763 +07:00 [INF] Starting Hangfire Server using job storage: 'PostgreSQL Server: Host: 127.0.0.1, DB: culinaryblog_db, Schema: hangfire'
+2026-10-06 08:19:41.764 +07:00 [INF] Using the following options for PostgreSQL job storage:
+2026-10-06 08:19:41.765 +07:00 [INF]     Queue poll interval: 00:00:15.
+2026-10-06 08:19:41.766 +07:00 [INF]     Invisibility timeout: 00:30:00.
+2026-10-06 08:19:41.767 +07:00 [INF]     Use sliding invisibility timeout: False.
+2026-10-06 08:19:41.768 +07:00 [INF] Using the following options for Hangfire Server:
+    Worker count: 20
+    Listening queues: 'default'
+    Shutdown timeout: 00:00:15
+    Schedule polling interval: 00:00:15
+2026-10-06 08:19:41.858 +07:00 [INF] Server quocnv:21324:33171990 successfully announced in 79,0823 ms
+2026-10-06 08:19:41.860 +07:00 [INF] Server quocnv:21324:33171990 is starting the registered dispatchers: ServerWatchdog, ServerJobCancellationWatcher, ExpirationManager, CountersAggregator, Worker, DelayedJobScheduler, RecurringJobScheduler...
+2026-10-06 08:19:41.872 +07:00 [INF] Server quocnv:21324:33171990 all the dispatchers started
+2026-10-06 08:24:41.888 +07:00 [INF] 1 servers were removed due to timeout
+2026-10-06 08:25:43.737 +07:00 [INF] HTTP GET /api/v1/auth/me responded 200 in 287.9532 ms
+2026-10-06 08:25:46.928 +07:00 [INF] Login attempt for: 123 from IP: ::1
+2026-10-06 08:25:46.937 +07:00 [INF] Login attempt for: 123
+2026-10-06 08:25:47.233 +07:00 [INF] Login successful for user "6aa8f346-1559-4bcf-b619-9e3c5496bb2a"
+2026-10-06 08:25:47.580 +07:00 [INF] Login successful for: 123
+2026-10-06 08:25:47.631 +07:00 [INF] HTTP POST /api/v1/auth/login responded 200 in 758.0963 ms
+2026-10-06 08:29:33.314 +07:00 [INF] HTTP GET /api/v1/auth/me responded 200 in 36.2206 ms
+2026-10-06 08:29:37.542 +07:00 [INF] HTTP POST /api/v1/auth/revoke responded 404 in 0.1588 ms
+2026-10-06 08:29:47.439 +07:00 [INF] Login attempt for: 123 from IP: ::1
+2026-10-06 08:29:47.443 +07:00 [INF] Login attempt for: 123
+2026-10-06 08:29:47.616 +07:00 [INF] Login successful for user "6aa8f346-1559-4bcf-b619-9e3c5496bb2a"
+2026-10-06 08:29:47.633 +07:00 [INF] Login successful for: 123
+2026-10-06 08:29:47.635 +07:00 [INF] HTTP POST /api/v1/auth/login responded 200 in 199.3923 ms
+2026-10-06 08:30:02.664 +07:00 [INF] HTTP POST /api/v1/auth/revoke responded 404 in 0.0577 ms
+2026-10-06 08:36:14.640 +07:00 [INF] Login attempt for: 123 from IP: ::1
+2026-10-06 08:36:14.644 +07:00 [INF] Login attempt for: 123
+2026-10-06 08:36:14.801 +07:00 [INF] Login successful for user "6aa8f346-1559-4bcf-b619-9e3c5496bb2a"
+2026-10-06 08:36:14.815 +07:00 [INF] Login successful for: 123
+2026-10-06 08:36:14.823 +07:00 [INF] HTTP POST /api/v1/auth/login responded 200 in 184.1425 ms
+2026-10-06 08:36:22.889 +07:00 [INF] HTTP POST /api/v1/auth/revoke responded 404 in 0.0111 ms
+2026-10-06 08:36:26.871 +07:00 [INF] Login attempt for: quoc from IP: ::1
+2026-10-06 08:36:26.880 +07:00 [INF] Login attempt for: quoc
+2026-10-06 08:36:26.892 +07:00 [WRN] Login failed: User not found for quoc
+2026-10-06 08:36:26.898 +07:00 [ERR] HTTP POST /api/v1/auth/login responded 500 in 27.8769 ms
+CulinaryBlog.Domain.Exceptions.UnauthorizedAuthException: Invalid username/email or password.
+   at CulinaryBlog.Infrastructure.Services.AuthService.LoginAsync(LoginRequest request, String ipAddress) in D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Infrastructure\Services\AuthService.cs:line 123
+   at CulinaryBlog.API.Controllers.AuthController.Login(LoginRequest request, CancellationToken cancellationToken) in D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Api\Controllers\AuthController.cs:line 49
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.TaskOfIActionResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Logged|12_1(ControllerActionInvoker invoker)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeInnerFilterAsync>g__Awaited|13_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Logged|17_1(ResourceInvoker invoker)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Logged|17_1(ResourceInvoker invoker)
+   at Serilog.AspNetCore.RequestLoggingMiddleware.Invoke(HttpContext httpContext)
+2026-10-06 08:36:26.974 +07:00 [ERR] Unhandled exception: POST /api/v1/auth/login - TraceId: 0HNP392UJELT5:00000006, ExceptionType: UnauthorizedAuthException, Message: Invalid username/email or password.
+CulinaryBlog.Domain.Exceptions.UnauthorizedAuthException: Invalid username/email or password.
+   at CulinaryBlog.Infrastructure.Services.AuthService.LoginAsync(LoginRequest request, String ipAddress) in D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Infrastructure\Services\AuthService.cs:line 123
+   at CulinaryBlog.API.Controllers.AuthController.Login(LoginRequest request, CancellationToken cancellationToken) in D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Api\Controllers\AuthController.cs:line 49
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.TaskOfIActionResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Logged|12_1(ControllerActionInvoker invoker)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeInnerFilterAsync>g__Awaited|13_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Logged|17_1(ResourceInvoker invoker)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Logged|17_1(ResourceInvoker invoker)
+   at Serilog.AspNetCore.RequestLoggingMiddleware.Invoke(HttpContext httpContext)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at CulinaryBlog.Api.Middleware.ExceptionHandlingMiddleware.InvokeAsync(HttpContext context) in D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Api\Middleware\ExceptionHandlingMiddleware.cs:line 30
+2026-10-06 08:36:27.154 +07:00 [WRN] Domain exception: POST /api/v1/auth/login - TraceId: 0HNP392UJELT5:00000006, StatusCode: "Unauthorized", ErrorCode: UNAUTHORIZED, Message: Invalid username/email or password.
+2026-10-06 08:36:27.328 +07:00 [INF] HTTP POST /api/v1/auth/refresh responded 400 in 29.9033 ms
+2026-10-06 08:36:36.208 +07:00 [INF] Login attempt for: quoc from IP: ::1
+2026-10-06 08:36:36.273 +07:00 [INF] Login attempt for: quoc
+2026-10-06 08:36:36.303 +07:00 [WRN] Login failed: User not found for quoc
+2026-10-06 08:36:36.325 +07:00 [ERR] HTTP POST /api/v1/auth/login responded 500 in 118.2082 ms
+CulinaryBlog.Domain.Exceptions.UnauthorizedAuthException: Invalid username/email or password.
+   at CulinaryBlog.Infrastructure.Services.AuthService.LoginAsync(LoginRequest request, String ipAddress) in D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Infrastructure\Services\AuthService.cs:line 123
+   at CulinaryBlog.API.Controllers.AuthController.Login(LoginRequest request, CancellationToken cancellationToken) in D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Api\Controllers\AuthController.cs:line 49
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.TaskOfIActionResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Logged|12_1(ControllerActionInvoker invoker)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeInnerFilterAsync>g__Awaited|13_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Logged|17_1(ResourceInvoker invoker)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Logged|17_1(ResourceInvoker invoker)
+   at Serilog.AspNetCore.RequestLoggingMiddleware.Invoke(HttpContext httpContext)
+2026-10-06 08:36:36.378 +07:00 [ERR] Unhandled exception: POST /api/v1/auth/login - TraceId: 0HNP392UJELT5:0000000A, ExceptionType: UnauthorizedAuthException, Message: Invalid username/email or password.
+CulinaryBlog.Domain.Exceptions.UnauthorizedAuthException: Invalid username/email or password.
+   at CulinaryBlog.Infrastructure.Services.AuthService.LoginAsync(LoginRequest request, String ipAddress) in D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Infrastructure\Services\AuthService.cs:line 123
+   at CulinaryBlog.API.Controllers.AuthController.Login(LoginRequest request, CancellationToken cancellationToken) in D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Api\Controllers\AuthController.cs:line 49
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.TaskOfIActionResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Logged|12_1(ControllerActionInvoker invoker)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Rethrow(ActionExecutedContextSealed context)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeInnerFilterAsync>g__Awaited|13_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Logged|17_1(ResourceInvoker invoker)
+   at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Logged|17_1(ResourceInvoker invoker)
+   at Serilog.AspNetCore.RequestLoggingMiddleware.Invoke(HttpContext httpContext)
+   at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+   at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+   at CulinaryBlog.Api.Middleware.ExceptionHandlingMiddleware.InvokeAsync(HttpContext context) in D:\PTUDWNC-2026-Nhom12\backend\src\CulinaryBlog.Api\Middleware\ExceptionHandlingMiddleware.cs:line 30
+2026-10-06 08:36:36.427 +07:00 [WRN] Domain exception: POST /api/v1/auth/login - TraceId: 0HNP392UJELT5:0000000A, StatusCode: "Unauthorized", ErrorCode: UNAUTHORIZED, Message: Invalid username/email or password.
+2026-10-06 08:36:36.452 +07:00 [INF] HTTP POST /api/v1/auth/refresh responded 400 in 2.2869 ms

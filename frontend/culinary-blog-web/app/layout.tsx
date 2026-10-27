@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { AppProviders } from "@/components/providers/AppProviders";
 
 export const metadata: Metadata = {
   title: "Culinary Blog | Nền tảng chia sẻ và học nấu ăn trực tuyến",
@@ -30,7 +31,7 @@ export default function RootLayout({
 
         {/* Main Content Area */}
         <main id="main-content" className="flex-1 w-full">
-          {children}
+          <AppProviders>{children}</AppProviders>
         </main>
 
         {/* Global Footer */}

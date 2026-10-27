@@ -134,4 +134,63 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
             return false;
         }
     }
+
+    public string GeneratePasswordResetToken(ApplicationUser user, TimeSpan expiry)
+    {
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new(JwtRegisteredClaimNames.Email, user.Email),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new("purpose", "password_reset")
+        };
+
+        var credentials = new SigningCredentials(_signingKey, SecurityAlgorithms.HmacSha256);
+        var token = new JwtSecurityToken(
+            issuer: _settings.Issuer,
+            audience: _settings.Audience,
+            claims: claims,
+            expires: DateTime.UtcNow.Add(expiry),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public bool ValidatePasswordResetToken(string token, out Guid userId)
+    {
+        userId = Guid.Empty;
+
+        try
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var principal = handler.ValidateToken(token, new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = _settings.Issuer,
+                ValidateAudience = true,
+                ValidAudience = _settings.Audience,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = _signingKey,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero
+            }, out _);
+
+            if (principal.FindFirst("purpose")?.Value != "password_reset")
+            {
+                return false;
+            }
+
+            return Guid.TryParse(
+                principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value,
+                out userId);
+        }
+        catch (SecurityTokenException)
+        {
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
 }
