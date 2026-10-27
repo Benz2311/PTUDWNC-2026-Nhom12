@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/toast";
 import { applyFieldErrors } from "@/components/auth/form-errors";
 import { ApiError } from "@/lib/api/client";
+import GoogleLoginButton from "@/components/auth/GoogleLoginButton";
 
 const loginSchema = z.object({
   identifier: z
@@ -26,8 +27,8 @@ const errorInputClasses = "border-red-400 focus:border-red-400 focus:ring-red-10
 const labelClasses = "mb-1.5 block text-sm font-medium text-gray-700";
 
 export default function LoginPage() {
-  const { login } = useAuth();
-  const { error: showErrorToast, info } = useToast();
+  const { login, googleLogin } = useAuth();
+  const { error: showErrorToast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -85,8 +86,17 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    info("Đăng nhập bằng Google đang được phát triển");
+  const handleGoogleLogin = async (idToken: string) => {
+    try {
+      await googleLogin(idToken);
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      const message = err instanceof ApiError
+        ? err.title || err.message
+        : "Đăng nhập Google thất bại";
+      showErrorToast(message);
+    }
   };
 
   return (
@@ -173,19 +183,7 @@ export default function LoginPage() {
             <div className="h-px flex-1 bg-gray-200" />
           </div>
 
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" fill="#34A853" />
-              <path d="M5.84 14.09A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.34-2.09V7.07H2.18A11 11 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z" fill="#EA4335" />
-            </svg>
-            Đăng nhập với Google
-          </button>
+          <GoogleLoginButton onCredential={handleGoogleLogin} />
 
           <p className="mt-6 text-center text-sm text-gray-500">
             Chưa có tài khoản?{" "}

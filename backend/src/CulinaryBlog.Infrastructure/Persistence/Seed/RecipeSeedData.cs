@@ -153,6 +153,8 @@ public static class RecipeSeedData
                 Id = DemoUserGuid,
                 UserName = "culinary-demo",
                 Email = "demo@culinaryblog.local",
+                NormalizedUserName = "CULINARY-DEMO",
+                NormalizedEmail = "DEMO@CULINARYBLOG.LOCAL",
                 PasswordHash = "seeded-demo-password"
             };
 

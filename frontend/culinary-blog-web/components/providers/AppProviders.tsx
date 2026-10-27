@@ -1,8 +1,7 @@
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToastProvider, Toaster } from "@/components/ui/toast";
-import Navbar from "@/components/layout/Navbar";
 
-/** Gộp tất cả Providers chung của ứng dụng + Navbar toàn cục. */
+/** Gộp các providers dùng chung của ứng dụng. */
 export function AppProviders({
   children,
 }: {
@@ -11,7 +10,6 @@ export function AppProviders({
   return (
     <ToastProvider>
       <AuthProvider>
-        <Navbar />
         {children}
         <Toaster />
       </AuthProvider>

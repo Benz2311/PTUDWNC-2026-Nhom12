@@ -9,4 +9,8 @@ public interface IJwtTokenGenerator
     string HashToken(string token);
     string GenerateEmailConfirmationToken(ApplicationUser user, TimeSpan expiry);
     bool ValidateEmailConfirmationToken(string token, out Guid userId);
+
+    string GeneratePasswordResetToken(ApplicationUser user, TimeSpan expiry);
+
+    bool ValidatePasswordResetToken(string token, out Guid userId);
 }

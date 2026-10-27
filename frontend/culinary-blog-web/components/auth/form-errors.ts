@@ -14,13 +14,13 @@ export function applyFieldErrors<TFieldValues extends FieldValues>(
     return;
   }
 
-  for (const [field, messages] of Object.entries(fieldErrors)) {
-    const message = Array.isArray(messages) ? messages[0] : messages;
+  Object.entries(fieldErrors).forEach(([field, messages]) => {
+    const message = messages[0];
     if (message) {
       setError(field as FieldPath<TFieldValues>, {
         type: "server",
         message,
       });
     }
-  }
+  });
 }

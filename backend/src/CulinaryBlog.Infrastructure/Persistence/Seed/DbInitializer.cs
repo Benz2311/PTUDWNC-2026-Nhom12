@@ -62,6 +62,8 @@ public static class DbInitializer
             Id = Guid.NewGuid(),
             UserName = adminUserName,
             Email = adminEmail,
+            NormalizedUserName = adminUserName.ToUpperInvariant(),
+            NormalizedEmail = adminEmail.ToUpperInvariant(),
             DisplayName = "Administrator",
             EmailConfirmed = true,
             IsActive = true,

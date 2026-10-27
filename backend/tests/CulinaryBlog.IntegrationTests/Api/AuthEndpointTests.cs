@@ -7,7 +7,9 @@ using Microsoft.Extensions.DependencyInjection;
 using FluentAssertions;
 using Xunit;
 using CulinaryBlog.Application.DTOs.Auth;
+using CulinaryBlog.Application.Common.Models;
 using CulinaryBlog.Domain.Entities;
+using CulinaryBlog.Infrastructure.Persistence;
 
 namespace CulinaryBlog.IntegrationTests.Api;
 
@@ -20,6 +22,12 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
     {
         _factory = factory;
         _client = factory.CreateClient();
+    }
+
+    private static async Task<T> ReadDataAsync<T>(HttpContent content)
+    {
+        var response = await content.ReadFromJsonAsync<ApiResponse<T>>();
+        return response!.Data;
     }
 
     [Fact]
@@ -39,7 +47,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var authResponse = await ReadDataAsync<AuthResponse>(response.Content);
         authResponse.Should().NotBeNull();
         authResponse!.AccessToken.Should().NotBeNullOrEmpty();
         authResponse.RefreshToken.Should().NotBeNullOrEmpty();
@@ -104,7 +112,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var authResponse = await ReadDataAsync<AuthResponse>(response.Content);
         authResponse.Should().NotBeNull();
         authResponse!.AccessToken.Should().NotBeNullOrEmpty();
         authResponse.RefreshToken.Should().NotBeNullOrEmpty();
@@ -142,7 +150,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
             DisplayName = "Me User"
         };
         var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", registerRequest);
-        var authResponse = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        var authResponse = await ReadDataAsync<AuthResponse>(registerResponse.Content);
 
         // Act - call /auth/me with access token
         _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authResponse!.AccessToken);
@@ -150,7 +158,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var userResponse = await response.Content.ReadFromJsonAsync<CulinaryBlog.Application.DTOs.Auth.UserResponse>();
+        var userResponse = await ReadDataAsync<CulinaryBlog.Application.DTOs.Auth.UserResponse>(response.Content);
         userResponse.Should().NotBeNull();
         userResponse!.UserName.Should().Be(userName);
         userResponse.Email.Should().Be(email);
@@ -181,7 +189,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
             DisplayName = "Original Name"
         };
         var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", registerRequest);
-        var authResponse = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        var authResponse = await ReadDataAsync<AuthResponse>(registerResponse.Content);
 
         // Act - update profile
         _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authResponse!.AccessToken);
@@ -195,7 +203,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var userResponse = await response.Content.ReadFromJsonAsync<CulinaryBlog.Application.DTOs.Auth.UserResponse>();
+        var userResponse = await ReadDataAsync<CulinaryBlog.Application.DTOs.Auth.UserResponse>(response.Content);
         userResponse.Should().NotBeNull();
         userResponse!.DisplayName.Should().Be("Updated Name");
         userResponse.AvatarUrl.Should().Be("https://example.com/avatar.jpg");
@@ -216,7 +224,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
             DisplayName = "Refresh User"
         };
         var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", registerRequest);
-        var authResponse = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        var authResponse = await ReadDataAsync<AuthResponse>(registerResponse.Content);
 
         // Act - refresh token
         var refreshRequest = new RefreshRequest { RefreshToken = authResponse!.RefreshToken };
@@ -224,7 +232,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var newAuthResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var newAuthResponse = await ReadDataAsync<AuthResponse>(response.Content);
         newAuthResponse.Should().NotBeNull();
         newAuthResponse!.AccessToken.Should().NotBeNullOrEmpty();
         newAuthResponse.RefreshToken.Should().NotBeNullOrEmpty();
@@ -258,7 +266,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
             DisplayName = "Logout User"
         };
         var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", registerRequest);
-        var authResponse = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        var authResponse = await ReadDataAsync<AuthResponse>(registerResponse.Content);
 
         // Act
         var logoutRequest = new RefreshRequest { RefreshToken = authResponse!.RefreshToken };
@@ -399,7 +407,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
             DisplayName = "Normal User"
         };
         var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", registerRequest);
-        var authResponse = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        var authResponse = await ReadDataAsync<AuthResponse>(registerResponse.Content);
 
         _client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authResponse!.AccessToken);
@@ -426,14 +434,18 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
     {
         // Arrange — create admin user directly via UserManager using factory services
         using var scope = _factory.Services.CreateScope();
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<ApplicationUser>>();
         
         var adminEmail = "admin_test_" + Guid.NewGuid().ToString("N")[..8] + "@example.com";
+        var adminUserName = "admin_" + Guid.NewGuid().ToString("N")[..8];
         var adminUser = new ApplicationUser
         {
             Id = Guid.NewGuid(),
-            UserName = "admin_" + Guid.NewGuid().ToString("N")[..8],
+            UserName = adminUserName,
             Email = adminEmail,
+            NormalizedUserName = adminUserName.ToUpperInvariant(),
+            NormalizedEmail = adminEmail.ToUpperInvariant(),
             DisplayName = "Test Admin",
             EmailConfirmed = true,
             IsActive = true,
@@ -441,8 +453,9 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
             Roles = ["Admin", "Author"]
         };
         
-        var createResult = await userManager.CreateAsync(adminUser, "Admin@123!");
-        createResult.Succeeded.Should().BeTrue();
+        adminUser.PasswordHash = passwordHasher.HashPassword(adminUser, "Admin@123!");
+        dbContext.Users.Add(adminUser);
+        await dbContext.SaveChangesAsync();
         
         // Login as admin
         var loginRequest = new LoginRequest
@@ -452,7 +465,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
         };
         var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", loginRequest);
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        var authResponse = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        var authResponse = await ReadDataAsync<AuthResponse>(loginResponse.Content);
         
         _client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authResponse!.AccessToken);
@@ -463,6 +476,120 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var pagedResponse = await response.Content.ReadFromJsonAsync<JsonElement>();
-        pagedResponse.GetProperty("items").GetArrayLength().Should().BeGreaterThanOrEqualTo(1);
+        pagedResponse.GetProperty("data").GetArrayLength().Should().BeGreaterThanOrEqualTo(1);
+    }
+
+    [Fact]
+    public async Task ChangePassword_ValidCurrentPassword_RevokesSessionsAndAllowsNewPassword()
+    {
+        var userName = "changepwd_" + Guid.NewGuid().ToString("N")[..8];
+        var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", new RegisterRequest
+        {
+            UserName = userName,
+            Email = userName + "@example.com",
+            Password = "Password123!",
+            DisplayName = "Change Password User"
+        });
+        var authResponse = await ReadDataAsync<AuthResponse>(registerResponse.Content);
+        _client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authResponse!.AccessToken);
+
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/change-password", new ChangePasswordRequest
+        {
+            CurrentPassword = "Password123!",
+            NewPassword = "NewPassword123!"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var oldRefreshResponse = await _client.PostAsJsonAsync("/api/v1/auth/refresh",
+            new RefreshRequest { RefreshToken = authResponse.RefreshToken });
+        oldRefreshResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequest
+        {
+            UserNameOrEmail = userName,
+            Password = "NewPassword123!"
+        });
+        loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task ChangePassword_WrongCurrentPassword_ReturnsUnauthorized()
+    {
+        var userName = "badchangepwd_" + Guid.NewGuid().ToString("N")[..8];
+        var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", new RegisterRequest
+        {
+            UserName = userName,
+            Email = userName + "@example.com",
+            Password = "Password123!",
+            DisplayName = "Change Password User"
+        });
+        var authResponse = await ReadDataAsync<AuthResponse>(registerResponse.Content);
+        _client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authResponse!.AccessToken);
+
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/change-password", new ChangePasswordRequest
+        {
+            CurrentPassword = "WrongPassword123!",
+            NewPassword = "NewPassword123!"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task ForgotPassword_ExistingAndUnknownEmail_ReturnNoContent()
+    {
+        var email = "forgot_" + Guid.NewGuid().ToString("N")[..8] + "@example.com";
+        await _client.PostAsJsonAsync("/api/v1/auth/register", new RegisterRequest
+        {
+            UserName = "forgot_" + Guid.NewGuid().ToString("N")[..8],
+            Email = email,
+            Password = "Password123!",
+            DisplayName = "Forgot Password User"
+        });
+
+        var existingResponse = await _client.PostAsJsonAsync("/api/v1/auth/forgot-password",
+            new ForgotPasswordRequest { Email = email });
+        var unknownResponse = await _client.PostAsJsonAsync("/api/v1/auth/forgot-password",
+            new ForgotPasswordRequest { Email = "unknown_" + Guid.NewGuid().ToString("N") + "@example.com" });
+
+        existingResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        unknownResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task ResetPassword_InvalidToken_ReturnsBadRequest()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/reset-password",
+            new ResetPasswordRequest { Token = "invalid-token", NewPassword = "NewPassword123!" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task RefreshToken_ReusingRotatedToken_RevokesTokenFamily()
+    {
+        var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", new RegisterRequest
+        {
+            UserName = "reuse_" + Guid.NewGuid().ToString("N")[..8],
+            Email = "reuse_" + Guid.NewGuid().ToString("N")[..8] + "@example.com",
+            Password = "Password123!",
+            DisplayName = "Reuse Detection User"
+        });
+        var authResponse = await ReadDataAsync<AuthResponse>(registerResponse.Content);
+
+        var firstRefresh = await _client.PostAsJsonAsync("/api/v1/auth/refresh",
+            new RefreshRequest { RefreshToken = authResponse!.RefreshToken });
+        var rotated = await ReadDataAsync<AuthResponse>(firstRefresh.Content);
+
+        var reuseResponse = await _client.PostAsJsonAsync("/api/v1/auth/refresh",
+            new RefreshRequest { RefreshToken = authResponse.RefreshToken });
+        var familyResponse = await _client.PostAsJsonAsync("/api/v1/auth/refresh",
+            new RefreshRequest { RefreshToken = rotated!.RefreshToken });
+
+        firstRefresh.StatusCode.Should().Be(HttpStatusCode.OK);
+        reuseResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        familyResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

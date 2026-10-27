@@ -22,12 +22,20 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.HasIndex(x => x.UserName)
             .IsUnique();
 
+        builder.HasIndex(x => x.NormalizedUserName)
+            .IsUnique()
+            .HasFilter("\"NormalizedUserName\" IS NOT NULL");
+
         builder.Property(x => x.Email)
             .IsRequired()
             .HasMaxLength(255);
 
         builder.HasIndex(x => x.Email)
             .IsUnique();
+
+        builder.HasIndex(x => x.NormalizedEmail)
+            .IsUnique()
+            .HasFilter("\"NormalizedEmail\" IS NOT NULL");
 
         builder.Property(x => x.PasswordHash)
             .IsRequired()

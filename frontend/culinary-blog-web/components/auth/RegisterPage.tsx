@@ -46,7 +46,7 @@ function extractErrorMessages(err: ApiError): string[] {
   const rawErrors = err.errors as unknown;
 
   if (Array.isArray(rawErrors)) {
-    for (const item of rawErrors) {
+    rawErrors.forEach((item) => {
       if (typeof item === "string" && item) {
         messages.push(item);
       } else if (
@@ -57,19 +57,17 @@ function extractErrorMessages(err: ApiError): string[] {
       ) {
         messages.push((item as { message: string }).message);
       }
-    }
+    });
   } else if (rawErrors && typeof rawErrors === "object") {
-    for (const msgs of Object.values(
-      rawErrors as Record<string, string[] | string>
-    )) {
+    Object.values(rawErrors as Record<string, string[] | string>).forEach((msgs) => {
       if (Array.isArray(msgs)) {
-        for (const m of msgs) {
+        msgs.forEach((m) => {
           if (typeof m === "string" && m) messages.push(m);
-        }
+        });
       } else if (typeof msgs === "string" && msgs) {
         messages.push(msgs);
       }
-    }
+    });
   }
 
   if (messages.length === 0) {

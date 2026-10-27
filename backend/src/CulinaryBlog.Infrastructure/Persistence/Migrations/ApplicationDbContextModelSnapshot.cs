@@ -54,10 +54,9 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(150)");
 
                     b.Property<string>("Email")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("boolean");
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<bool>("EmailConfirmed")
                         .ValueGeneratedOnAdd()
@@ -82,7 +81,9 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("PasswordHash")
-                        .HasColumnType("text");
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("PhoneNumber")
                         .HasColumnType("text");
@@ -101,17 +102,28 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
 
-                    b.PrimitiveCollection<string[]>("Roles")
-                        .IsRequired()
-                        .HasColumnType("text[]")
-                        .HasColumnName("Roles");
-
                     b.Property<string>("UserName")
-                        .HasColumnType("text");
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Email")
+                        .IsUnique();
+
                     b.HasIndex("IsActive");
+
+                    b.HasIndex("NormalizedEmail")
+                        .IsUnique()
+                        .HasFilter("\"NormalizedEmail\" IS NOT NULL");
+
+                    b.HasIndex("NormalizedUserName")
+                        .IsUnique()
+                        .HasFilter("\"NormalizedUserName\" IS NOT NULL");
+
+                    b.HasIndex("UserName")
+                        .IsUnique();
 
                     b.ToTable("Users", (string)null);
                 });
