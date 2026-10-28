@@ -13,6 +13,12 @@ public class RecipeNutritionConfiguration
             recipe => recipe.Nutrition,
             nutrition =>
             {
+                nutrition.Property(x => x.Source)
+                    .HasConversion<string>()
+                    .HasMaxLength(40)
+                    .HasColumnName("Nutrition_Source")
+                    .IsRequired();
+
                 nutrition.Property(x => x.Calories)
                     .HasPrecision(8, 2)
                     .HasColumnName("Nutrition_Calories");
@@ -24,6 +30,8 @@ public class RecipeNutritionConfiguration
                 nutrition.Property(x => x.Carbohydrates)
                     .HasPrecision(8, 2)
                     .HasColumnName("Nutrition_Carbohydrates");
+
+                nutrition.Ignore(x => x.Carbs);
 
                 nutrition.Property(x => x.Fat)
                     .HasPrecision(8, 2)

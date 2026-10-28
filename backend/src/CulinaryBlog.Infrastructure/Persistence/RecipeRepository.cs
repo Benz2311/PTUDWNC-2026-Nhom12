@@ -25,7 +25,7 @@ public class RecipeRepository : IRecipeRepository
                 .Include(recipe => recipe.Author)
                 .Include(recipe => recipe.Ingredients.OrderBy(ingredient => ingredient.SortOrder))
                 .Include(recipe => recipe.Steps.OrderBy(step => step.StepNumber))
-                .Include(recipe => recipe.Images.OrderBy(image => image.SortOrder))
+                .Include(recipe => recipe.Images.OrderBy(image => image.OrderIndex))
                 .Include(recipe => recipe.Nutrition)
                 .AsSplitQuery();
         }
@@ -52,7 +52,7 @@ public class RecipeRepository : IRecipeRepository
             .Include(recipe => recipe.Author)
             .Include(recipe => recipe.Ingredients.OrderBy(ingredient => ingredient.SortOrder))
             .Include(recipe => recipe.Steps.OrderBy(step => step.StepNumber))
-            .Include(recipe => recipe.Images.OrderBy(image => image.SortOrder))
+            .Include(recipe => recipe.Images.OrderBy(image => image.OrderIndex))
             .Include(recipe => recipe.Nutrition)
             .AsSplitQuery()
             .Where(recipe => recipe.Slug == slug);
@@ -69,6 +69,7 @@ public class RecipeRepository : IRecipeRepository
     {
         var normalizedSlug = slug.Trim();
         return _dbContext.Recipes
+            .IgnoreQueryFilters()
             .AnyAsync(recipe => recipe.Slug == normalizedSlug && (!excludeId.HasValue || recipe.Id != excludeId.Value), cancellationToken);
     }
 

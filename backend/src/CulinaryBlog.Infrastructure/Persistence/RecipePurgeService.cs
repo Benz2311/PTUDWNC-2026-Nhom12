@@ -31,11 +31,12 @@ public sealed class RecipePurgeService : IRecipePurgeService
     public async Task<bool> PurgeAsync(Guid recipeId, Guid actorId, CancellationToken cancellationToken = default)
     {
         var recipe = await _db.Recipes
+            .IgnoreQueryFilters()
             .Include(item => item.Images)
             .Include(item => item.Ingredients)
             .Include(item => item.Steps)
             .SingleOrDefaultAsync(item => item.Id == recipeId, cancellationToken);
-        if (recipe is null)
+        if (recipe is null || !recipe.IsDeleted)
         {
             return false;
         }
@@ -83,6 +84,7 @@ public sealed class RecipePurgeService : IRecipePurgeService
     {
         var cutoff = DateTime.UtcNow - RetentionPeriod;
         var expiredIds = await _db.Recipes
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(recipe => recipe.IsDeleted && (recipe.DeletedAt ?? recipe.UpdatedAt ?? recipe.CreatedAt) <= cutoff)
             .Select(recipe => recipe.Id)

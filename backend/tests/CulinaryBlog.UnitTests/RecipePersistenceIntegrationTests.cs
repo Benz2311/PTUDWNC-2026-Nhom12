@@ -63,6 +63,12 @@ public sealed class RecipePersistenceIntegrationTests
         };
 
         await writeService.CreateAsync(recipe);
+        recipe.IsDeleted = true;
+        await db.SaveChangesAsync();
+        Assert.True(await recipeRepository.ExistsBySlugAsync(recipe.Slug));
+        recipe.IsDeleted = false;
+        await db.SaveChangesAsync();
+
         var ingredient = new RecipeIngredient
         {
             RecipeId = recipe.Id,

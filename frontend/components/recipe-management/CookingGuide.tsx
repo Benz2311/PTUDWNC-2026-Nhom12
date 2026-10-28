@@ -2,24 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
-
-type Recipe = {
-  title: string;
-  servings: number;
-  prepTimeMinutes: number;
-  cookTimeMinutes: number;
-  ingredients: { id: string; name: string; quantity: number | null; unit: string | null; notes: string | null }[];
-  steps: { id: string; stepNumber: number; title: string; description: string }[];
-};
+import type { RecipeDetail } from '@/types/recipe';
 
 export default function CookingGuide({ slug }: { slug: string }) {
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [checkedIngredients, setCheckedIngredients] = useState<string[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    apiFetch<Recipe>(`/api/v1/recipes/${encodeURIComponent(slug)}`, {}, false)
+    apiFetch<RecipeDetail>(`/api/v1/recipes/${encodeURIComponent(slug)}`, {}, false)
       .then(setRecipe)
       .catch((reason: Error) => setError(reason.message || 'Không tải được công thức.'));
   }, [slug]);
