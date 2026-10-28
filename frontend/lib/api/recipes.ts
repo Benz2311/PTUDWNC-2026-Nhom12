@@ -124,7 +124,10 @@ export async function updateRecipe(
     `${recipeBasePath}/${encodeURIComponent(id)}`,
     {
       method: 'PUT',
-      headers: jsonHeaders(etag),
+      headers: {
+        'Content-Type': 'application/json',
+        'If-Match': requireEtag(etag),
+      },
       body: JSON.stringify(request),
     },
   );

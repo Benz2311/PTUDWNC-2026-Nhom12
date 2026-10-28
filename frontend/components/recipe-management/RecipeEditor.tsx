@@ -1,48 +1,67 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { apiFetchWithResponse } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { getRecipeBySlug } from '@/lib/api/recipes';
 import RecipeForm, { InitialRecipe } from './RecipeForm';
 
 export default function RecipeEditor({ slug }: { slug: string }) {
   const [recipe, setRecipe] = useState<InitialRecipe | null>(null);
   const [etag, setEtag] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    apiFetchWithResponse<InitialRecipe>(`/api/v1/recipes/${slug}`)
-      .then(({ data, headers }) => {
-        setRecipe(data);
-        setEtag(headers.get('ETag') ?? '');
-      })
-      .catch((reason: Error) => setError(reason.message));
+  const loadRecipe = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data, headers } = await getRecipeBySlug(slug);
+      setRecipe(data);
+      setEtag(headers.get('ETag') ?? '');
+    } catch (reason: unknown) {
+      setError(reason instanceof Error ? reason.message : 'Không thể tải công thức.');
+    } finally {
+      setLoading(false);
+    }
   }, [slug]);
 
   useEffect(() => {
-    function syncEtag(event: Event) {
-      const detail = (event as CustomEvent<{ recipeId: string; etag: string }>).detail;
-      if (detail?.recipeId === recipe?.id && detail.etag) {
-        setEtag(detail.etag);
-      }
-    }
-    window.addEventListener('culinary-recipe-etag-change', syncEtag);
-    return () => window.removeEventListener('culinary-recipe-etag-change', syncEtag);
-  }, [recipe?.id]);
+    void loadRecipe();
+  }, [loadRecipe]);
 
-  if (error) {
+  if (loading && !recipe) {
     return (
-      <div className="empty-state">
+      <div className="loading-state" role="status">
+        <span className="spinner" aria-hidden="true" /> Đang tải dữ liệu công thức...
+      </div>
+    );
+  }
+
+  if (error && !recipe) {
+    return (
+      <div className="empty-state error-state" role="alert">
         <strong>{error}</strong>
-        <a className="card-action" href={`/recipes/${slug}`}>
-          Quay lại
-        </a>
+        <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+          <button className="primary-button" type="button" onClick={() => void loadRecipe()}>
+            Thử lại
+          </button>
+          <a className="outline-button" href={`/recipes/${slug}`}>
+            Quay lại chi tiết
+          </a>
+        </div>
       </div>
     );
   }
 
   if (!recipe) {
-    return <div className="loading-state">Đang tải công thức...</div>;
+    return <div className="loading-state">Không tìm thấy công thức.</div>;
   }
 
-  return <RecipeForm recipeId={recipe.id} initialRecipe={recipe} etag={etag} />;
+  return (
+    <RecipeForm
+      recipeId={recipe.id}
+      initialRecipe={recipe}
+      initialEtag={etag}
+      onReload={loadRecipe}
+    />
+  );
 }

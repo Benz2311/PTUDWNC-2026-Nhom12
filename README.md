@@ -49,27 +49,66 @@ Không commit `.env` hoặc thông tin đăng nhập thật. Compose khởi đ�
 - [Tổng quan kiến trúc](./ARCHITECTURE.md): các tầng và luồng dữ liệu.
 - [Phân tích truy vấn Category](./docs/database/explain-analyze-category-recipe.md).
 
-## Phạm Nguyễn Ngọc Phước - Chi tiết công thức theo Slug (Bữa 7)
+## Bữa 8 - Phạm Nguyễn Ngọc Phước: Recipe Create / Edit / Lifecycle, Ingredient & Nutrition
 
-Trong Bữa 7, Phạm Nguyễn Ngọc Phước phụ trách hoàn thiện trang xem chi tiết công thức nấu ăn theo Slug và tích hợp dữ liệu với Backend:
+Trong Bữa 8 (**Hoàn thiện quản lý Recipe, Upload Image, Admin và Logging**), Phạm Nguyễn Ngọc Phước chịu trách nhiệm Recipe Create/Edit, Ingredient, Nutrition và toàn bộ vòng đời Recipe. Tất cả các mục được hoàn thành 100%:
 
-- Hoàn thiện trang xem chi tiết công thức theo Slug bằng API `GET /api/v1/recipes/{slug}`, truyền xác thực `withAuth = true` để hỗ trợ phân quyền người dùng.
-- Hiển thị đầy đủ các thông tin cơ bản: Title, Description, Content, Author, Category, Difficulty (`DifficultyBadge`), PrepTimeMinutes, CookTimeMinutes, Servings (`RecipeTimeInfo`), trạng thái (`RecipeStatusBadge`) và ngày xuất bản PublishedAt (định dạng ngày chuẩn tiếng Việt).
-- Tích hợp hệ thống Breadcrumbs điều hướng: *Trang chủ* > *Công thức* > *Danh mục* > *Tên công thức*.
-- Hiển thị ảnh Primary của Recipe ở vị trí nổi bật có huy hiệu *Ảnh chính* và caption mô tả; hiển thị bộ sưu tập ảnh phụ theo thứ tự `sortOrder` với thumbnail có thể tương tác; có giao diện fallback trang nhã khi công thức chưa có ảnh.
-- Sắp xếp danh sách nguyên liệu (Ingredients) đúng theo `OrderIndex` (`orderIndex ?? sortOrder`), hiển thị chi tiết Name, Quantity, Unit và Notes; hỗ trợ Empty State khi chưa có nguyên liệu.
-- Hiển thị bảng thông tin dinh dưỡng (Nutrition) gồm đầy đủ 6 chỉ số: Calories (kcal), Protein (g), Carbohydrates (g), Chất béo (g), Chất xơ (g) và Natri (mg) khi công thức có dữ liệu; hiển thị thông báo phù hợp khi chưa có dinh dưỡng.
-- Hiển thị các bước thực hiện đúng theo `StepNumber`, kèm Title, Description, thời gian hẹn giờ `TimerMinutes` (⏱ X phút) và hình ảnh bước chế biến (`imageUrl`) nếu có.
-- Tái sử dụng component `RecipeSteps` thuộc Võ Hùng Mạnh ở chế độ hiển thị phù hợp mà không sửa logic nội bộ của component; liên kết trực tiếp sang chế độ nấu tương tác `CookingGuide` (`/recipes/[slug]/cook`).
-- Hiển thị thông tin tác giả, Category với liên kết điều hướng lọc danh mục và liên kết quay lại danh sách công thức.
-- Xử lý trường hợp Recipe không tồn tại bằng giao diện 404 Not Found thích hợp kèm các nút điều hướng khám phá món ăn khác hoặc về trang chủ.
-- Xử lý quyền truy cập đối với công thức `Draft` hoặc `Archived` đúng theo Backend: chỉ cho phép Author sở hữu hoặc Admin xem khi có token xác thực; hiển thị màn hình 403 Forbidden giải thích rõ lý do kèm nút đăng nhập tài khoản khi người dùng không đủ quyền truy cập.
-- Xây dựng component `RecipeDetailSkeleton` với hiệu ứng shimmer mô phỏng chính xác bố cục trang chi tiết; hoàn thiện giao diện Error State kèm nút "Thử lại" và các Empty State dùng chung.
-- Hoàn thiện Responsive layout cho Recipe Detail: bố cục 2 cột trên Desktop (cột nội dung chính và bảng dinh dưỡng sticky cố định), tự động co giãn và chuyển sang 1 cột tối ưu trên Tablet và Mobile.
-- Không triển khai chức năng Create/Edit Recipe trong Bữa 7.
-- Kiểm thử tự động Recipe Detail tại `frontend/lib/api/recipe-detail.test.ts` bao phủ các trường hợp: Recipe Published đầy đủ, Recipe có/không có ảnh, Recipe có nhiều Step/Ingredient, Recipe không tồn tại (404) và Recipe không đủ quyền xem (403).
+1. **Trang Tạo mới (`/recipes/new`) & Cập nhật Recipe (`/recipes/[slug]/edit`)**:
+   - Kết nối trực tiếp với các API Backend: `POST /api/v1/recipes`, `PUT /api/v1/recipes/{id}`, các endpoint chuyển trạng thái và `GET /api/v1/categories`.
+   - Tạo mới tự động khởi tạo công thức ở trạng thái `Draft`; chỉnh sửa cho phép cập nhật dữ liệu và duy trì hoặc cập nhật slug lịch sử (`RecipeSlugHistory`).
 
-Kiểm tra Bữa 7: `npm run build`, `npm run lint` và `npm test` trong thư mục `frontend`; build API bằng `dotnet build backend/src/CulinaryBlog.Api/CulinaryBlog.API.csproj --no-restore`. Frontend build thành công 21 routes, lint 0 lỗi/cảnh báo, toàn bộ 11 tests đều đạt; backend build thành công 0 lỗi và 80 unit tests đều PASS.
+2. **Recipe Form hoàn chỉnh với đầy đủ 8 trường thông tin cốt lõi**:
+   - `Title`: Bắt buộc, kiểm tra độ dài 5 - 200 ký tự.
+   - `Description`: Mô tả ngắn gọn giới thiệu món ăn, tối đa 2.000 ký tự.
+   - `Content`: Bắt buộc, nội dung tổng quát quy trình nấu nướng.
+   - `CategoryId`: Chọn danh mục từ danh sách API Backend, kiểm tra hợp lệ.
+   - `PrepTimeMinutes`: Thời gian chuẩn bị > 0 phút.
+   - `CookTimeMinutes`: Thời gian nấu >= 0 phút.
+   - `Servings`: Khẩu phần ăn > 0 người.
+   - `Difficulty`: 4 mức độ theo enum Domain (`Easy`, `Medium`, `Hard`, `Expert`).
+
+3. **Tích hợp `IngredientEditor`**:
+   - Thêm, sửa, xóa và sắp xếp nguyên liệu linh hoạt bằng các nút di chuyển (↑, ↓) tự động cập nhật lại `orderIndex`.
+   - Hỗ trợ đầy đủ các trường: `name` (1 - 200 ký tự), `quantity` (số thập phân dương hoặc để trống), `unit` (tối đa 50 ký tự), `notes` (tối đa 500 ký tự) và `orderIndex`.
+   - Hiển thị badge số thứ tự (#1, #2...) và đếm tổng số nguyên liệu hợp lệ.
+
+4. **Xây dựng và tích hợp `NutritionEditor`**:
+   - Thành phần chuyên biệt quản lý đầy đủ 6 chỉ số dinh dưỡng: `Calories` (kcal), `Protein` (g), `Carbohydrates` (g), `Fat` (g), `Fiber` (g) và `Sodium` (mg).
+   - Ngăn chặn nhập số âm, bố cục lưới thẻ responsive trực quan và có chú thích cách tính theo khẩu phần.
+
+5. **Tích hợp module của Võ Hùng Mạnh**:
+   - Tích hợp `StepEditor` vào Recipe Form mà không thay đổi bất kỳ logic nội bộ nào của component.
+   - Tích hợp `ImageManager` vào Recipe Form tuân thủ nguyên tắc: Phước chịu trách nhiệm bố trí layout, Mạnh chịu trách nhiệm logic Step/Image.
+
+6. **Vòng đời trạng thái (Recipe Lifecycle)**:
+   - Hỗ trợ đầy đủ các bước chuyển trạng thái: `Draft → Published`, `Published → Unpublished` (về Draft), `Published → Archived`, `Archived → Unarchive` (về Draft), và `Recipe → Deleted` (xóa mềm vào Thùng rác).
+   - Kiểm tra điều kiện tiên quyết trước khi Publish: Category hợp lệ, ít nhất 1 Ingredient, ít nhất 1 Step, thông tin cơ bản hợp lệ và Author đã xác thực Email (`EmailConfirmed == true`).
+   - Cập nhật tức thời trạng thái trên giao diện (`Status Badge`) và cập nhật ETag từ HTTP response header.
+
+7. **Xử lý Optimistic Concurrency (ETag / If-Match & 409 Conflict)**:
+   - Gửi tiêu đề `If-Match: "<xmin>"` trong mọi thao tác PUT, đổi trạng thái và xóa công thức.
+   - Phát hiện lỗi 409 Conflict khi xảy ra cập nhật đồng thời, hiển thị banner cảnh báo trực quan kèm nút *"🔄 Tải lại dữ liệu mới nhất"* giúp đồng bộ dữ liệu mà không gây mất tính nhất quán.
+
+8. **Confirmation Dialog chuyên nghiệp**:
+   - Xây dựng component `ConfirmationDialog` dạng modal accessible (hỗ trợ phím ESC, focus trap, backdrop blur) thay thế hoàn toàn `window.confirm`.
+   - Áp dụng đồng bộ cho các thao tác: Xuất bản, Hủy xuất bản, Lưu trữ, Mở lưu trữ, Xóa công thức, Khôi phục (Restore) và Xóa vĩnh viễn (Purge).
+
+9. **Hoàn thiện các action tại My Recipes (`/recipes`)**:
+   - Mỗi thẻ công thức cung cấp đầy đủ các action tùy theo trạng thái: *Xem chi tiết*, *Chỉnh sửa*, *Xuất bản*, *Hủy xuất bản*, *Lưu trữ*, *Mở lưu trữ* và *Xóa*.
+   - Thực hiện qua ETag và cập nhật trực tiếp danh sách tại client không cần reload toàn trang.
+
+10. **Rà soát Thùng rác Quản trị viên (`/admin/recipes/trash`)**:
+    - Tích hợp `ConfirmationDialog` cho các thao tác *Khôi phục (Restore)* và *Xóa vĩnh viễn (Purge)* cùng thông báo kết quả chi tiết.
+
+11. **Kiểm thử tự động toàn diện**:
+    - Bộ test tự động `frontend/lib/api/recipe-lifecycle.test.ts` (14 kịch bản) kiểm thử toàn bộ vòng đời Create, Save Draft, Edit, Publish, Unpublish, Archive, Unarchive, Delete, ETag Concurrency và Ingredient OrderIndex.
+    - Tất cả 25 unit tests Vitest và toàn bộ 80 backend unit tests đều PASS 100%. Next.js build hoàn thành 21/21 routes không lỗi.
+
+Kiểm tra Bữa 8:
+- Chạy frontend tests: `npm test` trong thư mục `frontend` -> **4 test files passed, 25 tests passed (100%)**.
+- Chạy frontend lint: `npm run lint` trong thư mục `frontend` -> **No ESLint warnings or errors**.
+- Build production frontend: `npm run build` trong thư mục `frontend` -> **21/21 routes static/dynamic compiled successfully**.
+- Chạy backend unit tests: `dotnet test backend/tests/CulinaryBlog.UnitTests/CulinaryBlog.UnitTests.csproj --nologo` -> **80 tests passed, 0 failed**.
 
 ## Kiểm thử backend
 
