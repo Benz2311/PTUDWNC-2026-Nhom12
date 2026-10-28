@@ -17,6 +17,8 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
             .HasMaxLength(100)
             .IsRequired();
 
+        builder.Ignore(x => x.DisplayName);
+
         builder.Property(x => x.UserName)
             .HasMaxLength(256);
 

@@ -5,12 +5,19 @@ namespace CulinaryBlog.Infrastructure.Persistence.Seed;
 
 public static class RecipeStepSeeder
 {
-    public static List<RecipeStep> Generate(IEnumerable<Recipe> recipes)
+    private const int DefaultSeed = 20260924;
+
+    public static List<RecipeStep> Generate(IEnumerable<Recipe> recipes, int seed = DefaultSeed)
     {
         var result = new List<RecipeStep>();
-        var faker = new Faker("vi");
+        var orderedRecipes = recipes.OrderBy(x => x.Id).ThenBy(x => x.Title).ToList();
+        var faker = new Faker("vi")
+        {
+            Random = new Randomizer(seed)
+        };
+        var refDate = new DateTime(2026, 9, 29, 0, 0, 0, DateTimeKind.Utc);
 
-        foreach (var recipe in recipes)
+        foreach (var recipe in orderedRecipes)
         {
             var ingredients = recipe.Ingredients
                 .Where(x => !x.IsDeleted)
@@ -37,7 +44,7 @@ public static class RecipeStepSeeder
                     Title = steps[index].Title,
                     Description = steps[index].Description,
                     CreatedAt = faker.Date
-                        .Recent(30)
+                        .Recent(30, refDate)
                         .ToUniversalTime(),
                     UpdatedAt = null,
                     IsDeleted = false,

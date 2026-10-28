@@ -13,9 +13,16 @@ public class ApplicationUser
     public bool LockoutEnabled { get; set; } = true;
     public int AccessFailedCount { get; set; }
     public string FullName { get; set; } = string.Empty;
+    public string DisplayName
+    {
+        get => FullName;
+        set => FullName = value ?? string.Empty;
+    }
+
     public string UserName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
+    public string? Bio { get; set; }
     public string? PasswordHash { get; set; }
     public bool EmailConfirmed { get; set; }
     public string[] Roles { get; set; } = ["Author"];

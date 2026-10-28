@@ -6,9 +6,21 @@ public class RecipeImage
     public Guid RecipeId { get; set; }
     public Recipe Recipe { get; set; } = null!;
     public string Url { get; set; } = string.Empty;
+    public string OriginalUrl
+    {
+        get => Url;
+        set => Url = value;
+    }
+    public string? MediumUrl { get; set; }
+    public string? ThumbnailUrl { get; set; }
     public string? AltText { get; set; }
     public bool IsPrimary { get; set; }
     public int SortOrder { get; set; }
+    public int OrderIndex
+    {
+        get => SortOrder;
+        set => SortOrder = value;
+    }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
     public bool IsDeleted { get; set; }

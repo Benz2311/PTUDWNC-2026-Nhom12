@@ -1,0 +1,23 @@
+root = true
+
+[*.cs]
+# StyleCop — tắt một số rule không phù hợp với Minimal API style
+dotnet_diagnostic.SA0001.severity = none  # XML comment files
+dotnet_diagnostic.SA1101.severity = none  # Prefix this. (optional in modern C#)
+dotnet_diagnostic.SA1200.severity = none  # Using directives inside namespace
+dotnet_diagnostic.SA1309.severity = none  # Field names must not begin with underscore
+dotnet_diagnostic.SA1600.severity = suggestion  # Elements must be documented
+dotnet_diagnostic.SA1601.severity = suggestion
+dotnet_diagnostic.SA1602.severity = suggestion
+dotnet_diagnostic.SA1633.severity = none  # File header
+
+# SonarAnalyzer — treat as warnings (not errors) to not break build
+dotnet_diagnostic.S1135.severity = suggestion  # TODO comments
+
+# General .NET conventions
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+charset = utf-8-bom
+trim_trailing_whitespace = true
+insert_final_newline = true

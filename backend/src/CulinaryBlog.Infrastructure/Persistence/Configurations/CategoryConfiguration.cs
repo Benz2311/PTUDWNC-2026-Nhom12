@@ -37,7 +37,8 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
         builder.HasIndex(c => c.Slug)
             .IsUnique();
 
-        builder.HasIndex(c => c.Name);
+        builder.HasIndex(c => c.Name)
+            .IsUnique();
 
         builder.HasIndex(c => c.OrderIndex);
 

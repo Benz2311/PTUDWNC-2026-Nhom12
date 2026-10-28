@@ -1,7 +1,11 @@
 using System.Text.Json;
 using CulinaryBlog.Api.Helpers;
+using CulinaryBlog.Application.DTOs;
+using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipesByCategory;
 using CulinaryBlog.Domain.Entities;
+using CulinaryBlog.Domain.Enums;
 using CulinaryBlog.Infrastructure.Persistence;
+using MediatR;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.EntityFrameworkCore;
 
@@ -47,38 +51,60 @@ public static class CategoryEndpoints
             return Results.Ok(categories);
         });
 
-        group.MapGet("/{slug}", async (string slug, ApplicationDbContext db, IDistributedCache cache, CancellationToken cancellationToken) =>
+        group.MapGet("/statistics", async (ApplicationDbContext db, CancellationToken cancellationToken) =>
+        {
+            var categories = await db.Categories
+                .AsNoTracking()
+                .Where(category => !category.IsDeleted)
+                .OrderBy(category => category.Name)
+                .Select(category => new CategoryStatisticItemDto(
+                    category.Id,
+                    category.Name,
+                    category.Recipes.Count(recipe => !recipe.IsDeleted)))
+                .ToArrayAsync(cancellationToken);
+
+            var totalRecipes = await db.Recipes.CountAsync(cancellationToken);
+            var publishedRecipes = await db.Recipes.CountAsync(
+                recipe => recipe.Status == RecipeStatus.Published,
+                cancellationToken);
+            var draftRecipes = await db.Recipes.CountAsync(
+                recipe => recipe.Status == RecipeStatus.Draft,
+                cancellationToken);
+
+            return Results.Ok(new CategoryStatisticsDto(
+                categories.Length,
+                totalRecipes,
+                publishedRecipes,
+                draftRecipes,
+                categories));
+        });
+
+        group.MapGet("/{slug}", async (string slug, int? page, int? pageSize, ISender sender, IDistributedCache cache, CancellationToken cancellationToken) =>
         {
             var generation = await GetCacheGenerationAsync(cache, cancellationToken);
-            var cacheKey = $"categories:{generation}:{slug}";
+            var requestedPage = Math.Max(page ?? 1, 1);
+            var requestedPageSize = Math.Clamp(pageSize ?? 12, 1, 100);
+            var cacheKey = $"categories:{generation}:{slug}:{requestedPage}:{requestedPageSize}";
             var cached = await cache.GetStringAsync(cacheKey, cancellationToken);
             if (cached is not null)
             {
                 return Results.Content(cached, "application/json");
             }
 
-            var category = await db.Categories
-                .AsNoTracking()
-                .Where(item => !item.IsDeleted && item.Slug == slug)
-                .Select(item => new CategoryResponse(
-                    item.Id,
-                    item.Name,
-                    item.Slug,
-                    item.Description,
-                    item.Recipes.Count(recipe => !recipe.IsDeleted)))
-                .SingleOrDefaultAsync(cancellationToken);
-
-            if (category is null)
+            var result = await sender.Send(
+                new GetRecipesByCategoryQuery(slug, requestedPage, requestedPageSize),
+                cancellationToken);
+            if (result is null)
             {
                 return Results.NotFound();
             }
 
             await cache.SetStringAsync(
                 cacheKey,
-                JsonSerializer.Serialize(category),
+                JsonSerializer.Serialize(result),
                 new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(60) },
                 cancellationToken);
-            return Results.Ok(category);
+            return Results.Ok(result);
         });
 
         group.MapPost("", async (CategoryRequest request, ApplicationDbContext db, IDistributedCache cache, CancellationToken cancellationToken) =>

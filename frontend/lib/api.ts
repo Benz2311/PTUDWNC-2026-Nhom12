@@ -17,9 +17,7 @@ function readToken() {
 }
 
 export function saveAuth(payload: { accessToken?: string; refreshToken?: string }) {
-  if (typeof window === 'undefined') {
-    return;
-  }
+  if (typeof window === 'undefined') return;
 
   if (payload.accessToken) {
     localStorage.setItem(AUTH_STORAGE_KEYS.accessToken, payload.accessToken);
@@ -33,9 +31,7 @@ export function saveAuth(payload: { accessToken?: string; refreshToken?: string 
 }
 
 export function clearAuth() {
-  if (typeof window === 'undefined') {
-    return;
-  }
+  if (typeof window === 'undefined') return;
 
   localStorage.removeItem(AUTH_STORAGE_KEYS.accessToken);
   localStorage.removeItem(AUTH_STORAGE_KEYS.refreshToken);
@@ -59,13 +55,11 @@ async function refreshAuth(): Promise<boolean> {
         });
 
         if (!response.ok) {
-          if (response.status === 401) {
-            clearAuth();
-          }
+          if (response.status === 401) clearAuth();
           return false;
         }
 
-        const payload = await response.json() as { accessToken?: string; refreshToken?: string };
+        const payload = (await response.json()) as { accessToken?: string; refreshToken?: string };
         if (!payload.accessToken || !payload.refreshToken) {
           clearAuth();
           return false;
@@ -98,9 +92,10 @@ export async function apiFetchWithResponse<T = unknown>(url: string, options: Re
     ...options,
     headers,
   });
+
   let response = await request();
 
-  if (response.status === 401 && withAuth && readToken() && await refreshAuth()) {
+  if (response.status === 401 && withAuth && readToken() && (await refreshAuth())) {
     const refreshedToken = readToken();
     if (refreshedToken) {
       headers.set('Authorization', `Bearer ${refreshedToken}`);
@@ -132,7 +127,7 @@ export async function apiFetchWithResponse<T = unknown>(url: string, options: Re
     throw error;
   }
 
-  const data = response.status === 204 ? undefined as T : await response.json() as T;
+  const data = response.status === 204 ? (undefined as T) : ((await response.json()) as T);
   return { data, headers: response.headers };
 }
 

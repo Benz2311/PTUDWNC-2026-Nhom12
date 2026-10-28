@@ -106,7 +106,7 @@ public static class AuthEndpoints
         var tokenHash = HashToken(request.RefreshToken);
         var storedToken = await db.RefreshTokens
             .Include(token => token.User)
-            .SingleOrDefaultAsync(token => token.Token == tokenHash, cancellationToken);
+            .SingleOrDefaultAsync(token => token.TokenHash == tokenHash, cancellationToken);
 
         if (storedToken is null)
         {
@@ -136,7 +136,7 @@ public static class AuthEndpoints
         storedToken.IsRevoked = true;
         storedToken.RevokedAt = DateTime.UtcNow;
         var tokens = await IssueTokensAsync(storedToken.User, authService, db, httpContext, cancellationToken);
-        storedToken.ReplacedByToken = tokens.RefreshTokenHash;
+        storedToken.ReplacedByTokenHash = tokens.RefreshTokenHash;
         await db.SaveChangesAsync(cancellationToken);
 
         return Results.Ok(ToAuthResponse(storedToken.User, tokens));
@@ -159,7 +159,7 @@ public static class AuthEndpoints
             return Results.Unauthorized();
         }
         var tokenHash = HashToken(request.RefreshToken);
-        var storedToken = await db.RefreshTokens.SingleOrDefaultAsync(token => token.Token == tokenHash && token.UserId == userId, cancellationToken);
+        var storedToken = await db.RefreshTokens.SingleOrDefaultAsync(token => token.TokenHash == tokenHash && token.UserId == userId, cancellationToken);
         if (storedToken is not null && !storedToken.IsRevoked)
         {
             storedToken.IsRevoked = true;
