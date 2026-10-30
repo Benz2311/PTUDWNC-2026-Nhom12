@@ -23,9 +23,30 @@ export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserP
   const [error, setError] = useState('');
 
   useEffect(() => {
-    apiFetch<Category[]>('/api/v1/categories', {}, false)
-      .then(setCategories)
+    apiFetch<unknown>('/api/v1/categories', {}, false)
+      .then((data) => {
+        const rawList = Array.isArray(data)
+          ? data
+          : Array.isArray((data as Record<string, unknown>)?.items)
+            ? (data as { items: unknown[] }).items
+            : Array.isArray((data as Record<string, unknown>)?.data)
+              ? (data as { data: unknown[] }).data
+              : [];
+
+        const normalized: Category[] = rawList.map((item) => {
+          const cat = item as Record<string, unknown>;
+          return {
+            id: String(cat.id ?? cat.Id ?? cat.categoryId ?? ''),
+            name: String(cat.name ?? cat.Name ?? cat.categoryName ?? cat.title ?? ''),
+            slug: String(cat.slug ?? cat.Slug ?? ''),
+            recipeCount: Number(cat.recipeCount ?? cat.RecipeCount ?? cat.count ?? 0),
+          };
+        });
+
+        setCategories(normalized);
+      })
       .catch((reason: Error) => setError(reason.message));
+
     if (mode === 'search') {
       const initialQuery = new URLSearchParams(window.location.search).get('q') ?? '';
       setQuery(initialQuery);
@@ -92,8 +113,17 @@ export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserP
         <fieldset>
           <legend>Danh mục</legend>
           <label><input type="radio" name="category" checked={!categoryId} onChange={() => { setCategoryId(''); setPage(1); }} /> Tất cả danh mục</label>
-          {categories.map((category) => (
-            <label key={category.id}><input type="radio" name="category" checked={categoryId === category.id} onChange={() => { setCategoryId(category.id); setPage(1); }} /> {category.name} <span className="filter-count">{category.recipeCount}</span></label>
+          {categories.map((category, idx) => (
+            <label key={category.id || `cat-${idx}`}>
+              <input
+                type="radio"
+                name="category"
+                checked={categoryId === category.id}
+                onChange={() => { setCategoryId(category.id); setPage(1); }}
+              />
+              {category.name || 'Danh mục khác'}
+              <span className="filter-count">{category.recipeCount}</span>
+            </label>
           ))}
         </fieldset>
         <p className="filter-note">Chỉ hiển thị công thức đã xuất bản.</p>

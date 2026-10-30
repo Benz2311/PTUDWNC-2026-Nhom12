@@ -189,8 +189,8 @@ export default function RecipeList({ admin = false }: { admin?: boolean }) {
             }}
           >
             <option value="">Tất cả danh mục</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
+            {Array.isArray(categories) && categories.map((category, idx) => (
+              <option key={category.id || ("cat-" + idx)} value={category.id}>
                 {category.name}
               </option>
             ))}

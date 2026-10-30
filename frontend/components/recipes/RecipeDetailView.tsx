@@ -16,7 +16,7 @@ const nutritionLabels = [
   ['sodium', 'Natri', 'mg'],
 ] as const;
 
-function formatPublishedDate(value: string | null): string | null {
+function formatPublishedDate(value?: string | null): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;

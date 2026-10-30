@@ -9,21 +9,21 @@ export type DifficultyLevel = z.infer<typeof difficultyLevelSchema>;
 export const recipeIngredientSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
-  quantity: z.number().nullable(),
-  unit: z.string().nullable(),
-  sortOrder: z.number().int(),
+  quantity: z.number().nullish(),
+  unit: z.string().nullish(),
+  sortOrder: z.number().int().optional(),
   orderIndex: z.number().int().optional(),
-  notes: z.string().nullable(),
+  notes: z.string().nullish(),
 });
 export type RecipeIngredient = z.infer<typeof recipeIngredientSchema>;
 
 export const recipeNutritionSchema = z.object({
-  calories: z.number().nullable(),
-  protein: z.number().nullable(),
-  carbohydrates: z.number().nullable(),
-  fat: z.number().nullable(),
-  fiber: z.number().nullable(),
-  sodium: z.number().nullable(),
+  calories: z.number().nullish(),
+  protein: z.number().nullish(),
+  carbohydrates: z.number().nullish(),
+  fat: z.number().nullish(),
+  fiber: z.number().nullish(),
+  sodium: z.number().nullish(),
 });
 export type RecipeNutrition = z.infer<typeof recipeNutritionSchema>;
 
@@ -32,17 +32,17 @@ export const recipeStepSchema = z.object({
   stepNumber: z.number().int(),
   title: z.string(),
   description: z.string(),
-  timerMinutes: z.number().int().nullable().optional(),
-  imageUrl: z.string().nullable().optional(),
+  timerMinutes: z.number().int().nullish(),
+  imageUrl: z.string().nullish(),
 });
 export type RecipeStep = z.infer<typeof recipeStepSchema>;
 
 export const recipeImageSchema = z.object({
   id: z.string().uuid(),
   url: z.string(),
-  altText: z.string().nullable(),
-  isPrimary: z.boolean(),
-  sortOrder: z.number().int(),
+  altText: z.string().nullish(),
+  isPrimary: z.boolean().default(false),
+  sortOrder: z.number().int().optional(),
 });
 export type RecipeImage = z.infer<typeof recipeImageSchema>;
 
@@ -50,17 +50,17 @@ export const recipeSummarySchema = z.object({
   id: z.string().uuid(),
   title: z.string(),
   slug: z.string(),
-  description: z.string().nullable(),
-  category: z.string(),
-  author: z.string(),
+  description: z.string().nullish(),
+  category: z.string().nullish(),
+  author: z.string().nullish(),
   prepTimeMinutes: z.number().int(),
   cookTimeMinutes: z.number().int(),
   servings: z.number().int(),
   difficulty: difficultyLevelSchema,
   status: recipeStatusSchema,
-  createdAt: z.string(),
-  publishedAt: z.string().nullable(),
-  primaryImageUrl: z.string().nullable(),
+  createdAt: z.string().nullish(),
+  publishedAt: z.string().nullish(),
+  primaryImageUrl: z.string().nullish(),
 });
 export type RecipeSummary = z.infer<typeof recipeSummarySchema>;
 
@@ -68,22 +68,22 @@ export const recipeDetailSchema = z.object({
   id: z.string().uuid(),
   title: z.string(),
   slug: z.string(),
-  description: z.string().nullable(),
-  content: z.string(),
+  description: z.string().nullish(),
+  content: z.string().default(''),
   categoryId: z.string().uuid(),
-  category: z.string(),
-  author: z.string(),
+  category: z.string().nullish(),
+  author: z.string().nullish(),
   prepTimeMinutes: z.number().int(),
   cookTimeMinutes: z.number().int(),
   servings: z.number().int(),
   difficulty: difficultyLevelSchema,
   status: recipeStatusSchema,
-  createdAt: z.string(),
-  publishedAt: z.string().nullable(),
-  ingredients: z.array(recipeIngredientSchema),
-  steps: z.array(recipeStepSchema),
-  nutrition: recipeNutritionSchema.nullable(),
-  images: z.array(recipeImageSchema),
+  createdAt: z.string().nullish(),
+  publishedAt: z.string().nullish(),
+  ingredients: z.array(recipeIngredientSchema).default([]),
+  steps: z.array(recipeStepSchema).default([]),
+  nutrition: recipeNutritionSchema.nullish(),
+  images: z.array(recipeImageSchema).default([]),
 });
 export type RecipeDetail = z.infer<typeof recipeDetailSchema>;
 export type Recipe = RecipeDetail;

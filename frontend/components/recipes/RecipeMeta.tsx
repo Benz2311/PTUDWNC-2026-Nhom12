@@ -1,10 +1,10 @@
 type RecipeMetaProps = {
-  category: string;
-  author: string;
-  publishedAt: string | null;
+  category?: string | null;
+  author?: string | null;
+  publishedAt?: string | null;
 };
 
-function formatDate(value: string | null): string | null {
+function formatDate(value?: string | null): string | null {
   if (!value) return null;
 
   const date = new Date(value);
@@ -18,8 +18,8 @@ export default function RecipeMeta({ category, author, publishedAt }: RecipeMeta
 
   return (
     <div className="recipe-card-meta">
-      <span>{category}</span>
-      <span>Tác giả: {author}</span>
+      {category && <span>{category}</span>}
+      {author && <span>Tác giả: {author}</span>}
       {publishedDate && <time dateTime={publishedAt ?? undefined}>Đăng ngày {publishedDate}</time>}
     </div>
   );

@@ -13,6 +13,7 @@ namespace CulinaryBlog.Api.Endpoints.Categories;
 
 public static class CategoryEndpoints
 {
+    private static readonly JsonSerializerOptions WebJsonOptions = new(JsonSerializerDefaults.Web);
     public static void MapCategoryEndpoints(this WebApplication app)
     {
         MapCategoryGroup(app.MapGroup("/api/categories").WithTags("Categories"));
@@ -45,7 +46,7 @@ public static class CategoryEndpoints
 
             await cache.SetStringAsync(
                 cacheKey,
-                JsonSerializer.Serialize(categories),
+                JsonSerializer.Serialize(categories, WebJsonOptions),
                 new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(60) },
                 cancellationToken);
             return Results.Ok(categories);
@@ -101,7 +102,7 @@ public static class CategoryEndpoints
 
             await cache.SetStringAsync(
                 cacheKey,
-                JsonSerializer.Serialize(result),
+                JsonSerializer.Serialize(result, WebJsonOptions),
                 new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(60) },
                 cancellationToken);
             return Results.Ok(result);
