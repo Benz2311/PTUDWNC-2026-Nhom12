@@ -24,6 +24,10 @@ public static class DependencyInjection
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
         services.AddScoped<IAuthenticationService, JwtTokenService>();
         services.AddScoped<IRecipeRepository, RecipeRepository>();
+        services.AddScoped<CulinaryBlog.Application.Contracts.Persistence.ICategoryRepository, CulinaryBlog.Infrastructure.Persistence.Repositories.CategoryRepository>();
+        services.AddScoped<CulinaryBlog.Application.Contracts.Persistence.IRecipeRepository, CulinaryBlog.Infrastructure.Persistence.Repositories.RecipeRepository>();
+        services.AddScoped<CulinaryBlog.Application.Repositories.IUserRepository, CulinaryBlog.Infrastructure.Repositories.UserRepository>();
+        services.AddScoped<CulinaryBlog.Application.Repositories.IRefreshTokenRepository, CulinaryBlog.Infrastructure.Repositories.RefreshTokenRepository>();
         services.AddScoped<IUnitOfWork, ApplicationUnitOfWork>();
         services.AddScoped<IRecipeCacheInvalidator, RecipeCacheInvalidator>();
         services.AddScoped<IRecipePurgeService, RecipePurgeService>();
