@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { AppProviders } from "@/components/providers/AppProviders";
 
 export const metadata: Metadata = {
   title: "Culinary Blog | Nền tảng chia sẻ và học nấu ăn trực tuyến",
@@ -25,16 +26,18 @@ export default function RootLayout({
           Chuyển thẳng đến nội dung chính
         </a>
 
-        {/* Global Navigation Header */}
-        <Header />
+        <AppProviders>
+          {/* Global Navigation Header */}
+          <Header />
 
-        {/* Main Content Area */}
-        <main id="main-content" className="flex-1 w-full">
-          {children}
-        </main>
+          {/* Main Content Area */}
+          <main id="main-content" className="flex-1 w-full">
+            {children}
+          </main>
 
-        {/* Global Footer */}
-        <Footer />
+          {/* Global Footer */}
+          <Footer />
+        </AppProviders>
       </body>
     </html>
   );

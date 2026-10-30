@@ -27,7 +27,7 @@ public sealed class RecipePurgeService : IRecipePurgeService
 
     public async Task<bool> PurgeAsync(Guid recipeId, Guid actorId, CancellationToken cancellationToken = default)
     {
-        var recipe = await _db.Recipes
+        var recipe = await _db.Recipes.IgnoreQueryFilters()
             .Include(item => item.Images)
             .Include(item => item.Ingredients)
             .Include(item => item.Steps)

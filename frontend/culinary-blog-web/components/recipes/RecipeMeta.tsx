@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 type RecipeMetaProps = {
   category?: string | { id?: string; name?: string; slug?: string } | null;
   author?: string | { id?: string; displayName?: string; name?: string } | null;
@@ -21,16 +23,35 @@ export default function RecipeMeta({ category, author, publishedAt }: RecipeMeta
       ? category.name || category.slug || 'Ẩm thực'
       : (category || 'Ẩm thực');
 
+  const categorySlug =
+    typeof category === 'object' && category && category.slug
+      ? category.slug
+      : encodeURIComponent(String(categoryName).trim().toLowerCase().replace(/\s+/g, '-'));
+
   const authorName =
     typeof author === 'object' && author
-      ? author.displayName || (author as any).name || 'Đầu bếp'
+      ? author.displayName || (author as { name?: string }).name || 'Đầu bếp'
       : (author || 'Đầu bếp');
 
   return (
-    <div className="recipe-card-meta">
-      <span>{categoryName}</span>
-      <span>Tác giả: {authorName}</span>
-      {publishedDate && <time dateTime={publishedAt ?? undefined}>Đăng ngày {publishedDate}</time>}
+    <div className="recipe-card-meta flex flex-wrap items-center gap-4 text-sm text-slate-600 my-3">
+      <Link
+        href={`/categories/${categorySlug}`}
+        className="inline-flex items-center gap-1.5 font-medium text-emerald-700 hover:text-emerald-800 hover:underline"
+      >
+        Danh mục: {categoryName}
+      </Link>
+      <Link
+        href={`/search?q=${encodeURIComponent(String(authorName))}`}
+        className="inline-flex items-center gap-1.5 font-medium text-slate-700 hover:text-emerald-700 hover:underline"
+      >
+        Tác giả: {authorName}
+      </Link>
+      {publishedDate && (
+        <time dateTime={publishedAt ?? undefined} className="text-slate-500">
+          Đăng ngày {publishedDate}
+        </time>
+      )}
     </div>
   );
 }

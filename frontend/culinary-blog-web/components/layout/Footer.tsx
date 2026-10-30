@@ -96,22 +96,22 @@ export function Footer() {
           {/* Dashboard & Admin Quick Links */}
           <div>
             <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4 border-l-2 border-emerald-600 pl-2">
-              Quản trị & Báo cáo
+              Quản trị & Tác giả
             </h4>
             <ul className="space-y-2.5 text-xs">
-              <li>
-                <Link href="/dashboard/statistics" className="hover:text-emerald-700 transition-colors">
-                  Báo cáo thống kê
-                </Link>
-              </li>
               <li>
                 <Link href="/dashboard/categories" className="hover:text-emerald-700 transition-colors">
                   Quản lý danh mục
                 </Link>
               </li>
               <li>
-                <Link href="/admin/recipes/trash" className="hover:text-emerald-700 transition-colors">
-                  Thùng rác công thức
+                <Link href="/admin/users" className="hover:text-emerald-700 transition-colors">
+                  Quản lý người dùng
+                </Link>
+              </li>
+              <li>
+                <Link href="/recipes/create" className="hover:text-emerald-700 transition-colors">
+                  Tạo công thức mới
                 </Link>
               </li>
               <li>

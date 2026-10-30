@@ -526,6 +526,13 @@ public static class RecipeEndpoints
         ISender sender,
         CancellationToken ct)
     {
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return Results.Json(
+                new { title = "Unauthorized", status = 401, detail = "Authentication is required to upload images." },
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
         Guid? currentUserId = null;
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? user.FindFirst("sub")?.Value;
@@ -541,11 +548,17 @@ public static class RecipeEndpoints
             {
                 var form = await httpRequest.ReadFormAsync(ct);
                 var file = form.Files.GetFile("file") ?? (form.Files.Count > 0 ? form.Files[0] : null);
-                if (file == null || file.Length == 0)
+                if (file == null)
                 {
                     return Results.ValidationProblem(
                         new Dictionary<string, string[]> { ["File"] = ["Vui lòng chọn tệp ảnh để tải lên (File is required)."] },
                         statusCode: StatusCodes.Status400BadRequest);
+                }
+                if (file.Length == 0)
+                {
+                    return Results.ValidationProblem(
+                        new Dictionary<string, string[]> { ["File"] = ["Tệp tải lên không được để trống (File is empty)."] },
+                        statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
 
                 var altText = form["altText"].FirstOrDefault();
@@ -604,7 +617,7 @@ public static class RecipeEndpoints
         {
             return Results.ValidationProblem(
                 ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
-                statusCode: StatusCodes.Status400BadRequest);
+                statusCode: StatusCodes.Status422UnprocessableEntity);
         }
         catch (InvalidOperationException ex)
         {
@@ -623,6 +636,13 @@ public static class RecipeEndpoints
         ISender sender,
         CancellationToken ct)
     {
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return Results.Json(
+                new { title = "Unauthorized", status = 401, detail = "Authentication is required to update images." },
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
         Guid? currentUserId = null;
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? user.FindFirst("sub")?.Value;
@@ -658,7 +678,7 @@ public static class RecipeEndpoints
         {
             return Results.ValidationProblem(
                 ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
-                statusCode: StatusCodes.Status400BadRequest);
+                statusCode: StatusCodes.Status422UnprocessableEntity);
         }
     }
 
@@ -669,6 +689,13 @@ public static class RecipeEndpoints
         ISender sender,
         CancellationToken ct)
     {
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return Results.Json(
+                new { title = "Unauthorized", status = 401, detail = "Authentication is required to set primary image." },
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
         Guid? currentUserId = null;
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? user.FindFirst("sub")?.Value;
@@ -702,6 +729,13 @@ public static class RecipeEndpoints
         ISender sender,
         CancellationToken ct)
     {
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return Results.Json(
+                new { title = "Unauthorized", status = 401, detail = "Authentication is required to delete images." },
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
         Guid? currentUserId = null;
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? user.FindFirst("sub")?.Value;
@@ -1491,7 +1525,7 @@ public static class RecipeEndpoints
         IRecipeCacheInvalidator invalidator,
         CancellationToken cancellationToken)
     {
-        var recipe = await db.Recipes.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        var recipe = await db.Recipes.IgnoreQueryFilters().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (recipe is null)
         {
             return Results.NotFound();

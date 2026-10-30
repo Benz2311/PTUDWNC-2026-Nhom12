@@ -182,11 +182,6 @@ public class RecipeImageCommandHandler :
                 IsDeleted = false
             };
 
-            if (shouldBePrimary)
-            {
-                recipe.CoverImageUrl = request.OriginalUrl;
-                recipe.UpdatedAt = DateTime.UtcNow;
-            }
 
             _context.RecipeImages.Add(newImage);
             await _context.SaveChangesAsync(cancellationToken);
@@ -337,11 +332,6 @@ public class RecipeImageCommandHandler :
                 IsDeleted = false
             };
 
-            if (shouldBePrimary)
-            {
-                recipe.CoverImageUrl = publicUrl;
-                recipe.UpdatedAt = DateTime.UtcNow;
-            }
 
             _context.RecipeImages.Add(newImage);
             await _context.SaveChangesAsync(cancellationToken);
@@ -486,19 +476,6 @@ public class RecipeImageCommandHandler :
 
             if (modified)
             {
-                if (targetImage.IsPrimary)
-                {
-                    recipe.CoverImageUrl = targetImage.OriginalUrl;
-                }
-                else
-                {
-                    var currentPrimary = activeImages.FirstOrDefault(img => img.IsPrimary && img.Id != targetImage.Id);
-                    if (currentPrimary != null)
-                    {
-                        recipe.CoverImageUrl = currentPrimary.OriginalUrl;
-                    }
-                }
-                recipe.UpdatedAt = DateTime.UtcNow;
                 targetImage.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync(cancellationToken);
             }
@@ -578,14 +555,11 @@ public class RecipeImageCommandHandler :
                 {
                     remainingImages[0].IsPrimary = true;
                     remainingImages[0].UpdatedAt = DateTime.UtcNow;
-                    recipe.CoverImageUrl = remainingImages[0].OriginalUrl;
-                    recipe.UpdatedAt = DateTime.UtcNow;
                     await _context.SaveChangesAsync(cancellationToken);
                 }
                 else
                 {
-                    recipe.CoverImageUrl = null;
-                    recipe.UpdatedAt = DateTime.UtcNow;
+                    // No remaining images - no primary to set
                     await _context.SaveChangesAsync(cancellationToken);
                 }
             }

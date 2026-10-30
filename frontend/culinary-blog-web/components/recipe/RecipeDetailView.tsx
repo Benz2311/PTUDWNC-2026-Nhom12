@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import type { RecipeDetail } from '@/types/recipe';
 import DifficultyBadge from './DifficultyBadge';
 import RecipeMeta from './RecipeMeta';
@@ -17,9 +18,11 @@ const nutritionLabels = [
 ] as const;
 
 export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
-  const images = [...(recipe.images || [])].sort((left, right) =>
-    Number(Boolean(right.isPrimary)) - Number(Boolean(left.isPrimary)) ||
-    ((left.sortOrder ?? left.orderIndex ?? 0) - (right.sortOrder ?? right.orderIndex ?? 0)));
+  const images = [...(recipe.images || [])].sort(
+    (left, right) =>
+      Number(Boolean(right.isPrimary)) - Number(Boolean(left.isPrimary)) ||
+      (left.sortOrder ?? left.orderIndex ?? 0) - (right.sortOrder ?? right.orderIndex ?? 0)
+  );
   const [activeImage, setActiveImage] = useState(0);
   const selectedImage = images[activeImage];
 
@@ -27,8 +30,8 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
     <article className="recipe-detail recipe-detail-view">
       <header className="recipe-detail-header">
         <div className="recipe-detail-badges">
-          <RecipeStatusBadge status={recipe.status} />
-          <DifficultyBadge difficulty={recipe.difficulty} />
+          <RecipeStatusBadge status={String(recipe.status)} />
+          <DifficultyBadge difficulty={String(recipe.difficulty)} />
         </div>
         <h1 className="flow-title">{recipe.title}</h1>
         {recipe.description && <p className="detail-lead">{recipe.description}</p>}
@@ -45,7 +48,9 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
           className="recipe-detail-cover"
           role="img"
           aria-label={selectedImage?.altText || recipe.title}
-          style={{ backgroundImage: `url("${selectedImage?.url ?? selectedImage?.originalUrl ?? '/sample-images/food-01.svg'}")` }}
+          style={{
+            backgroundImage: `url("${selectedImage?.url ?? selectedImage?.originalUrl ?? '/sample-images/food-01.svg'}")`,
+          }}
         />
         {images.length > 1 && (
           <div className="recipe-detail-thumbnails" aria-label="Chọn ảnh công thức">
@@ -73,16 +78,24 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
 
           <section className="detail-section">
             <h2>Nguyên liệu</h2>
-            {(!recipe.ingredients || recipe.ingredients.length === 0) ? (
+            {!recipe.ingredients || recipe.ingredients.length === 0 ? (
               <p className="detail-content">Chưa có nguyên liệu được cung cấp.</p>
             ) : (
               <ul className="ingredient-list">
                 {[...recipe.ingredients]
-                  .sort((left, right) => (left.sortOrder ?? left.orderIndex ?? 0) - (right.sortOrder ?? right.orderIndex ?? 0))
+                  .sort(
+                    (left, right) =>
+                      (left.sortOrder ?? left.orderIndex ?? 0) - (right.sortOrder ?? right.orderIndex ?? 0)
+                  )
                   .map((ingredient) => (
                     <li className="ingredient-item" key={ingredient.id}>
-                      <span>{ingredient.name}{ingredient.notes && <small>{ingredient.notes}</small>}</span>
-                      <strong>{ingredient.quantity ?? '—'} {ingredient.unit ?? ''}</strong>
+                      <span>
+                        {ingredient.name}
+                        {ingredient.notes && <small>{ingredient.notes}</small>}
+                      </span>
+                      <strong>
+                        {ingredient.quantity ?? '—'} {ingredient.unit ?? ''}
+                      </strong>
                     </li>
                   ))}
               </ul>
@@ -91,7 +104,7 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
 
           <section className="detail-section">
             <h2>Các bước thực hiện</h2>
-            {(!recipe.steps || recipe.steps.length === 0) ? (
+            {!recipe.steps || recipe.steps.length === 0 ? (
               <p className="detail-content">Chưa có hướng dẫn chế biến.</p>
             ) : (
               <ol className="step-list">
@@ -116,18 +129,28 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
           <h2>Mỗi khẩu phần</h2>
           {recipe.nutrition ? (
             <dl className="nutrition-list">
-              {nutritionLabels.map(([key, label, unit]) => (
-                <div key={key}>
-                  <dt>{label}</dt>
-                  <dd>{(recipe.nutrition as any)?.[key] ?? '—'}{(recipe.nutrition as any)?.[key] == null ? '' : unit}</dd>
-                </div>
-              ))}
+              {nutritionLabels.map(([key, label, unit]) => {
+                const val = recipe.nutrition?.[key as keyof typeof recipe.nutrition];
+                return (
+                  <div key={key}>
+                    <dt>{label}</dt>
+                    <dd>
+                      {val ?? '—'}
+                      {val == null ? '' : unit}
+                    </dd>
+                  </div>
+                );
+              })}
             </dl>
-          ) : <p>Chưa có thông tin dinh dưỡng.</p>}
+          ) : (
+            <p>Chưa có thông tin dinh dưỡng.</p>
+          )}
         </aside>
       </div>
 
-      <a className="outline-button detail-back" href="/recipes">← Danh sách công thức</a>
+      <Link className="outline-button detail-back" href="/search">
+        ← Danh sách công thức
+      </Link>
     </article>
   );
 }

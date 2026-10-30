@@ -139,7 +139,7 @@ function processQueue(error: unknown, token: string | null = null): void {
 
 /**
  * Refresh thất bại (hết hạn / Reuse Detection / Revoke Token Family):
- * xóa token, thông báo AuthContext và chuyển hướng về /login.
+ * xóa token, thông báo AuthContext. Chỉ điều hướng nếu đang ở trang bảo vệ.
  */
 function handleRefreshFailure(): void {
   authStorage.clear();
@@ -149,7 +149,16 @@ function handleRefreshFailure(): void {
   }
 
   window.dispatchEvent(new Event("auth:session-expired"));
-  window.location.assign("/login");
+
+  const pathname = window.location.pathname;
+  const isProtectedPath =
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/dashboard");
+
+  if (isProtectedPath) {
+    window.location.assign("/login");
+  }
 }
 
 // Response Interceptor 1 — bắt 401, gọi ngầm /auth/refresh rồi retry request
@@ -169,11 +178,23 @@ apiClient.interceptors.response.use(
     }
 
     if (process.env.NODE_ENV === "development") {
-      console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      });
+      const status = error.response?.status;
+      const url = error.config?.url || "";
+      // Các mã HTTP client thông thường (401, 403, 404) dùng warn để ghi nhận đầy đủ mà không gây Dev Overlay đỏ
+      if (status === 401 || status === 403 || status === 404) {
+        console.warn(`[API ${status}] ${error.config?.method?.toUpperCase()} ${url}`, {
+          status,
+          data: error.response?.data,
+          message: error.message,
+        });
+      } else {
+        // Các lỗi mạng, 5xx server error thực sự vẫn ghi nhận console.error
+        console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${url}`, {
+          status,
+          data: error.response?.data,
+          message: error.message,
+        });
+      }
     }
 
     const originalRequest = error.config as
@@ -194,6 +215,13 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    const refreshToken = authStorage.getRefreshToken();
+    // Nếu KHÔNG có refreshToken: không gọi refresh rỗng, chỉ dọn storage và reject
+    if (!refreshToken) {
+      authStorage.clear();
+      return Promise.reject(error);
+    }
+
     // Đang refresh: xếp request vào queue, retry khi có token mới
     if (isRefreshing) {
       return new Promise<string>((resolve, reject) => {
@@ -208,8 +236,6 @@ apiClient.interceptors.response.use(
 
     originalRequest._retry = true;
     isRefreshing = true;
-
-    const refreshToken = authStorage.getRefreshToken();
 
     try {
       const response = await apiClient.post<ApiResponse<AuthResponse>>("/auth/refresh", {
@@ -286,4 +312,3 @@ export function setStoredToken(token: string): void {
 export function removeStoredToken(): void {
   authStorage.clear();
 }
-

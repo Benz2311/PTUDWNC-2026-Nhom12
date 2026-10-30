@@ -30,5 +30,11 @@ public interface IAuthService
 
     Task<UserResponse> UpdateProfileAsync(string userId, UpdateProfileRequest request);
 
+    Task ChangePasswordAsync(string userId, ChangePasswordRequest request);
+
+    Task ForgotPasswordAsync(ForgotPasswordRequest request);
+
+    Task ResetPasswordAsync(ResetPasswordRequest request);
+
     Task<bool> UpdateUserStatusAsync(Guid adminUserId, Guid targetUserId, bool isActive);
 }
