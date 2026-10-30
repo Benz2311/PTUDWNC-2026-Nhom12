@@ -110,9 +110,24 @@ export default function RecipeForm({
   // Load category list
   useEffect(() => {
     let cancelled = false;
-    apiJson<Category[]>('/api/v1/categories')
-      .then((items) => {
+    apiJson<unknown>('/api/v1/categories')
+      .then((data) => {
         if (cancelled) return;
+        // API returns { value: [...], Count: N } — extract array and normalize PascalCase keys
+        const raw: unknown[] = Array.isArray(data)
+          ? (data as unknown[])
+          : Array.isArray((data as Record<string, unknown>)?.value)
+            ? (data as { value: unknown[] }).value
+            : Array.isArray((data as Record<string, unknown>)?.items)
+              ? (data as { items: unknown[] }).items
+              : [];
+        const items: Category[] = raw.map((entry) => {
+          const cat = entry as Record<string, unknown>;
+          return {
+            id: String(cat.id ?? cat.Id ?? ''),
+            name: String(cat.name ?? cat.Name ?? ''),
+          };
+        });
         setCategories(items);
         setCategoryId((current) => current || initialRecipe?.categoryId || items[0]?.id || '');
       })

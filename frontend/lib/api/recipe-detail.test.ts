@@ -166,7 +166,7 @@ describe('Recipe Detail API and display contract tests', () => {
 
     const resultWithImages = await getRecipeBySlug('pho-bo-nhieu-anh', true);
     const sorted = [...resultWithImages.data.images].sort(
-      (a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.sortOrder - b.sortOrder,
+      (a, b) => Number(b.isPrimary) - Number(a.isPrimary) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
     );
     expect(sorted[0].isPrimary).toBe(true);
     expect(sorted[0].altText).toBe('Ảnh chính');

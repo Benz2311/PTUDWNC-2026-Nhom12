@@ -13,9 +13,11 @@ export default function CategoryChips() {
       .then((data) => {
         const rawList = Array.isArray(data)
           ? data
-          : Array.isArray((data as Record<string, unknown>)?.items)
-            ? (data as { items: unknown[] }).items
-            : [];
+          : Array.isArray((data as Record<string, unknown>)?.value)
+            ? (data as { value: unknown[] }).value
+            : Array.isArray((data as Record<string, unknown>)?.items)
+              ? (data as { items: unknown[] }).items
+              : [];
         const normalized: Category[] = rawList.map((item) => {
           const cat = item as Record<string, unknown>;
           return {

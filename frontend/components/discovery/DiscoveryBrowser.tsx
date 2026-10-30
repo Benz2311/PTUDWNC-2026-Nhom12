@@ -27,11 +27,13 @@ export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserP
       .then((data) => {
         const rawList = Array.isArray(data)
           ? data
-          : Array.isArray((data as Record<string, unknown>)?.items)
-            ? (data as { items: unknown[] }).items
-            : Array.isArray((data as Record<string, unknown>)?.data)
-              ? (data as { data: unknown[] }).data
-              : [];
+          : Array.isArray((data as Record<string, unknown>)?.value)
+            ? (data as { value: unknown[] }).value
+            : Array.isArray((data as Record<string, unknown>)?.items)
+              ? (data as { items: unknown[] }).items
+              : Array.isArray((data as Record<string, unknown>)?.data)
+                ? (data as { data: unknown[] }).data
+                : [];
 
         const normalized: Category[] = rawList.map((item) => {
           const cat = item as Record<string, unknown>;
