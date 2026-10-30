@@ -1,4 +1,4 @@
-# Environment variables
+﻿# Environment variables
 .env
 
 # Build
@@ -16,3 +16,11 @@ node_modules/
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Test outputs
+playwright-report/
+test-results/

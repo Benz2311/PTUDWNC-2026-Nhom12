@@ -115,7 +115,7 @@ public AuthServiceTests()
     public async Task RegisterAsync_DuplicateUserName_ThrowsConflictException()
     {
         // Arrange
-        var request = new RegisterRequest { UserName = "existing_user", Email = "test@example.com", Password = "pwd" };
+        var request = new RegisterRequest { UserName = "existing_user", Email = "test@example.com", Password = "Password123!" };
         _userRepoMock.Setup(x => x.ExistsByUserNameAsync("existing_user", default)).ReturnsAsync(true);
 
         // Act & Assert
@@ -127,7 +127,7 @@ public AuthServiceTests()
     public async Task RegisterAsync_DuplicateEmail_ThrowsConflictException()
     {
         // Arrange
-        var request = new RegisterRequest { UserName = "new_user", Email = "existing@example.com", Password = "pwd" };
+        var request = new RegisterRequest { UserName = "new_user", Email = "existing@example.com", Password = "Password123!" };
         _userRepoMock.Setup(x => x.ExistsByUserNameAsync("new_user", default)).ReturnsAsync(false);
         _userRepoMock.Setup(x => x.ExistsByEmailAsync("existing@example.com", default)).ReturnsAsync(true);
 
@@ -319,7 +319,17 @@ public AuthServiceTests()
     {
         // Arrange
         var userId = Guid.NewGuid().ToString();
-        var profile = new UserProfileDto(userId, "john", "john@example.com", "John Chef", null, "Bio text");
+        var profile = new UserProfileDto(
+            userId,
+            "john",
+            "john@example.com",
+            "John Chef",
+            null,
+            "Bio text",
+            true,
+            ["User"],
+            true,
+            DateTime.UtcNow);
         _userRepoMock.Setup(x => x.GetProfileAsync(userId, default)).ReturnsAsync(profile);
 
         // Act

@@ -8,7 +8,7 @@ test("homepage loads and displays navigation", async ({ page }) => {
   await page.goto("/");
 
   // Page title should be present
-  await expect(page).toHaveTitle(/culinary|blog|ẩm thực/i);
+  await expect(page).toHaveTitle(/culinary|blog|áº©m thá»±c/i);
 
   // Navigation should be visible
   const nav = page.locator("nav");
@@ -41,7 +41,7 @@ test("category page loads without errors", async ({ page }) => {
   await expect(page.locator("main")).toBeVisible();
 
   // No error boundary should be triggered
-  const errorText = page.getByText(/something went wrong|lỗi/i);
+  const errorText = page.getByText(/something went wrong|lá»—i/i);
   await expect(errorText).not.toBeVisible();
 });
 
@@ -52,17 +52,11 @@ test("category page loads without errors", async ({ page }) => {
 test("search input accepts text and submits", async ({ page }) => {
   await page.goto("/");
 
-  const searchInput = page.getByRole("searchbox");
-  if (await searchInput.isVisible()) {
-    await searchInput.fill("Phở Bò");
-    await searchInput.press("Enter");
-
-    // URL should reflect search query
-    await expect(page).toHaveURL(/search|q=|query=/i);
-  } else {
-    // Search may not be on homepage — skip gracefully
-    test.skip();
-  }
+  const searchInput = page.locator('input[data-testid="header-search-input"]').or(page.getByPlaceholder(/tĂ¬m|search/i)).first();
+  await expect(searchInput).toBeVisible();
+  await searchInput.fill("Phá»Ÿ BĂ²");
+  await searchInput.press("Enter");
+  await expect(page).toHaveURL(/search.*(?:q=|query=)/i);
 });
 
 /**
