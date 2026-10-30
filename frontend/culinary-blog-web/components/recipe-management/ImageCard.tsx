@@ -10,6 +10,10 @@ interface ImageCardProps {
   onSetPrimary: (imageId: string) => void;
   onDeleteRequest: (image: RecipeImage) => void;
   onPreview?: (image: RecipeImage) => void;
+  onMoveUp?: (index: number) => void;
+  onMoveDown?: (index: number) => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
 }
 
 export function ImageCard({
@@ -19,6 +23,10 @@ export function ImageCard({
   onSetPrimary,
   onDeleteRequest,
   onPreview,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp = false,
+  canMoveDown = false,
 }: ImageCardProps) {
   return (
     <div
@@ -66,9 +74,47 @@ export function ImageCard({
           </div>
         )}
 
-        {/* Order Badge */}
-        <div className="absolute top-3 right-3 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-slate-900/70 text-white backdrop-blur-md shadow-xs">
-          Thứ tự: {image.orderIndex ?? index}
+        {/* Order Badge & Reorder Controls */}
+        <div className="absolute top-3 right-3 flex items-center gap-1">
+          <div className="px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-slate-900/70 text-white backdrop-blur-md shadow-xs">
+            Thứ tự: {image.orderIndex ?? index}
+          </div>
+          {onMoveUp && (
+            <button
+              type="button"
+              data-testid={`btn-move-up-${index}`}
+              disabled={disabled || !canMoveUp}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveUp(index);
+              }}
+              className="p-1 rounded-full bg-slate-900/70 text-white hover:bg-emerald-600 disabled:opacity-30 disabled:pointer-events-none transition-all"
+              title="Di chuyển lên trước"
+              aria-label="Di chuyển ảnh lên trước"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+              </svg>
+            </button>
+          )}
+          {onMoveDown && (
+            <button
+              type="button"
+              data-testid={`btn-move-down-${index}`}
+              disabled={disabled || !canMoveDown}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveDown(index);
+              }}
+              className="p-1 rounded-full bg-slate-900/70 text-white hover:bg-emerald-600 disabled:opacity-30 disabled:pointer-events-none transition-all"
+              title="Di chuyển xuống sau"
+              aria-label="Di chuyển ảnh xuống sau"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
