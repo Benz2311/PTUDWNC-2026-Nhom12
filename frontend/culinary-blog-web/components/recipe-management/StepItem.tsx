@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { RecipeStep } from '@/types/step';
 
 export interface StepItemProps {
@@ -8,6 +8,8 @@ export interface StepItemProps {
   index: number;
   totalSteps: number;
   disabled?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
   onEdit: (step: RecipeStep) => void;
   onDeleteRequest: (step: RecipeStep) => void;
   onMoveUp: (index: number) => void;
@@ -19,16 +21,24 @@ export function StepItem({
   index,
   totalSteps,
   disabled = false,
+  canEdit = true,
+  canDelete = true,
   onEdit,
   onDeleteRequest,
   onMoveUp,
   onMoveDown,
 }: StepItemProps) {
+  const [imageError, setImageError] = useState(false);
   const isFirst = index === 0;
   const isLast = index === totalSteps - 1;
 
   // Format step number with leading zero (e.g. 01, 02)
   const formattedNumber = String(step.stepNumber ?? index + 1).padStart(2, '0');
+
+  const isEditDisabled = disabled || !canEdit;
+  const isDeleteDisabled = disabled || !canDelete;
+  const isMoveUpDisabled = disabled || isFirst || !canEdit;
+  const isMoveDownDisabled = disabled || isLast || !canEdit;
 
   return (
     <div
@@ -46,7 +56,7 @@ export function StepItem({
           <button
             type="button"
             data-testid={`btn-move-up-${index}`}
-            disabled={disabled || isFirst}
+            disabled={isMoveUpDisabled}
             onClick={() => onMoveUp(index)}
             aria-label={`Di chuyển bước ${formattedNumber} lên trên`}
             title="Di chuyển lên trên"
@@ -66,7 +76,7 @@ export function StepItem({
           <button
             type="button"
             data-testid={`btn-move-down-${index}`}
-            disabled={disabled || isLast}
+            disabled={isMoveDownDisabled}
             onClick={() => onMoveDown(index)}
             aria-label={`Di chuyển bước ${formattedNumber} xuống dưới`}
             title="Di chuyển xuống dưới"
@@ -124,15 +134,22 @@ export function StepItem({
 
         {step.imageUrl && (
           <div className="mt-3 overflow-hidden rounded-xl border border-emerald-100 max-w-sm bg-gray-50 shadow-2xs group/img">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={step.imageUrl}
-              alt={step.title || `Ảnh minh họa bước ${formattedNumber}`}
-              className="w-full h-36 sm:h-40 object-cover transition-transform duration-300 group-hover/img:scale-105"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = 'none';
-              }}
-            />
+            {imageError ? (
+              <div className="flex items-center gap-2 p-3 text-xs text-slate-500 bg-slate-50">
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>Không thể tải hình ảnh minh họa</span>
+              </div>
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={step.imageUrl}
+                alt={step.title || `Ảnh minh họa bước ${formattedNumber}`}
+                className="w-full h-36 sm:h-40 object-cover transition-transform duration-300 group-hover/img:scale-105"
+                onError={() => setImageError(true)}
+              />
+            )}
           </div>
         )}
       </div>
@@ -142,7 +159,7 @@ export function StepItem({
         <button
           type="button"
           data-testid={`btn-edit-step-${index}`}
-          disabled={disabled}
+          disabled={isEditDisabled}
           onClick={() => onEdit(step)}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-950 border border-emerald-200/80 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed transition-all"
         >
@@ -155,7 +172,7 @@ export function StepItem({
         <button
           type="button"
           data-testid={`btn-delete-step-${index}`}
-          disabled={disabled}
+          disabled={isDeleteDisabled}
           onClick={() => onDeleteRequest(step)}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl text-rose-700 bg-rose-50 hover:bg-rose-100 hover:text-rose-900 border border-rose-200/80 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed transition-all"
         >
