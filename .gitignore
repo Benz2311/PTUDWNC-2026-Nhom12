@@ -24,3 +24,12 @@ logs/
 # Test outputs
 playwright-report/
 test-results/
+
+# Internal AI audit reports (kept locally / in backup, excluded from remote)
+/*_REPORT.md
+/*_AUDIT.md
+/*_MANIFEST.md
+/*_READINESS.md
+/*_RESULT.md
+/*_CHECK.md
+/BAO_CAO_*.md
