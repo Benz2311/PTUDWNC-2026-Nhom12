@@ -210,7 +210,7 @@ public static class CategoryEndpoints
         try
         {
             var result = await sender.Send(
-                new UpdateCategoryCommand(id, request.Name, request.Description),
+                new UpdateCategoryCommand(id, request.Name, request.Description, request.ImageUrl, request.OrderIndex),
                 cancellationToken);
 
             return result switch
@@ -272,3 +272,4 @@ public static class CategoryEndpoints
         };
     }
 }
+
