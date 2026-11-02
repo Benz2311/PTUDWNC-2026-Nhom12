@@ -78,9 +78,9 @@ public class Category : BaseEntity
             Slug = slug;
         }
 
-        if (description != null)
+        Description = description;
         {
-            Description = description;
+
         }
 
         if (imageUrl != null)
