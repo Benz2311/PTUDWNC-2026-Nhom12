@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Layers, ArrowRight, Utensils, ChefHat } from "lucide-react";
 import { getCategories } from "@/lib/api/categories";
 import type { Category } from "@/types/category";
@@ -154,23 +155,24 @@ export default function CategoriesPage() {
                   <Card className="overflow-hidden h-full flex flex-col justify-between culinary-card-hover border-gray-100 bg-white">
                     {/* Category Image Header */}
                     <div className="relative aspect-16/9 w-full overflow-hidden bg-gray-100">
-                      <img
+                      <Image
                         src={imageUrl}
                         alt={`Ảnh danh mục ${category.name}`}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        loading="lazy"
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        className="object-cover transition-transform duration-300 group-hover:scale-105"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-gray-950/60 via-transparent to-transparent" />
-                      
+                      <div className="absolute inset-0 bg-gradient-to-t from-gray-950/60 via-transparent to-transparent pointer-events-none" />
+
                       {/* Top Badges */}
-                      <div className="absolute top-3 right-3">
+                      <div className="absolute top-3 right-3 z-10">
                         <span className="rounded-full bg-white/90 text-emerald-900 px-3 py-1 text-xs font-bold shadow-xs backdrop-blur-xs">
                           {recipeCount} công thức
                         </span>
                       </div>
 
                       {/* Bottom Title overlay on image */}
-                      <div className="absolute bottom-3 left-4 right-4">
+                      <div className="absolute bottom-3 left-4 right-4 z-10">
                         <h3 className="text-lg font-extrabold text-white drop-shadow-sm group-hover:text-amber-300 transition-colors">
                           {category.name}
                         </h3>

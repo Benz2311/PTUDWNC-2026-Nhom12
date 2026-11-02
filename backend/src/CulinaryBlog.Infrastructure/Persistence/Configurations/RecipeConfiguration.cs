@@ -25,6 +25,13 @@ public class RecipeConfiguration
         builder.Property(r => r.Description)
             .HasColumnType("text");
 
+        // PostgreSQL không tự sinh rowversion như SQL Server.
+        // RowVersion được ứng dụng gán giá trị và dùng làm Concurrency Token cho Optimistic Concurrency.
+        builder.Property(r => r.RowVersion)
+            .IsRequired()
+            .IsConcurrencyToken()
+            .ValueGeneratedNever();
+
 
 
         builder.HasIndex(r => r.Slug)

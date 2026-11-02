@@ -7,12 +7,23 @@ import { SearchContainer } from '@/components/search/SearchContainer';
 function SearchPageContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
+  const initialPage = parseInt(searchParams.get('page') || '1', 10) || 1;
+  const initialCategory = searchParams.get('category') || 'all';
+  const initialDifficulty = searchParams.get('difficulty') || 'all';
+  const initialMaxCookTime = parseInt(searchParams.get('maxCookTime') || '0', 10) || 0;
+  const initialSort = (searchParams.get('sort') as 'relevance' | 'newest' | 'cookTime') || 'relevance';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50/60 via-slate-50 to-white py-8 px-4 sm:px-6">
       <div className="max-w-5xl mx-auto">
         <SearchContainer
+          key={`${initialQuery}-${initialPage}-${initialCategory}-${initialDifficulty}-${initialSort}-${initialMaxCookTime}`}
           initialQuery={initialQuery}
+          initialPage={initialPage}
+          initialCategory={initialCategory}
+          initialDifficulty={initialDifficulty}
+          initialMaxCookTime={initialMaxCookTime}
+          initialSort={initialSort}
           autoSearchOnMount={Boolean(initialQuery.trim().length >= 2)}
         />
       </div>

@@ -36,21 +36,31 @@ public class RefreshTokenRepository : IRefreshTokenRepository
 
     public async Task RevokeAsync(string tokenHash, DateTimeOffset revokedAt, string? replacedByTokenHash = null, CancellationToken cancellationToken = default)
     {
-        var revokedUtc = revokedAt.UtcDateTime;
-        await _db.RefreshTokens
-            .Where(x => x.TokenHash == tokenHash)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(x => x.RevokedAt, revokedUtc)
-                .SetProperty(x => x.ReplacedByTokenHash, replacedByTokenHash), cancellationToken);
+        var token = await _db.RefreshTokens.FirstOrDefaultAsync(x => x.TokenHash == tokenHash, cancellationToken);
+        if (token != null)
+        {
+            token.RevokedAt = revokedAt.UtcDateTime;
+            token.ReplacedByTokenHash = replacedByTokenHash;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public async Task RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var nowUtc = DateTime.UtcNow;
-        await _db.RefreshTokens
+        var tokens = await _db.RefreshTokens
             .Where(x => x.UserId == userId && x.RevokedAt == null)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(x => x.RevokedAt, nowUtc), cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in tokens)
+        {
+            token.RevokedAt = nowUtc;
+        }
+
+        if (tokens.Count > 0)
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public Task RevokeAllForUserAsync(string userId, CancellationToken cancellationToken = default)
@@ -66,8 +76,16 @@ public class RefreshTokenRepository : IRefreshTokenRepository
     public async Task<int> DeleteExpiredAsync(CancellationToken cancellationToken = default)
     {
         var nowUtc = DateTime.UtcNow;
-        return await _db.RefreshTokens
+        var expiredTokens = await _db.RefreshTokens
             .Where(x => x.ExpiresAt <= nowUtc)
-            .ExecuteDeleteAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        if (expiredTokens.Count > 0)
+        {
+            _db.RefreshTokens.RemoveRange(expiredTokens);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        return expiredTokens.Count;
     }
 }

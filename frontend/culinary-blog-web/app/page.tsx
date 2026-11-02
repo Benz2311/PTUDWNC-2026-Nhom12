@@ -160,7 +160,7 @@ export default function HomePage() {
       {/* ── 1. HERO BANNER ─────────────────────────────────────────── */}
       <section className="relative overflow-hidden culinary-hero-gradient text-white py-14 sm:py-20 px-4 sm:px-6 lg:px-8">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
-        
+
         <div className="relative mx-auto max-w-4xl text-center space-y-6">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold text-emerald-100 backdrop-blur-md border border-white/15">
             <Sparkles className="h-4 w-4 text-amber-400" />

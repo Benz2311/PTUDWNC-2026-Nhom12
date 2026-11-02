@@ -528,7 +528,7 @@
 - Xây dựng trang xem danh sách tất cả Category, hiển thị tên danh mục, hình ảnh, mô tả và `recipeCount`.
 - Hoàn thiện trang Category Detail theo slug, hiển thị thông tin Category và danh sách Recipe thuộc Category.
 - Tích hợp Pagination cho danh sách Recipe trên Trang chủ và Category Detail.
-- Hoàn thiện liên kết điều hướng từ Category Sidebar/Category Card đến trang Category Detail và từ Recipe Card đến Recipe Detail.
+- Hoàn thiện liên kết điều hướng từ Category Sidebar/Category Card đến trang Category Detail và từ Recipe Card đến Recipe Detail. 
 - Tái sử dụng các Shared Components Loading Skeleton, Error State, Empty State và Pagination thay vì viết riêng cho từng màn hình.
 - Bảo đảm Trang chủ và Category hoạt động responsive trên Desktop, Tablet và Mobile.
 - Kiểm tra người dùng chưa đăng nhập vẫn có thể truy cập Trang chủ, danh sách Category và các Recipe Published.

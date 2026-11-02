@@ -143,6 +143,7 @@ public sealed class RecipePersistenceIntegrationTests
 
         db.ChangeTracker.Clear();
         Assert.True(await db.Recipes
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(item => item.Id == recipe.Id)
             .Select(item => item.IsDeleted)

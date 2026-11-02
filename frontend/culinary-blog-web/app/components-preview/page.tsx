@@ -143,7 +143,7 @@ export default function ComponentsPreviewPage() {
         <section className="space-y-6">
           <h2 className="text-lg font-bold text-gray-800">Giao diện StepEditor (Võ Hùng Mạnh)</h2>
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs">
-            <StepEditor recipeId="rec-preview-001" />
+            <StepEditor initialSteps={sampleDetail.steps} />
           </div>
         </section>
       )}
@@ -152,7 +152,7 @@ export default function ComponentsPreviewPage() {
         <section className="space-y-6">
           <h2 className="text-lg font-bold text-gray-800">Giao diện ImageManager (Võ Hùng Mạnh)</h2>
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs">
-            <ImageManager recipeId="rec-preview-001" />
+            <ImageManager initialImages={sampleDetail.images} />
           </div>
         </section>
       )}

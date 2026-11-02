@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, use } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { ChefHat, ArrowLeft, Layers } from "lucide-react";
@@ -21,18 +21,9 @@ interface CategoryDetailPageProps {
   }>;
 }
 
-export default function CategoryDetailPage({ params }: CategoryDetailPageProps) {
-  // Support both Next.js 15 unwrapped params and useParams() hook
-  const routeParams = useParams();
-  let routeSlug = (routeParams?.slug as string) || "";
-  if (params) {
-    try {
-      const unwrapped = use(params);
-      if (unwrapped?.slug) routeSlug = unwrapped.slug;
-    } catch {
-      // Fallback to routeParams
-    }
-  }
+export default function CategoryDetailPage() {
+  const routeParams = useParams<{ slug: string }>();
+  const routeSlug = typeof routeParams?.slug === "string" ? decodeURIComponent(routeParams.slug) : "";
 
   const router = useRouter();
   const searchParams = useSearchParams();

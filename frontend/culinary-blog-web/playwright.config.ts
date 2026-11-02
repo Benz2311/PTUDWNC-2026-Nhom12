@@ -34,9 +34,9 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: {
+  webServer: process.env.SKIP_WEBSERVER ? undefined : {
     command: "npm run dev",
-    url: "http://localhost:3000",
+    url: process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

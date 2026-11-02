@@ -62,8 +62,10 @@ export function useRecipeSearch({
 
       const hasCustomFilters = Boolean(
         f.categorySlug ||
+        f.categoryId ||
         (f.difficulty && f.difficulty !== 'all') ||
-        (f.sortBy && f.sortBy !== 'relevance')
+        (f.sortBy && f.sortBy !== 'relevance') ||
+        (f.maxCookTimeMinutes && f.maxCookTimeMinutes > 0)
       );
 
       try {
@@ -73,8 +75,10 @@ export function useRecipeSearch({
             q,
             page: p,
             pageSize,
+            categoryId: f.categoryId || undefined,
             categorySlug: f.categorySlug || undefined,
             difficulty: f.difficulty && f.difficulty !== 'all' ? f.difficulty : undefined,
+            maxCookTimeMinutes: f.maxCookTimeMinutes && f.maxCookTimeMinutes > 0 ? f.maxCookTimeMinutes : undefined,
             sortBy: f.sortBy || undefined,
           };
           res = await searchRecipes(searchParams);

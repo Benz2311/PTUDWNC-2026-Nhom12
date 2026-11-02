@@ -35,9 +35,13 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Đăng ký PostgreSQL extensions phục vụ tìm kiếm tiếng Việt và fuzzy fallback theo SRS v1.2.0
-        modelBuilder.HasPostgresExtension("unaccent");
-        modelBuilder.HasPostgresExtension("pg_trgm");
+        var isInMemory = Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory";
+        if (!isInMemory)
+        {
+            // Đăng ký PostgreSQL extensions phục vụ tìm kiếm tiếng Việt và fuzzy fallback theo SRS v1.2.0
+            modelBuilder.HasPostgresExtension("unaccent");
+            modelBuilder.HasPostgresExtension("pg_trgm");
+        }
 
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(ApplicationDbContext).Assembly);
@@ -48,14 +52,20 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
             // Cấu hình Shadow Property SearchVectorFts kiểu tsvector và ánh xạ vào cột "SearchVector"
             // Tránh xung đột với CLR property [NotMapped] string? SearchVector trên Recipe.cs của Domain
-            entity.Property<NpgsqlTsVector>("SearchVectorFts")
-                .HasColumnName("SearchVector")
-                .HasColumnType("tsvector");
+            if (!isInMemory)
+            {
+                entity.Property<NpgsqlTsVector>("SearchVectorFts")
+                    .HasColumnName("SearchVector")
+                    .HasColumnType("tsvector");
+            }
 
             entity.Property(x => x.xmin).IsRowVersion();
 
-            entity.HasIndex("SearchVectorFts")
-                .HasMethod("GIN");
+            if (!isInMemory)
+            {
+                entity.HasIndex("SearchVectorFts")
+                    .HasMethod("GIN");
+            }
         });
 
         modelBuilder.Entity<RecipeSlugHistory>(entity =>

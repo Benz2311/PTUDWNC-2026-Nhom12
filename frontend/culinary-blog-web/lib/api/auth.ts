@@ -1,9 +1,11 @@
 import { apiClient, unwrapData } from "./client";
 import type {
   AuthResponse,
+  ChangePasswordRequest,
   ForgotPasswordRequest,
   LoginRequest,
   RegisterRequest,
+  ResetPasswordRequest,
   UpdateProfileRequest,
   User,
 } from "@/types/auth";
@@ -12,6 +14,13 @@ import type { ApiResponse } from "@/types/api";
 export const authApi = {
   async login(request: LoginRequest): Promise<AuthResponse> {
     const response = await apiClient.post<ApiResponse<AuthResponse>>("/auth/login", request);
+    return unwrapData(response);
+  },
+
+  async googleLogin(idToken: string): Promise<AuthResponse> {
+    const response = await apiClient.post<ApiResponse<AuthResponse>>("/auth/google", {
+      idToken,
+    });
     return unwrapData(response);
   },
 
@@ -40,19 +49,27 @@ export const authApi = {
     return unwrapData(response);
   },
 
-  async revoke(refreshToken: string): Promise<void> {
-    await apiClient.post("/auth/revoke", { refreshToken });
+  async logout(refreshToken: string): Promise<void> {
+    await apiClient.post("/auth/logout", { refreshToken });
   },
 
   async resendVerificationEmail(email: string): Promise<void> {
     await apiClient.post("/auth/email/resend", { email });
   },
 
-  async confirmEmail(userId: string, token: string): Promise<void> {
-    await apiClient.post("/auth/email/confirm", { userId, token });
+  async confirmEmail(token: string): Promise<void> {
+    await apiClient.post("/auth/email/confirm", { token });
   },
 
   async forgotPassword(request: ForgotPasswordRequest): Promise<void> {
     await apiClient.post("/auth/forgot-password", request);
+  },
+
+  async changePassword(request: ChangePasswordRequest): Promise<void> {
+    await apiClient.post("/auth/change-password", request);
+  },
+
+  async resetPassword(request: ResetPasswordRequest): Promise<void> {
+    await apiClient.post("/auth/reset-password", request);
   },
 };

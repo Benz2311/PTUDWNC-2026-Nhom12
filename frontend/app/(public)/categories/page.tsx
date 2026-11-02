@@ -161,7 +161,7 @@ export default function CategoriesPage() {
                         loading="lazy"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-gray-950/60 via-transparent to-transparent" />
-                      
+
                       {/* Top Badges */}
                       <div className="absolute top-3 right-3">
                         <span className="rounded-full bg-white/90 text-emerald-900 px-3 py-1 text-xs font-bold shadow-xs backdrop-blur-xs">

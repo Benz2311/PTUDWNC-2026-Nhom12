@@ -1,4 +1,4 @@
-using CulinaryBlog.API.Extensions;
+﻿using CulinaryBlog.API.Extensions;
 using System.Diagnostics;
 using System.Security.Claims;
 using CulinaryBlog.API.Endpoints;
@@ -16,7 +16,7 @@ using Scalar.AspNetCore;
 using Serilog;
 using Serilog.Events;
 
-// ── Serilog — cấu hình trước khi build host ──────────────────────────────────
+// â”€â”€ Serilog â€” cáº¥u hĂ¬nh trÆ°á»›c khi build host â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(new ConfigurationBuilder()
         .SetBasePath(AppContext.BaseDirectory)
@@ -33,7 +33,7 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // Dùng Serilog thay thế logging mặc định
+    // DĂ¹ng Serilog thay tháº¿ logging máº·c Ä‘á»‹nh
     builder.Host.UseSerilog();
 
     builder.Services.AddApplication();
@@ -44,11 +44,7 @@ try
         options.SerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
 
-    builder.Services.AddControllers()
-        .AddJsonOptions(options =>
-        {
-            options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
-        });
+    // builder.Services.AddControllers() // Minimal APIs architecture (CONS-003)
     builder.Services.AddHostedService<CulinaryBlog.Api.Jobs.RecipePurgeHostedService>();
     builder.Services.AddHostedService<CulinaryBlog.Api.Jobs.SitemapGenerationHostedService>();
     builder.Services.AddOpenApi(options =>
@@ -72,9 +68,20 @@ try
 
         if (builder.Environment.IsDevelopment())
         {
-            var devOrigins = new[] { "http://localhost:3000", "http://localhost:5000", "http://127.0.0.1:3000" };
+            var devOrigins = new[] { "http://localhost:3000", "http://localhost:5000", "http://127.0.0.1:3000", "http://localhost:3001", "http://localhost:5001", "http://127.0.0.1:3001" };
             allowedOrigins = allowedOrigins.Union(devOrigins, StringComparer.OrdinalIgnoreCase).ToArray();
         }
+
+        options.AddDefaultPolicy(policy =>
+        {
+            if (allowedOrigins.Length > 0)
+            {
+                policy.WithOrigins(allowedOrigins)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+            }
+        });
 
         options.AddPolicy("Frontend", policy =>
         {
@@ -97,77 +104,80 @@ try
 
     var app = builder.Build();
 
-    // ── Migrate + Seed ────────────────────────────────────────────────────────
-    using (var scope = app.Services.CreateScope())
+    // â”€â”€ Migrate + Seed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    if (!app.Environment.IsEnvironment("Testing") && app.Configuration.GetValue<bool>("Database:AutoMigrateAndSeed", false))
     {
-        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        try
+        using (var scope = app.Services.CreateScope())
         {
-            await dbContext.Database.MigrateAsync();
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Database migration skipped or tables already exist.");
-        }
-
-        try
-        {
-            await CategoryDataSeeder.SeedAsync(dbContext, targetCount: 20);
-        }
-        catch (Exception seedEx)
-        {
-            Log.Warning(seedEx, "Seeding skipped: {Message}", seedEx.Message);
-        }
-
-        try
-        {
-            var passwordHasher = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.IPasswordHasher<ApplicationUser>>();
-            if (!await dbContext.Users.AnyAsync(u => u.Email == "admin@culinaryblog.com"))
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            try
             {
-                var admin = new ApplicationUser
-                {
-                    Id = Guid.NewGuid(),
-                    UserName = "admin",
-                    Email = "admin@culinaryblog.com",
-                    DisplayName = "Quản trị viên",
-                    EmailConfirmed = true,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow,
-                    Roles = ["Admin", "Author"]
-                };
-                admin.PasswordHash = passwordHasher.HashPassword(admin, "Admin@123");
-                await dbContext.Users.AddAsync(admin);
-                await dbContext.SaveChangesAsync();
-                Log.Information("Successfully seeded Admin user admin@culinaryblog.com");
+                await dbContext.Database.MigrateAsync();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Database migration skipped or tables already exist.");
             }
 
-            if (!await dbContext.Users.AnyAsync(u => u.Email == "author@culinaryblog.com"))
+            try
             {
-                var author = new ApplicationUser
-                {
-                    Id = Guid.NewGuid(),
-                    UserName = "author",
-                    Email = "author@culinaryblog.com",
-                    DisplayName = "Tác giả Demo",
-                    EmailConfirmed = true,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow,
-                    Roles = ["Author"]
-                };
-                author.PasswordHash = passwordHasher.HashPassword(author, "Author@123");
-                await dbContext.Users.AddAsync(author);
-                await dbContext.SaveChangesAsync();
-                Log.Information("Successfully seeded Author user author@culinaryblog.com");
+                await CategoryDataSeeder.SeedAsync(dbContext, targetCount: 20);
             }
-        }
-        catch (Exception initEx)
-        {
-            Log.Warning(initEx, "User seed skipped: {Message}", initEx.Message);
+            catch (Exception seedEx)
+            {
+                Log.Warning(seedEx, "Seeding skipped: {Message}", seedEx.Message);
+            }
+
+            try
+            {
+                var passwordHasher = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.IPasswordHasher<ApplicationUser>>();
+                if (!await dbContext.Users.AnyAsync(u => u.Email == "admin@culinaryblog.com"))
+                {
+                    var admin = new ApplicationUser
+                    {
+                        Id = Guid.NewGuid(),
+                        UserName = "admin",
+                        Email = "admin@culinaryblog.com",
+                        DisplayName = "Quáº£n trá»‹ viĂªn",
+                        EmailConfirmed = true,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        Roles = ["Admin", "Author"]
+                    };
+                    admin.PasswordHash = passwordHasher.HashPassword(admin, "Admin@123");
+                    await dbContext.Users.AddAsync(admin);
+                    await dbContext.SaveChangesAsync();
+                    Log.Information("Successfully seeded Admin user admin@culinaryblog.com");
+                }
+
+                if (!await dbContext.Users.AnyAsync(u => u.Email == "author@culinaryblog.com"))
+                {
+                    var author = new ApplicationUser
+                    {
+                        Id = Guid.NewGuid(),
+                        UserName = "author",
+                        Email = "author@culinaryblog.com",
+                        DisplayName = "TĂ¡c giáº£ Demo",
+                        EmailConfirmed = true,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        Roles = ["Author"]
+                    };
+                    author.PasswordHash = passwordHasher.HashPassword(author, "Author@123");
+                    await dbContext.Users.AddAsync(author);
+                    await dbContext.SaveChangesAsync();
+                    Log.Information("Successfully seeded Author user author@culinaryblog.com");
+                }
+            }
+            catch (Exception initEx)
+            {
+                Log.Warning(initEx, "User seed skipped: {Message}", initEx.Message);
+            }
         }
     }
 
-    // ── Middleware pipeline ───────────────────────────────────────────────────
-    // 1. CorrelationId Middleware đặt đầu tiên để sinh/đọc header và gắn vào LogContext cho toàn bộ request flow
+    // â”€â”€ Middleware pipeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // 1. CorrelationId Middleware Ä‘áº·t Ä‘áº§u tiĂªn Ä‘á»ƒ sinh/Ä‘á»c header vĂ  gáº¯n vĂ o LogContext cho toĂ n bá»™ request flow
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseExceptionHandling();
     app.MapOpenApi();
@@ -179,13 +189,13 @@ try
     app.UseAuthorization();
     app.UseRateLimiter();
 
-    // Hangfire Dashboard (chỉ môi trường dev)
+    // Hangfire Dashboard (chá»‰ mĂ´i trÆ°á»ng dev)
     if (app.Environment.IsDevelopment())
     {
         app.UseHangfireDashboard("/hangfire");
     }
 
-    // 2. Serilog request logging — Structured Logging với đầy đủ properties & cảnh báo Slow Request > 500ms
+    // 2. Serilog request logging â€” Structured Logging vá»›i Ä‘áº§y Ä‘á»§ properties & cáº£nh bĂ¡o Slow Request > 500ms
     app.UseSerilogRequestLogging(options =>
     {
         options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
@@ -257,24 +267,26 @@ try
 
     app.MapCategoryEndpoints();
     app.MapRecipeEndpoints();
+    app.MapAuthEndpoints();
+    app.MapAdminUsersEndpoints();
     CulinaryBlog.Api.Endpoints.Sitemap.SitemapEndpoints.MapSitemapEndpoints(app);
-    app.MapControllers();
+    // app.MapControllers();
 
-    // ── Health Check Endpoints (Task 4 - Võ Hùng Mạnh) ─────────────────────────
-    // 1. /health - Tổng quan toàn bộ dependency (PostgreSQL, Redis, MinIO)
+    // â”€â”€ Health Check Endpoints (Task 4 - VĂµ HĂ¹ng Máº¡nh) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // 1. /health - Tá»•ng quan toĂ n bá»™ dependency (PostgreSQL, Redis, MinIO)
     app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
     {
         ResponseWriter = CulinaryBlog.Infrastructure.HealthChecks.HealthCheckResponseWriter.WriteResponse
     });
 
-    // 2. /health/live - Liveness: Chỉ xác nhận process/app đang sống, không phụ thuộc external dependencies
+    // 2. /health/live - Liveness: Chá»‰ xĂ¡c nháº­n process/app Ä‘ang sá»‘ng, khĂ´ng phá»¥ thuá»™c external dependencies
     app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
     {
         Predicate = check => check.Tags.Contains("live"),
         ResponseWriter = CulinaryBlog.Infrastructure.HealthChecks.HealthCheckResponseWriter.WriteResponse
     });
 
-    // 3. /health/ready - Readiness: Kiểm tra dependency bắt buộc tiếp nhận traffic (PostgreSQL + Redis)
+    // 3. /health/ready - Readiness: Kiá»ƒm tra dependency báº¯t buá»™c tiáº¿p nháº­n traffic (PostgreSQL + Redis)
     app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
     {
         Predicate = check => check.Tags.Contains("ready"),

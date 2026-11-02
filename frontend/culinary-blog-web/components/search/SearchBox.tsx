@@ -54,9 +54,9 @@ export function SearchBox({
 
   return (
     <div className={`w-full space-y-1.5 ${className}`} data-testid="search-box">
-      <form onSubmit={handleSubmit} className="relative flex items-center w-full">
+      <form role="search" onSubmit={handleSubmit} className="relative flex items-center w-full">
         {/* Search Icon */}
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-700">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-700" aria-hidden="true">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
@@ -69,6 +69,9 @@ export function SearchBox({
           value={query}
           maxLength={100}
           disabled={isLoading}
+          aria-label="Từ khóa tìm kiếm công thức"
+          aria-invalid={Boolean(validationError)}
+          aria-describedby={validationError ? 'search-validation-error' : undefined}
           onChange={(e) => {
             setQuery(e.target.value);
             if (validationError) setValidationError(null);
@@ -120,7 +123,12 @@ export function SearchBox({
 
       {/* Validation Error Message */}
       {validationError && (
-        <p data-testid="search-validation-error" className="text-xs text-rose-600 font-medium pl-3 flex items-center gap-1.5">
+        <p
+          id="search-validation-error"
+          data-testid="search-validation-error"
+          role="alert"
+          className="text-xs text-rose-600 font-medium pl-3 flex items-center gap-1.5"
+        >
           <svg className="w-3.5 h-3.5 shrink-0 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="10" strokeWidth={2} />
             <line x1="12" y1="8" x2="12" y2="12" strokeWidth={2} strokeLinecap="round" />
