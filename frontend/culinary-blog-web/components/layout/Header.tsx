@@ -12,6 +12,8 @@ import {
   LayoutDashboard,
   ShieldAlert,
   ChevronDown,
+  Layers,
+  Users,
 } from "lucide-react";
 import { getStoredToken, removeStoredToken, setStoredToken } from "@/lib/api/client";
 import { Button } from "@/components/ui/Button";
@@ -249,13 +251,23 @@ export function Header() {
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/dashboard/categories")}>
                     <LayoutDashboard className="h-4 w-4 text-gray-600" />
-                    <span>Quản lý danh mục</span>
+                    <span>Thống kê danh mục</span>
                   </DropdownMenuItem>
                   {user.role === "Admin" && (
-                    <DropdownMenuItem onClick={() => router.push("/admin/recipes/trash")}>
-                      <ShieldAlert className="h-4 w-4 text-purple-600" />
-                      <span>Thùng rác công thức</span>
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem onClick={() => router.push("/admin/categories")}>
+                        <Layers className="h-4 w-4 text-emerald-700" />
+                        <span>Quản lý danh mục (Admin)</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push("/admin/users")}>
+                        <Users className="h-4 w-4 text-purple-600" />
+                        <span>Quản lý người dùng</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push("/admin/recipes/trash")}>
+                        <ShieldAlert className="h-4 w-4 text-purple-600" />
+                        <span>Thùng rác công thức</span>
+                      </DropdownMenuItem>
+                    </>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 hover:bg-red-50 hover:text-red-700">
