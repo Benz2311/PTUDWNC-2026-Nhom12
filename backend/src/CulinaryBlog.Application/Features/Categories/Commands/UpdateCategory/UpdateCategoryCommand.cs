@@ -8,7 +8,9 @@ namespace CulinaryBlog.Application.Features.Categories.Commands.UpdateCategory;
 
 public sealed record UpdateCategoryRequest(
     string Name,
-    string? Description);
+    string? Description = null,
+    string? ImageUrl = null,
+    int? OrderIndex = null);
 
 public enum UpdateCategoryResult
 {
@@ -20,7 +22,9 @@ public enum UpdateCategoryResult
 public sealed record UpdateCategoryCommand(
     Guid Id,
     string Name,
-    string? Description) : IRequest<UpdateCategoryResult>;
+    string? Description = null,
+    string? ImageUrl = null,
+    int? OrderIndex = null) : IRequest<UpdateCategoryResult>;
 
 public sealed class UpdateCategoryCommandValidator : AbstractValidator<UpdateCategoryCommand>
 {
@@ -73,7 +77,7 @@ public sealed class UpdateCategoryCommandHandler
             return UpdateCategoryResult.NameAlreadyExists;
         }
 
-        category.UpdateDetails(name, request.Description);
+        category.Update(name, request.Description, request.ImageUrl, request.OrderIndex);
         _categoryRepository.Update(category);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _cache.RemoveAsync(CategoryListCacheKey, cancellationToken);
