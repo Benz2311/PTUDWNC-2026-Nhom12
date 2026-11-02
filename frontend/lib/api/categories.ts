@@ -1,4 +1,4 @@
-import { apiClient, unwrapData } from "./client";
+import axios from "axios";
 import type {
   Category,
   CategoryDetailResponse,
@@ -6,7 +6,17 @@ import type {
   CreateCategoryRequest,
   UpdateCategoryRequest,
 } from "@/types/category";
-import type { ApiResponse } from "@/types/api";
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://localhost:5000/api/v1";
+
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
 export class CategoryConflictError extends Error {
   status = 409;
@@ -18,8 +28,12 @@ export class CategoryConflictError extends Error {
 
 export async function getCategories(): Promise<Category[]> {
   try {
-    const response = await apiClient.get<ApiResponse<Category[]>>("/categories");
-    return unwrapData(response);
+    const response = await api.get("/categories");
+    const payload = response.data;
+    if (payload && typeof payload === "object" && "data" in payload) {
+      return payload.data;
+    }
+    return payload;
   } catch (err) {
     console.error("Failed to fetch categories:", err);
     return [];
@@ -32,13 +46,14 @@ export async function getCategoryBySlug(
   pageSize = 12
 ): Promise<CategoryDetailResponse | null> {
   try {
-    const response = await apiClient.get<ApiResponse<CategoryDetailResponse>>(
-      `/categories/${encodeURIComponent(slug)}`,
-      {
-        params: { page, pageSize },
-      }
-    );
-    return unwrapData(response);
+    const response = await api.get(`/categories/${encodeURIComponent(slug)}`, {
+      params: { page, pageSize },
+    });
+    const payload = response.data;
+    if (payload && typeof payload === "object" && "data" in payload) {
+      return payload.data;
+    }
+    return payload;
   } catch (err) {
     console.error(`Failed to fetch category with slug ${slug}:`, err);
     return null;
@@ -49,12 +64,13 @@ export async function createCategory(
   data: CreateCategoryRequest
 ): Promise<Category> {
   try {
-    const response = await apiClient.post<ApiResponse<Category>>("/categories", data);
-    return unwrapData(response);
+    const response = await api.post("/categories", data);
+    const payload = response.data;
+    return (payload && typeof payload === "object" && "data" in payload) ? payload.data : payload;
   } catch (err: any) {
-    if (err?.response?.status === 409 || err?.status === 409) {
+    if (err?.response?.status === 409) {
       throw new CategoryConflictError(
-        err?.response?.data?.detail || err?.title || "Tên danh mục đã tồn tại trong hệ thống."
+        err?.response?.data?.detail || "Tên danh mục đã tồn tại trong hệ thống."
       );
     }
     throw err;
@@ -66,11 +82,11 @@ export async function updateCategory(
   data: UpdateCategoryRequest
 ): Promise<void> {
   try {
-    await apiClient.put(`/categories/${id}`, data);
+    await api.put(`/categories/${id}`, data);
   } catch (err: any) {
-    if (err?.response?.status === 409 || err?.status === 409) {
+    if (err?.response?.status === 409) {
       throw new CategoryConflictError(
-        err?.response?.data?.detail || err?.title || "Tên danh mục đã tồn tại trong hệ thống."
+        err?.response?.data?.detail || "Tên danh mục đã tồn tại trong hệ thống."
       );
     }
     throw err;
@@ -79,11 +95,11 @@ export async function updateCategory(
 
 export async function deleteCategory(id: string): Promise<void> {
   try {
-    await apiClient.delete(`/categories/${id}`);
+    await api.delete(`/categories/${id}`);
   } catch (err: any) {
-    if (err?.response?.status === 409 || err?.status === 409) {
+    if (err?.response?.status === 409) {
       throw new CategoryConflictError(
-        err?.response?.data?.detail || "Không thể xóa danh mục vì vẫn còn công thức liên kết."
+        "Không thể xóa danh mục vì vẫn còn công thức liên kết."
       );
     }
     throw err;
@@ -92,10 +108,9 @@ export async function deleteCategory(id: string): Promise<void> {
 
 export async function getCategoryStatistics(): Promise<CategoryStatistics> {
   try {
-    const response = await apiClient.get<ApiResponse<CategoryStatistics>>(
-      "/categories/statistics"
-    );
-    return unwrapData(response);
+    const response = await api.get("/categories/statistics");
+    const payload = response.data;
+    return (payload && typeof payload === "object" && "data" in payload) ? payload.data : payload;
   } catch (err) {
     console.error("Failed to fetch category statistics:", err);
     return {
