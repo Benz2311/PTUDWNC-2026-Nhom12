@@ -15,6 +15,14 @@ jest.mock('@/lib/api/search', () => {
   };
 });
 
+// Mock module @/lib/api/categories
+jest.mock('@/lib/api/categories', () => ({
+  getCategories: jest.fn().mockResolvedValue([
+    { id: 'cat-1', name: 'Món Nước', slug: 'mon-nuoc' },
+    { id: 'cat-2', name: 'Món Xào', slug: 'mon-xao' },
+  ]),
+}));
+
 const mockSearchResponse: SearchResponse = {
   items: [
     {
@@ -285,5 +293,93 @@ describe('Search UI Module Tests', () => {
       expect(titles[0]).toHaveTextContent('Phở xào bò rau cải');
       expect(titles[1]).toHaveTextContent('Phở bò Hà Nội truyền thống');
     });
+  });
+
+  // 16. Bộ lọc theo Danh mục (Category)
+  it('16. Lọc kết quả theo Danh mục lấy từ API thật và gửi categorySlug lên backend', async () => {
+    render(<SearchContainer initialQuery="pho bo" />);
+
+    await screen.findByTestId('search-toolbar');
+
+    const selectCat = screen.getByTestId('select-category');
+    fireEvent.change(selectCat, { target: { value: 'mon-nuoc' } });
+
+    await waitFor(() => {
+      expect(searchApi.searchRecipes).toHaveBeenCalledWith({
+        q: 'pho bo',
+        page: 1,
+        pageSize: 10,
+        categorySlug: 'mon-nuoc',
+        difficulty: undefined,
+        maxCookTimeMinutes: undefined,
+        sortBy: 'relevance',
+      });
+    });
+  });
+
+  // 17. Bộ lọc theo Thời gian nấu tối đa (MaxCookTime)
+  it('17. Lọc kết quả theo thời gian nấu tối đa 30 phút và gửi maxCookTimeMinutes lên backend', async () => {
+    render(<SearchContainer initialQuery="pho bo" />);
+
+    await screen.findByTestId('search-toolbar');
+
+    const selectCookTime = screen.getByTestId('select-max-cook-time');
+    fireEvent.change(selectCookTime, { target: { value: '30' } });
+
+    await waitFor(() => {
+      expect(searchApi.searchRecipes).toHaveBeenCalledWith({
+        q: 'pho bo',
+        page: 1,
+        pageSize: 10,
+        categorySlug: undefined,
+        difficulty: undefined,
+        maxCookTimeMinutes: 30,
+        sortBy: 'relevance',
+      });
+    });
+  });
+
+  // 18. Nút Đặt lại bộ lọc (Reset filters)
+  it('18. Khôi phục tất cả bộ lọc về mặc định khi bấm nút Đặt lại bộ lọc', async () => {
+    render(<SearchContainer initialQuery="pho bo" />);
+
+    await screen.findByTestId('search-toolbar');
+
+    const selectDiff = screen.getByTestId('select-difficulty');
+    fireEvent.change(selectDiff, { target: { value: 'easy' } });
+
+    const resetBtn = await screen.findByTestId('btn-reset-filters');
+    fireEvent.click(resetBtn);
+
+    await waitFor(() => {
+      expect(searchApi.searchRecipes).toHaveBeenCalledWith('pho bo', 1, 10);
+    });
+  });
+
+  // 19. Nút xóa nhanh từ khóa (Clear search)
+  it('19. Xóa trắng từ khóa và reset thông báo validation khi bấm nút Clear trên SearchBox', async () => {
+    const handleSearch = jest.fn();
+    render(<SearchBox initialQuery="thịt bò" onSearch={handleSearch} />);
+
+    const clearBtn = screen.getByTestId('btn-clear-search');
+    fireEvent.click(clearBtn);
+
+    const input = screen.getByTestId('search-input');
+    expect(input).toHaveValue('');
+  });
+
+  // 20. Validation khi người dùng chỉ nhập khoảng trắng
+  it('20. Hiển thị thông báo yêu cầu nhập từ khóa khi người dùng chỉ nhập khoảng trắng', async () => {
+    const handleSearch = jest.fn();
+    render(<SearchBox onSearch={handleSearch} />);
+
+    const input = screen.getByTestId('search-input');
+    await userEvent.type(input, '     ');
+    fireEvent.click(screen.getByTestId('btn-submit-search'));
+
+    expect(screen.getByTestId('search-validation-error')).toHaveTextContent(
+      'Vui lòng nhập từ khóa tìm kiếm.'
+    );
+    expect(handleSearch).not.toHaveBeenCalled();
   });
 });

@@ -56,6 +56,7 @@ export interface CategoryDetailResponse {
     name: string;
     slug: string;
     description: string | null;
+    imageUrl?: string | null;
   };
   recipes: {
     items: CategoryRecipeItem[];
@@ -63,6 +64,8 @@ export interface CategoryDetailResponse {
     page: number;
     pageSize: number;
     totalPages: number;
+    hasNextPage?: boolean;
+    hasPreviousPage?: boolean;
   };
 }
 

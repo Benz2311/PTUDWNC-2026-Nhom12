@@ -6,11 +6,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useState,
 } from "react";
 import type { ReactNode } from "react";
 import { authApi } from "@/lib/api/auth";
 import { authStorage } from "@/lib/auth-storage";
 import { useAuthStore } from "@/lib/auth-store";
+import { isTokenExpired } from "@/lib/jwt";
 import type {
   ChangePasswordRequest,
   LoginRequest,
@@ -35,6 +37,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [isInitializing, setIsInitializing] = useState(true);
   const user = useAuthStore((state) => state.user);
   const accessToken = useAuthStore((state) => state.accessToken);
   const isLoading = useAuthStore((state) => state.isLoading);
@@ -49,16 +52,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       useAuthStore.getState().hydrate();
       const token = authStorage.getAccessToken();
-      if (!token) {
+      const refreshToken = authStorage.getRefreshToken();
+
+      // 1. Nếu không có accessToken lẫn refreshToken: Guest thuần túy, kết thúc ngay lập tức, KHÔNG gọi /auth/me
+      if (!token && !refreshToken) {
         setLoading(false);
+        if (!cancelled) {
+          setIsInitializing(false);
+        }
         return;
       }
 
+      let activeToken = token;
+
+      // 2. Nếu accessToken đã hết hạn hoặc định dạng không hợp lệ
+      if (token && isTokenExpired(token)) {
+        if (refreshToken) {
+          try {
+            const refreshRes = await authApi.refreshToken(refreshToken);
+            activeToken = refreshRes.accessToken;
+            authStorage.setTokens(refreshRes.accessToken, refreshRes.refreshToken);
+            if (!cancelled) {
+              setTokens(refreshRes.accessToken, refreshRes.refreshToken);
+            }
+          } catch {
+            authStorage.clear();
+            if (!cancelled) {
+              clear();
+              setLoading(false);
+              setIsInitializing(false);
+            }
+            return;
+          }
+        } else {
+          // Token hết hạn mà không có refresh token -> dọn dẹp sạch và chuyển về Guest
+          authStorage.clear();
+          if (!cancelled) {
+            clear();
+            setLoading(false);
+            setIsInitializing(false);
+          }
+          return;
+        }
+      }
+
+      if (!activeToken) {
+        setLoading(false);
+        if (!cancelled) {
+          setIsInitializing(false);
+        }
+        return;
+      }
+
+      // 3. Token hợp lệ: Tải Profile người dùng hiện tại
       try {
         const me = await authApi.getMe();
         if (!cancelled) {
           setUser(me);
-          setTokens(token, authStorage.getRefreshToken());
+          setTokens(activeToken, authStorage.getRefreshToken());
         }
       } catch {
         if (!cancelled) {
@@ -67,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } finally {
         if (!cancelled) {
           setLoading(false);
+          setIsInitializing(false);
         }
       }
     })();
@@ -125,12 +177,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await authApi.changePassword(request);
   }, []);
 
+  const effectiveLoading = isLoading || isInitializing;
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       accessToken,
       isAuthenticated: Boolean(user && accessToken),
-      isLoading,
+      isLoading: effectiveLoading,
       login,
       googleLogin,
       register,
@@ -138,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateProfile,
       changePassword,
     }),
-    [user, accessToken, isLoading, login, googleLogin, register, logout, updateProfile, changePassword]
+    [user, accessToken, effectiveLoading, login, googleLogin, register, logout, updateProfile, changePassword]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -51,9 +51,7 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(x => x.Bio)
             .HasMaxLength(1000);
 
-        builder.Property(x => x.EmailConfirmed)
-            .IsRequired()
-            .HasDefaultValue(false);
+        builder.Property(x => x.EmailConfirmed).IsRequired();
 
         builder.Property(x => x.IsActive)
             .IsRequired()

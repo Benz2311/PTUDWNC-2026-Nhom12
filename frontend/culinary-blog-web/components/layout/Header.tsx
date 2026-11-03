@@ -9,12 +9,12 @@ import {
   X,
   LogOut,
   PlusCircle,
-  LayoutDashboard,
-  ShieldAlert,
   ChevronDown,
+  Users,
+  UserCircle,
+  PenTool,
 } from "lucide-react";
-import { getStoredToken, removeStoredToken, setStoredToken } from "@/lib/api/client";
-import { Button } from "@/components/ui/Button";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -27,91 +27,48 @@ import {
 interface UserProfile {
   name: string;
   email: string;
-  role: "Guest" | "Author" | "Admin";
+  role: "Guest" | "User" | "Author" | "Admin";
 }
 
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
+  const { user: authUser, logout } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [user, setUser] = useState<UserProfile>({
-    name: "Khách",
-    email: "",
-    role: "Guest",
-  });
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [tokenInput, setTokenInput] = useState("");
-
-  // Sync token state on mount
-  useEffect(() => {
-    const saved = getStoredToken();
-    if (saved) {
-      setTokenInput(saved);
-      try {
-        const payload = JSON.parse(atob(saved.split(".")[1]));
-        const role =
-          payload.role?.includes("Admin") ||
-          payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] === "Admin"
-            ? "Admin"
-            : "Author";
-        const name = payload.unique_name || payload.name || payload.email || (role === "Admin" ? "Quản trị viên" : "Đầu bếp thành viên");
-        setUser({
-          name,
-          email: payload.email || "user@culinaryblog.vn",
-          role,
-        });
-      } catch {
-        setUser({
-          name: "Đầu bếp thành viên",
-          email: "author@culinaryblog.vn",
-          role: "Author",
-        });
+  const user: UserProfile = authUser
+    ? {
+        name: authUser.displayName || authUser.userName,
+        email: authUser.email,
+        role: authUser.roles.includes("Admin")
+          ? "Admin"
+          : authUser.roles.includes("Author")
+            ? "Author"
+            : "User",
       }
-    } else {
-      setUser({
-        name: "Khách",
-        email: "",
-        role: "Guest",
-      });
+    : { name: "Khách", email: "", role: "Guest" };
+  const hasAuthorAccess = user.role === "Author" || user.role === "Admin";
+
+  // Sync search input if on search page
+  useEffect(() => {
+    if (typeof window !== "undefined" && pathname === "/search") {
+      const q = new URLSearchParams(window.location.search).get("q");
+      if (q) setSearchQuery(q);
     }
-  }, []);
+  }, [pathname]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      router.push(`/recipes?search=${encodeURIComponent(searchQuery.trim())}`);
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
       setMobileMenuOpen(false);
     }
   };
 
-  const handleLogout = () => {
-    removeStoredToken();
-    setUser({
-      name: "Khách",
-      email: "",
-      role: "Guest",
-    });
-    setTokenInput("");
-    window.location.reload();
-  };
-
-  const handleApplyRole = (role: "Guest" | "Author" | "Admin", tokenVal?: string) => {
-    if (role === "Guest") {
-      removeStoredToken();
-      setUser({ name: "Khách", email: "", role: "Guest" });
-    } else {
-      const token = tokenVal || `mock_${role.toLowerCase()}_token`;
-      setStoredToken(token);
-      setUser({
-        name: role === "Admin" ? "Quản trị viên Demo" : "Đầu bếp Demo",
-        email: `${role.toLowerCase()}@culinaryblog.vn`,
-        role,
-      });
-    }
-    setIsAuthModalOpen(false);
-    window.location.reload();
+  const handleLogout = async () => {
+    await logout();
+    router.refresh();
   };
 
   const navLinks = [
@@ -167,6 +124,19 @@ export function Header() {
                 </Link>
               );
             })}
+            {user.role === "Admin" && (
+              <Link
+                href="/admin/users"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  pathname.startsWith("/admin/users")
+                    ? "bg-purple-700 text-white"
+                    : "text-purple-700 hover:bg-purple-50"
+                }`}
+              >
+                Quản lý người dùng
+              </Link>
+            )}
           </nav>
 
           {/* 3. Search Bar */}
@@ -176,34 +146,25 @@ export function Header() {
           >
             <input
               type="text"
+              data-testid="header-search-input"
               placeholder="Tìm công thức, món ăn..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-9 pl-9 pr-4 text-xs rounded-full border border-gray-200 bg-gray-50 focus:bg-white focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 transition-all placeholder:text-gray-400"
+              className="w-full h-9 pl-9 pr-14 text-xs rounded-full border border-gray-200 bg-gray-50 focus:bg-white focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 transition-all placeholder:text-gray-400"
             />
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+            <button
+              type="submit"
+              data-testid="header-search-submit"
+              aria-label="Tìm kiếm"
+              className="absolute right-1 top-1/2 -translate-y-1/2 px-2.5 py-1 text-[11px] font-bold rounded-full text-white bg-emerald-700 hover:bg-emerald-800 transition-colors shadow-2xs cursor-pointer"
+            >
+              Tìm
+            </button>
           </form>
 
           {/* 4. Auth & User Profile Section */}
           <div className="flex items-center gap-2">
-            {/* Quick Role Simulator Button for Demonstration */}
-            <button
-              onClick={() => setIsAuthModalOpen(true)}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-emerald-200 bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer"
-              title="Đổi vai trò để thử nghiệm phân quyền"
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  user.role === "Admin"
-                    ? "bg-purple-600"
-                    : user.role === "Author"
-                    ? "bg-emerald-600"
-                    : "bg-gray-400"
-                }`}
-              />
-              <span className="text-[11px] font-semibold">{user.role}</span>
-            </button>
-
             {user.role !== "Guest" ? (
               /* User Dropdown Menu */
               <DropdownMenu>
@@ -226,18 +187,26 @@ export function Header() {
                     </span>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push("/recipes/create")}>
-                    <PlusCircle className="h-4 w-4 text-emerald-700" />
-                    <span>Tạo công thức mới</span>
+                  <DropdownMenuItem onClick={() => router.push("/profile")}>
+                    <UserCircle className="h-4 w-4 text-emerald-700" />
+                    <span>Hồ sơ cá nhân</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/dashboard/categories")}>
-                    <LayoutDashboard className="h-4 w-4 text-gray-600" />
-                    <span>Quản lý danh mục</span>
-                  </DropdownMenuItem>
+                  {hasAuthorAccess && (
+                    <DropdownMenuItem onClick={() => router.push("/recipes/create")}>
+                      <PlusCircle className="h-4 w-4 text-emerald-700" />
+                      <span>Tạo công thức mới</span>
+                    </DropdownMenuItem>
+                  )}
+                  {hasAuthorAccess && (
+                    <DropdownMenuItem onClick={() => router.push("/dashboard/recipes")}>
+                      <PenTool className="h-4 w-4 text-blue-600" />
+                      <span>Quản lý công thức</span>
+                    </DropdownMenuItem>
+                  )}
                   {user.role === "Admin" && (
-                    <DropdownMenuItem onClick={() => router.push("/admin/recipes/trash")}>
-                      <ShieldAlert className="h-4 w-4 text-purple-600" />
-                      <span>Thùng rác công thức</span>
+                    <DropdownMenuItem onClick={() => router.push("/admin/users")}>
+                      <Users className="h-4 w-4 text-purple-600" />
+                      <span>Quản lý người dùng</span>
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
@@ -250,22 +219,18 @@ export function Header() {
             ) : (
               /* Guest Auth Buttons */
               <div className="hidden sm:flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="text-xs"
+                <Link
+                  href="/login"
+                  className="inline-flex h-8 items-center rounded-md px-3 text-xs text-gray-700 hover:bg-gray-100"
                 >
                   Đăng nhập
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="text-xs font-semibold"
+                </Link>
+                <Link
+                  href="/register"
+                  className="inline-flex h-8 items-center rounded-md bg-emerald-700 px-3 text-xs font-semibold text-white hover:bg-emerald-800"
                 >
                   Đăng ký
-                </Button>
+                </Link>
               </div>
             )}
 
@@ -289,15 +254,23 @@ export function Header() {
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-gray-100 bg-white px-4 pt-3 pb-6 space-y-3 shadow-lg animate-in slide-in-from-top-2">
           {/* Mobile Search */}
-          <form onSubmit={handleSearchSubmit} className="relative w-full">
+          <form onSubmit={handleSearchSubmit} className="relative w-full flex items-center">
             <input
               type="text"
+              data-testid="mobile-search-input"
               placeholder="Tìm công thức, món ăn..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-9 pr-4 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:border-emerald-600 outline-none"
+              className="w-full h-10 pl-9 pr-20 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:border-emerald-600 outline-none"
             />
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
+            <button
+              type="submit"
+              data-testid="mobile-search-submit"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1.5 text-xs font-bold rounded-md text-white bg-emerald-700 hover:bg-emerald-800 transition-colors cursor-pointer"
+            >
+              Tìm kiếm
+            </button>
           </form>
 
           {/* Mobile Nav Links */}
@@ -321,32 +294,59 @@ export function Header() {
                 </Link>
               );
             })}
+            {user.role === "Admin" && (
+              <Link
+                href="/admin/users"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  pathname.startsWith("/admin/users")
+                    ? "bg-purple-700 text-white"
+                    : "text-purple-700 hover:bg-purple-50"
+                }`}
+              >
+                Quản lý người dùng
+              </Link>
+            )}
           </nav>
+
+          {user.role !== "Guest" && (
+            <Link
+              href="/profile"
+              onClick={() => setMobileMenuOpen(false)}
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50"
+            >
+              <UserCircle className="h-4 w-4 text-emerald-700" />
+              Hồ sơ cá nhân
+            </Link>
+          )}
+
+          {hasAuthorAccess && (
+            <Link
+              href="/dashboard/recipes"
+              onClick={() => setMobileMenuOpen(false)}
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-50"
+            >
+              <PenTool className="h-4 w-4" />
+              Quản lý công thức
+            </Link>
+          )}
 
           {user.role === "Guest" && (
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setIsAuthModalOpen(true);
-                }}
-                className="w-full text-xs font-medium"
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="inline-flex h-8 items-center justify-center rounded-md border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50"
               >
                 Đăng nhập
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setIsAuthModalOpen(true);
-                }}
-                className="w-full text-xs font-semibold"
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => setMobileMenuOpen(false)}
+                className="inline-flex h-8 items-center justify-center rounded-md bg-emerald-700 px-3 text-xs font-semibold text-white hover:bg-emerald-800"
               >
                 Đăng ký
-              </Button>
+              </Link>
             </div>
           )}
 
@@ -354,110 +354,10 @@ export function Header() {
             <span className="text-xs text-gray-500 font-medium">
               Vai trò hiện tại: <strong>{user.role}</strong>
             </span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                setIsAuthModalOpen(true);
-              }}
-              className="text-xs"
-            >
-              Chuyển vai trò
-            </Button>
           </div>
         </div>
       )}
 
-      {/* Role / Authentication Simulation Modal */}
-      {isAuthModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-gray-100">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <h3 className="text-base font-bold text-gray-900">
-                Mô phỏng Trạng thái Authentication
-              </h3>
-              <button
-                onClick={() => setIsAuthModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="mt-3 text-xs text-gray-600 leading-relaxed">
-              Dành cho việc kiểm thử giao diện Header và phân quyền. Chọn vai trò nhanh hoặc dán Access Token thực tế từ backend:
-            </p>
-
-            <div className="mt-4 space-y-3">
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleApplyRole("Guest")}
-                  className={`py-2 px-2 text-xs font-medium rounded-lg border text-center transition-all ${
-                    user.role === "Guest"
-                      ? "border-emerald-700 bg-emerald-50 text-emerald-800 font-bold"
-                      : "border-gray-200 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  Khách (Guest)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleApplyRole("Author")}
-                  className={`py-2 px-2 text-xs font-medium rounded-lg border text-center transition-all ${
-                    user.role === "Author"
-                      ? "border-emerald-700 bg-emerald-50 text-emerald-800 font-bold"
-                      : "border-gray-200 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  Tác giả (Author)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleApplyRole("Admin")}
-                  className={`py-2 px-2 text-xs font-medium rounded-lg border text-center transition-all ${
-                    user.role === "Admin"
-                      ? "border-purple-600 bg-purple-50 text-purple-700 font-bold"
-                      : "border-gray-200 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  Quản trị (Admin)
-                </button>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Hoặc dán Access Token JWT:
-                </label>
-                <textarea
-                  rows={2}
-                  value={tokenInput}
-                  onChange={(e) => setTokenInput(e.target.value)}
-                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  className="w-full rounded-lg border border-gray-300 p-2 text-xs font-mono focus:border-emerald-700 outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="mt-5 flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleApplyRole("Guest")}
-              >
-                Xóa Token (Khách)
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => handleApplyRole(user.role === "Guest" ? "Author" : user.role, tokenInput)}
-              >
-                Lưu & Áp dụng
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 }

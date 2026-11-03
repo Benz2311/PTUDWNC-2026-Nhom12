@@ -1,4 +1,4 @@
-using CulinaryBlog.Application;
+﻿using CulinaryBlog.Application;
 using CulinaryBlog.Application.Common.Interfaces;
 using CulinaryBlog.Application.Exceptions;
 using CulinaryBlog.Application.Features.Recipes.Commands.RecipeImages;
@@ -441,14 +441,14 @@ public class Program
 
                 var adminSetPrimarySuccess = await mediator.Send(new SetPrimaryRecipeImageCommand(
                     imgTestRecipeId,
-                    adminAddSuccess.Id,
+                    adminAddSuccess!.Id,
                     CurrentUserId: Guid.NewGuid(),
                     IsAdmin: true));
                 Assert(adminSetPrimarySuccess != null && adminSetPrimarySuccess.IsPrimary, "Phase 13: Admin user can Set Primary image regardless of author ownership");
 
                 var adminDeleteSuccess = await mediator.Send(new DeleteRecipeImageCommand(
                     imgTestRecipeId,
-                    adminAddSuccess.Id,
+                    adminAddSuccess!.Id,
                     CurrentUserId: Guid.NewGuid(),
                     IsAdmin: true));
                 Assert(adminDeleteSuccess, "Phase 13: Admin user can Delete image regardless of author ownership");
@@ -660,7 +660,7 @@ public class Program
                     author.Id,
                     false));
 
-                Assert(s1.StepNumber == 1 && s2.StepNumber == 2 && s3.StepNumber == 3,
+                Assert(s1!.StepNumber == 1 && s2!.StepNumber == 2 && s3!.StepNumber == 3,
                     "Case 2: Server tự cấp StepNumber liên tục (1, 2, 3)");
 
                 // 3. Update Step thành công

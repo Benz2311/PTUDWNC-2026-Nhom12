@@ -1,6 +1,7 @@
 import { getCategoryStatistics } from "@/lib/api/categories";
 import CategoryStatistics from "@/components/category/CategoryStatistics";
 import Link from "next/link";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 export const dynamic = "force-dynamic";
 
@@ -8,8 +9,9 @@ export default async function DashboardCategoriesPage() {
   const statistics = await getCategoryStatistics();
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8">
-      <div className="mx-auto max-w-6xl">
+    <ProtectedRoute roles={["Admin"]}>
+      <main className="min-h-screen bg-gray-50 p-8">
+        <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
@@ -29,8 +31,8 @@ export default async function DashboardCategoriesPage() {
         </div>
 
         <CategoryStatistics data={statistics} />
-      </div>
-    </main>
+        </div>
+      </main>
+    </ProtectedRoute>
   );
 }
-

@@ -68,6 +68,7 @@ public static class RecipeEndpoints
         // TV4: Thêm ảnh cho công thức (Multipart Form Upload / JSON URL)
         group.MapPost("/{recipeId:guid}/images", AddRecipeImage)
             .RequireRateLimiting(RateLimitingExtensions.UploadPolicy)
+            .RequireAuthorization(policy => policy.RequireRole("Author", "Admin"))
             .WithName("AddRecipeImage")
             .WithSummary("Tải lên ảnh cho công thức (Multipart Form hoặc JSON)")
             .Produces<RecipeImageDto>(StatusCodes.Status201Created)
@@ -78,6 +79,7 @@ public static class RecipeEndpoints
 
         // TV4: Cập nhật thông tin ảnh công thức (AltText, OrderIndex, IsPrimary)
         group.MapPatch("/{recipeId:guid}/images/{imageId:guid}", UpdateRecipeImage)
+            .RequireAuthorization(policy => policy.RequireRole("Author", "Admin"))
             .WithName("UpdateRecipeImage")
             .WithSummary("Cập nhật thông tin ảnh công thức")
             .Produces<RecipeImageDto>(StatusCodes.Status200OK)
@@ -87,11 +89,13 @@ public static class RecipeEndpoints
 
         // TV4: Đặt ảnh đại diện (Set Primary trong cùng transaction)
         group.MapPatch("/{recipeId:guid}/images/{imageId:guid}/primary", SetPrimaryRecipeImage)
+            .RequireAuthorization(policy => policy.RequireRole("Author", "Admin"))
             .WithName("SetPrimaryRecipeImage")
             .WithSummary("Đặt ảnh đại diện cho công thức");
 
         // TV4: Xóa mềm ảnh và tự động chuyển Primary cho ảnh OrderIndex nhỏ nhất
         group.MapDelete("/{recipeId:guid}/images/{imageId:guid}", DeleteRecipeImage)
+            .RequireAuthorization(policy => policy.RequireRole("Author", "Admin"))
             .WithName("DeleteRecipeImage")
             .WithSummary("Xóa mềm ảnh công thức")
             .Produces(StatusCodes.Status204NoContent)
@@ -100,19 +104,19 @@ public static class RecipeEndpoints
 
         // Phước: Tạo công thức (Draft)
         group.MapPost("/", CreateRecipe)
-            .RequireAuthorization()
+            .RequireAuthorization(policy => policy.RequireRole("Author", "Admin"))
             .WithName("CreateRecipe")
             .WithSummary("Tạo công thức mới (bản nháp)");
 
         // Phước: Cập nhật công thức
         group.MapPut("/{id:guid}", UpdateRecipe)
-            .RequireAuthorization()
+            .RequireAuthorization(policy => policy.RequireRole("Author", "Admin"))
             .WithName("UpdateRecipe")
             .WithSummary("Cập nhật công thức");
 
         // Phước: Xóa mềm công thức
         group.MapDelete("/{id:guid}", DeleteRecipe)
-            .RequireAuthorization()
+            .RequireAuthorization(policy => policy.RequireRole("Author", "Admin"))
             .WithName("DeleteRecipe")
             .WithSummary("Xóa mềm công thức");
 
@@ -124,17 +128,17 @@ public static class RecipeEndpoints
 
         // Phước: Quản lý nguyên liệu
         group.MapPost("/{id:guid}/ingredients", AddIngredient)
-            .RequireAuthorization()
+            .RequireAuthorization(policy => policy.RequireRole("Author", "Admin"))
             .WithName("AddIngredient")
             .WithSummary("Thêm nguyên liệu");
 
         group.MapPut("/{recipeId:guid}/ingredients/{ingredientId:guid}", UpdateIngredient)
-            .RequireAuthorization()
+            .RequireAuthorization(policy => policy.RequireRole("Author", "Admin"))
             .WithName("UpdateIngredient")
             .WithSummary("Cập nhật nguyên liệu");
 
         group.MapDelete("/{recipeId:guid}/ingredients/{ingredientId:guid}", DeleteIngredient)
-            .RequireAuthorization()
+            .RequireAuthorization(policy => policy.RequireRole("Author", "Admin"))
             .WithName("DeleteIngredient")
             .WithSummary("Xóa nguyên liệu");
 
@@ -526,6 +530,13 @@ public static class RecipeEndpoints
         ISender sender,
         CancellationToken ct)
     {
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return Results.Json(
+                new { title = "Unauthorized", status = 401, detail = "Authentication is required to upload images." },
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
         Guid? currentUserId = null;
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? user.FindFirst("sub")?.Value;
@@ -541,11 +552,17 @@ public static class RecipeEndpoints
             {
                 var form = await httpRequest.ReadFormAsync(ct);
                 var file = form.Files.GetFile("file") ?? (form.Files.Count > 0 ? form.Files[0] : null);
-                if (file == null || file.Length == 0)
+                if (file == null)
                 {
                     return Results.ValidationProblem(
                         new Dictionary<string, string[]> { ["File"] = ["Vui lòng chọn tệp ảnh để tải lên (File is required)."] },
                         statusCode: StatusCodes.Status400BadRequest);
+                }
+                if (file.Length == 0)
+                {
+                    return Results.ValidationProblem(
+                        new Dictionary<string, string[]> { ["File"] = ["Tệp tải lên không được để trống (File is empty)."] },
+                        statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
 
                 var altText = form["altText"].FirstOrDefault();
@@ -604,7 +621,7 @@ public static class RecipeEndpoints
         {
             return Results.ValidationProblem(
                 ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
-                statusCode: StatusCodes.Status400BadRequest);
+                statusCode: StatusCodes.Status422UnprocessableEntity);
         }
         catch (InvalidOperationException ex)
         {
@@ -623,6 +640,13 @@ public static class RecipeEndpoints
         ISender sender,
         CancellationToken ct)
     {
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return Results.Json(
+                new { title = "Unauthorized", status = 401, detail = "Authentication is required to update images." },
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
         Guid? currentUserId = null;
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? user.FindFirst("sub")?.Value;
@@ -658,7 +682,7 @@ public static class RecipeEndpoints
         {
             return Results.ValidationProblem(
                 ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
-                statusCode: StatusCodes.Status400BadRequest);
+                statusCode: StatusCodes.Status422UnprocessableEntity);
         }
     }
 
@@ -669,6 +693,13 @@ public static class RecipeEndpoints
         ISender sender,
         CancellationToken ct)
     {
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return Results.Json(
+                new { title = "Unauthorized", status = 401, detail = "Authentication is required to set primary image." },
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
         Guid? currentUserId = null;
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? user.FindFirst("sub")?.Value;
@@ -702,6 +733,13 @@ public static class RecipeEndpoints
         ISender sender,
         CancellationToken ct)
     {
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return Results.Json(
+                new { title = "Unauthorized", status = 401, detail = "Authentication is required to delete images." },
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
         Guid? currentUserId = null;
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? user.FindFirst("sub")?.Value;
@@ -1351,7 +1389,8 @@ public static class RecipeEndpoints
             return Results.Ok(ApiResponse.Success(new { recipe.Id, status = recipe.Status.ToString(), version = recipe.xmin.ToString() }));
         }
 
-        group.MapPost("/{id:guid}/" + action, UpdateStatus).RequireAuthorization();
+        group.MapPost("/{id:guid}/" + action, UpdateStatus)
+            .RequireAuthorization(policy => policy.RequireRole("Author", "Admin"));
     }
 
     private static async Task<IResult> AddIngredient(
@@ -1491,7 +1530,7 @@ public static class RecipeEndpoints
         IRecipeCacheInvalidator invalidator,
         CancellationToken cancellationToken)
     {
-        var recipe = await db.Recipes.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        var recipe = await db.Recipes.IgnoreQueryFilters().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (recipe is null)
         {
             return Results.NotFound();

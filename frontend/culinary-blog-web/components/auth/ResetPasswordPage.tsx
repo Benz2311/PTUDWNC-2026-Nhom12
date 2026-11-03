@@ -7,6 +7,7 @@ import { z } from "zod";
 import { ApiError } from "@/lib/api/client";
 import { authApi } from "@/lib/api/auth";
 import { useToast } from "@/components/ui/toast";
+import { Eye, EyeOff } from "lucide-react";
 
 const schema = z
   .object({
@@ -25,6 +26,8 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,23 +66,43 @@ export default function ResetPasswordPage() {
         <form onSubmit={submit} className="mt-8 space-y-5">
           <label className="block text-sm font-medium text-gray-700">
             Mật khẩu mới
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-gray-300 px-4 py-2.5"
-              autoComplete="new-password"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="mt-1.5 w-full rounded-lg border border-gray-300 px-4 py-2.5 pr-11"
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((visible) => !visible)}
+                aria-label={showPassword ? "Ẩn mật khẩu mới" : "Hiện mật khẩu mới"}
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-gray-500 hover:text-teal-700"
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
           </label>
           <label className="block text-sm font-medium text-gray-700">
             Xác nhận mật khẩu
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-gray-300 px-4 py-2.5"
-              autoComplete="new-password"
-            />
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                className="mt-1.5 w-full rounded-lg border border-gray-300 px-4 py-2.5 pr-11"
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((visible) => !visible)}
+                aria-label={showConfirmPassword ? "Ẩn xác nhận mật khẩu" : "Hiện xác nhận mật khẩu"}
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-gray-500 hover:text-teal-700"
+              >
+                {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
           </label>
           {message && <p role="alert" className="text-sm text-red-600">{message}</p>}
           <button

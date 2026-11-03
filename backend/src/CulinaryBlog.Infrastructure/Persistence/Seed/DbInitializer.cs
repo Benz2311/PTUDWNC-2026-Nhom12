@@ -31,8 +31,8 @@ public static class DbInitializer
             logger?.LogWarning(ex, "DbInitializer migration skipped.");
         }
 
-        // Seed Admin User
-        await SeedAdminUserAsync(context, passwordHasher, logger, cancellationToken);
+        // Seed User/Auth accounts
+        await SeedUsersAsync(context, passwordHasher, logger, cancellationToken);
 
         // Seed Categories
         await SeedCategoriesAsync(context, logger, cancellationToken);
@@ -40,42 +40,55 @@ public static class DbInitializer
         logger?.LogInformation("Database initialization completed.");
     }
 
-    private static async Task SeedAdminUserAsync(
+    public static async Task SeedUsersAsync(
         ApplicationDbContext context,
         IPasswordHasher<ApplicationUser> passwordHasher,
         ILogger? logger,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
-        const string adminEmail = "admin@culinaryblog.com";
-        const string adminUserName = "admin";
-        const string adminPassword = "Admin@123";
-
-        var existingAdmin = await context.Users.FirstOrDefaultAsync(u => u.Email == adminEmail, cancellationToken);
-        if (existingAdmin is not null)
+        var users = new[]
         {
-            logger?.LogInformation("Admin user already exists: {Email}", adminEmail);
-            return;
+            new SeedUser("admin", "admin@culinaryblog.com", "Admin@123", "Quản trị viên", ["Admin", "Author"], true),
+            new SeedUser("author", "author@culinaryblog.com", "Author@123", "Tác giả Demo", ["Author"], true),
+            new SeedUser("user", "user@culinaryblog.com", "User@123", "Người dùng Demo", ["User"], true),
+            new SeedUser("inactive", "inactive@culinaryblog.com", "Inactive@123", "Tài khoản vô hiệu hóa", ["User"], false)
+        };
+
+        foreach (var seed in users)
+        {
+            if (await context.Users.AnyAsync(u => u.Email == seed.Email, cancellationToken))
+            {
+                continue;
+            }
+
+            var user = new ApplicationUser
+            {
+                Id = Guid.NewGuid(),
+                UserName = seed.UserName,
+                Email = seed.Email,
+                NormalizedUserName = seed.UserName.ToUpperInvariant(),
+                NormalizedEmail = seed.Email.ToUpperInvariant(),
+                DisplayName = seed.DisplayName,
+                EmailConfirmed = true,
+                IsActive = seed.IsActive,
+                CreatedAt = DateTime.UtcNow,
+                Roles = seed.Roles
+            };
+            user.PasswordHash = passwordHasher.HashPassword(user, seed.Password);
+            await context.Users.AddAsync(user, cancellationToken);
         }
 
-        var admin = new ApplicationUser
-        {
-            Id = Guid.NewGuid(),
-            UserName = adminUserName,
-            Email = adminEmail,
-            NormalizedUserName = adminUserName.ToUpperInvariant(),
-            NormalizedEmail = adminEmail.ToUpperInvariant(),
-            DisplayName = "Administrator",
-            EmailConfirmed = true,
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            Roles = ["Admin", "Author"]
-        };
-        admin.PasswordHash = passwordHasher.HashPassword(admin, adminPassword);
-
-        await context.Users.AddAsync(admin, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
-        logger?.LogInformation("Created admin user: {Email}", adminEmail);
+        logger?.LogInformation("User/Auth seed completed for {Count} accounts.", users.Length);
     }
+
+    private sealed record SeedUser(
+        string UserName,
+        string Email,
+        string Password,
+        string DisplayName,
+        string[] Roles,
+        bool IsActive);
 
     private static async Task SeedCategoriesAsync(
         ApplicationDbContext context,

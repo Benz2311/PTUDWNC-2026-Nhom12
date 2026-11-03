@@ -37,4 +37,6 @@ public interface IAuthService
     Task ResetPasswordAsync(ResetPasswordRequest request);
 
     Task<bool> UpdateUserStatusAsync(Guid adminUserId, Guid targetUserId, bool isActive);
+
+    Task<bool> UpdateAuthorRoleAsync(Guid adminUserId, Guid targetUserId, bool enabled);
 }

@@ -24,3 +24,8 @@ export type PagedUsersResponse = PagedResult<AdminUserDto>;
 export interface UpdateUserStatusRequest {
   isActive: boolean;
 }
+
+export interface UpdateAuthorRoleRequest {
+  role: "Author";
+  enabled: boolean;
+}

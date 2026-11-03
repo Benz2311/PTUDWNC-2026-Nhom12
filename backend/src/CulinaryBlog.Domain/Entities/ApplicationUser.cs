@@ -14,7 +14,7 @@ public class ApplicationUser : IdentityUser<Guid>
     public string? AvatarUrl { get; set; }
     public string? Bio { get; set; }
 
-    public string[] Roles { get; set; } = ["Author"];
+    public string[] Roles { get; set; } = ["User"];
 
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

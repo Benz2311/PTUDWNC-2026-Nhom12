@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Calendar, RotateCcw, Search, SearchX, Users } from "lucide-react";
+import Image from "next/image";
+import {
+  Calendar,
+  Eye,
+  RotateCcw,
+  Search,
+  SearchX,
+  Users,
+  X,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/toast";
 import { adminApi } from "@/lib/api/admin";
@@ -53,6 +62,7 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
 
   const [pendingUser, setPendingUser] = useState<AdminUserDto | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminUserDto | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Debounce từ khóa tìm kiếm
@@ -89,7 +99,13 @@ export default function AdminUsersPage() {
 
       setData(result);
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (err instanceof ApiError && err.status === 403) {
+        setError("Bạn không có quyền truy cập trang quản lý người dùng.");
+      } else if (err instanceof ApiError && err.status === 404) {
+        setError("Không tìm thấy tài nguyên quản lý người dùng.");
+      } else if (err instanceof ApiError && err.status === 409) {
+        setError("Dữ liệu người dùng bị xung đột. Vui lòng thử lại.");
+      } else if (err instanceof ApiError) {
         setError(err.title || "Không thể tải danh sách người dùng");
       } else {
         setError("Không thể kết nối đến máy chủ. Vui lòng thử lại sau.");
@@ -136,10 +152,51 @@ export default function AdminUsersPage() {
       // Backend trả 400 RFC 7807 khi Admin cố tự khóa chính mình
       if (err instanceof ApiError && err.status === 400) {
         showErrorToast(SELF_DISABLE_MESSAGE);
+      } else if (err instanceof ApiError && err.status === 403) {
+        showErrorToast("Bạn không có quyền thực hiện thao tác này.");
+      } else if (err instanceof ApiError && err.status === 404) {
+        showErrorToast("Không tìm thấy người dùng cần cập nhật.");
+      } else if (err instanceof ApiError && err.status === 409) {
+        showErrorToast(
+          "Tài khoản đã được cập nhật bởi người khác. Vui lòng tải lại."
+        );
       } else if (err instanceof ApiError) {
         showErrorToast(err.title || "Cập nhật trạng thái thất bại");
       } else {
         showErrorToast("Có lỗi xảy ra, vui lòng thử lại");
+      }
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleAuthorRoleChange = async (user: AdminUserDto) => {
+    const enabled = !user.roles.some((role) => role.toLowerCase() === "author");
+    const action = enabled ? "cấp quyền Author" : "thu hồi quyền Author";
+    if (!window.confirm(`Bạn có chắc muốn ${action} cho ${user.displayName}?`)) {
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      await adminApi.updateAuthorRole(user.id, enabled);
+      success(
+        enabled
+          ? `Đã cấp quyền Author cho ${user.displayName}`
+          : `Đã thu hồi quyền Author của ${user.displayName}`
+      );
+      await loadUsers();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        showErrorToast("Bạn không có quyền thay đổi vai trò.");
+      } else if (err instanceof ApiError && err.status === 404) {
+        showErrorToast("Không tìm thấy người dùng cần cập nhật.");
+      } else {
+        showErrorToast(
+          err instanceof ApiError
+            ? err.title || "Cập nhật vai trò thất bại"
+            : "Có lỗi xảy ra, vui lòng thử lại"
+        );
       }
     } finally {
       setIsUpdating(false);
@@ -289,9 +346,12 @@ export default function AdminUsersPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           {user.avatarUrl ? (
-                            <img
+                            <Image
                               src={user.avatarUrl}
                               alt={user.displayName}
+                              width={40}
+                              height={40}
+                              unoptimized
                               className="h-10 w-10 rounded-full object-cover"
                             />
                           ) : (
@@ -330,6 +390,15 @@ export default function AdminUsersPage() {
                         <div className="flex items-center justify-end">
                           <button
                             type="button"
+                            onClick={() => setSelectedUser(user)}
+                            className="mr-3 inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-teal-300 hover:bg-teal-50 hover:text-teal-700"
+                            aria-label={`Xem chi tiết ${user.displayName}`}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Chi tiết
+                          </button>
+                          <button
+                            type="button"
                             role="switch"
                             aria-checked={user.isActive}
                             aria-label={
@@ -352,6 +421,18 @@ export default function AdminUsersPage() {
                               }`}
                             />
                           </button>
+                          {user.roles.some((role) => role.toLowerCase() === "Admin".toLowerCase()) === false && (
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() => handleAuthorRoleChange(user)}
+                              className="ml-3 rounded-lg border border-purple-200 px-2.5 py-1.5 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-50 disabled:opacity-50"
+                            >
+                              {user.roles.some((role) => role.toLowerCase() === "author")
+                                ? "Thu hồi Author"
+                                : "Cấp Author"}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -404,6 +485,87 @@ export default function AdminUsersPage() {
           onConfirm={handleConfirmStatusChange}
           onCancel={() => setPendingUser(null)}
         />
+
+        {selectedUser && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Thông tin người dùng ${selectedUser.displayName}`}
+            className="fixed inset-0 z-40 flex items-center justify-center p-4"
+          >
+            <button
+              type="button"
+              aria-label="Đóng thông tin người dùng"
+              className="absolute inset-0 bg-black/50"
+              onClick={() => setSelectedUser(null)}
+            />
+            <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+              <button
+                type="button"
+                onClick={() => setSelectedUser(null)}
+                className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+                aria-label="Đóng"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Thông tin người dùng
+              </h2>
+              <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-gray-500">Id</dt>
+                  <dd className="mt-1 break-all font-medium text-gray-900">
+                    {selectedUser.id}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500">Ngày tạo</dt>
+                  <dd className="mt-1 font-medium text-gray-900">
+                    {formatDate(selectedUser.createdAt)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500">Tên đăng nhập</dt>
+                  <dd className="mt-1 font-medium text-gray-900">
+                    @{selectedUser.userName}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500">Email</dt>
+                  <dd className="mt-1 break-words font-medium text-gray-900">
+                    {selectedUser.email}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500">Tên hiển thị</dt>
+                  <dd className="mt-1 font-medium text-gray-900">
+                    {selectedUser.displayName}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500">Trạng thái</dt>
+                  <dd className="mt-1">
+                    <UserStatusBadge isActive={selectedUser.isActive} />
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-gray-500">Vai trò</dt>
+                  <dd className="mt-1 flex flex-wrap gap-1.5">
+                    {selectedUser.roles.map((role) => (
+                      <RoleBadge key={role} role={role} />
+                    ))}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-gray-500">Bio</dt>
+                  <dd className="mt-1 whitespace-pre-wrap text-gray-900">
+                    {selectedUser.bio || "Chưa cập nhật"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

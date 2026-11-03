@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -78,10 +78,18 @@ export function Header() {
     }
   }, []);
 
+  // Sync search input if on search page
+  useEffect(() => {
+    if (typeof window !== "undefined" && pathname === "/search") {
+      const q = new URLSearchParams(window.location.search).get("q");
+      if (q) setSearchQuery(q);
+    }
+  }, [pathname]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      router.push(`/recipes?search=${encodeURIComponent(searchQuery.trim())}`);
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
       setMobileMenuOpen(false);
     }
   };
@@ -176,12 +184,21 @@ export function Header() {
           >
             <input
               type="text"
+              data-testid="header-search-input"
               placeholder="Tìm công thức, món ăn..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-9 pl-9 pr-4 text-xs rounded-full border border-gray-200 bg-gray-50 focus:bg-white focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 transition-all placeholder:text-gray-400"
+              className="w-full h-9 pl-9 pr-14 text-xs rounded-full border border-gray-200 bg-gray-50 focus:bg-white focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 transition-all placeholder:text-gray-400"
             />
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+            <button
+              type="submit"
+              data-testid="header-search-submit"
+              aria-label="Tìm kiếm"
+              className="absolute right-1 top-1/2 -translate-y-1/2 px-2.5 py-1 text-[11px] font-bold rounded-full text-white bg-emerald-700 hover:bg-emerald-800 transition-colors shadow-2xs cursor-pointer"
+            >
+              Tìm
+            </button>
           </form>
 
           {/* 4. Auth & User Profile Section */}
@@ -249,7 +266,7 @@ export function Header() {
               </DropdownMenu>
             ) : (
               /* Guest Auth Buttons */
-              <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -289,15 +306,23 @@ export function Header() {
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-gray-100 bg-white px-4 pt-3 pb-6 space-y-3 shadow-lg animate-in slide-in-from-top-2">
           {/* Mobile Search */}
-          <form onSubmit={handleSearchSubmit} className="relative w-full">
+          <form onSubmit={handleSearchSubmit} className="relative w-full flex items-center">
             <input
               type="text"
+              data-testid="mobile-search-input"
               placeholder="Tìm công thức, món ăn..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-9 pr-4 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:border-emerald-600 outline-none"
+              className="w-full h-10 pl-9 pr-20 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:border-emerald-600 outline-none"
             />
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
+            <button
+              type="submit"
+              data-testid="mobile-search-submit"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-3 py-1.5 text-xs font-bold rounded-md text-white bg-emerald-700 hover:bg-emerald-800 transition-colors cursor-pointer"
+            >
+              Tìm kiếm
+            </button>
           </form>
 
           {/* Mobile Nav Links */}
@@ -322,6 +347,33 @@ export function Header() {
               );
             })}
           </nav>
+
+          {user.role === "Guest" && (
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setIsAuthModalOpen(true);
+                }}
+                className="w-full text-xs font-medium"
+              >
+                Đăng nhập
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setIsAuthModalOpen(true);
+                }}
+                className="w-full text-xs font-semibold"
+              >
+                Đăng ký
+              </Button>
+            </div>
+          )}
 
           <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
             <span className="text-xs text-gray-500 font-medium">

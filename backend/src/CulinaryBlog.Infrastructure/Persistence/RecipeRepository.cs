@@ -36,6 +36,7 @@ public class RecipeRepository : IRecipeRepository
     public Task<Recipe?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return _dbContext.Recipes
+            .IgnoreQueryFilters()
             .Include(recipe => recipe.Ingredients)
             .Include(recipe => recipe.Steps)
             .Include(recipe => recipe.Images)
@@ -69,7 +70,8 @@ public class RecipeRepository : IRecipeRepository
     {
         var normalizedSlug = slug.Trim();
         return _dbContext.Recipes
-            .AnyAsync(recipe => recipe.Slug == normalizedSlug && (!excludeId.HasValue || recipe.Id != excludeId.Value) && !recipe.IsDeleted, cancellationToken);
+            .IgnoreQueryFilters()
+            .AnyAsync(recipe => recipe.Slug == normalizedSlug && (!excludeId.HasValue || recipe.Id != excludeId.Value), cancellationToken);
     }
 
     public Task AddAsync(Recipe recipe, CancellationToken cancellationToken = default)

@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace CulinaryBlog.API.Controllers;
 
 [ApiController]
-[Route("api/v1/[controller]")]
+[Route("api/v1/legacy/categories")]
 public class CategoriesController : ControllerBase
 {
     private readonly ICategoryService _categoryService;

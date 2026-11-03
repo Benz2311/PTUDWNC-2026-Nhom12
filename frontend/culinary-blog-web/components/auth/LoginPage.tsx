@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/toast";
 import { applyFieldErrors } from "@/components/auth/form-errors";
 import { ApiError } from "@/lib/api/client";
 import GoogleLoginButton from "@/components/auth/GoogleLoginButton";
+import { Eye, EyeOff } from "lucide-react";
 
 const loginSchema = z.object({
   identifier: z
@@ -32,6 +33,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -54,7 +56,7 @@ export default function LoginPage() {
         password: values.password,
       });
       console.log("[LoginPage] Login successful, redirecting to home");
-      router.push("/");
+      router.replace("/");
       router.refresh();
     } catch (err) {
       console.error("[LoginPage] Login error:", err);
@@ -153,14 +155,28 @@ export default function LoginPage() {
                   Quên mật khẩu?
                 </a>
               </div>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                className={`${inputClasses} ${errors.password ? errorInputClasses : ""}`}
-                placeholder="••••••••"
-                {...register("password")}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  className={`${inputClasses} pr-11 ${errors.password ? errorInputClasses : ""}`}
+                  placeholder="••••••••"
+                  {...register("password")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                  className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-gray-500 hover:text-teal-700"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
               {errors.password && (
                 <p className="mt-1.5 text-sm text-red-600">
                   {errors.password.message}

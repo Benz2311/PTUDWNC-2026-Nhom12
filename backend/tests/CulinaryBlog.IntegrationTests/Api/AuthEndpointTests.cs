@@ -54,7 +54,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
         authResponse.User.UserName.Should().Be(request.UserName);
         authResponse.User.Email.Should().Be(request.Email);
         authResponse.User.DisplayName.Should().Be(request.DisplayName);
-        authResponse.User.Roles.Should().Contain("Author");
+        authResponse.User.Roles.Should().Contain("User");
     }
 
     [Fact]

@@ -26,6 +26,7 @@ public class AuthService : IAuthService
     private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
     private readonly IEmailService _emailService;
     private readonly JwtSettings _jwtSettings;
+    private readonly string _frontendBaseUrl;
     private readonly GoogleAuthSettings _googleAuthSettings;
     private readonly ILogger<AuthService> _logger;
     private readonly IHostEnvironment _environment;
@@ -50,6 +51,7 @@ public class AuthService : IAuthService
         _jwtSettings = configuration
             .GetSection(JwtSettings.Section)
             .Get<JwtSettings>() ?? throw new InvalidOperationException("Jwt settings not configured.");
+        _frontendBaseUrl = configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
         
         _googleAuthSettings = configuration
             .GetSection(GoogleAuthSettings.Section)
@@ -93,7 +95,7 @@ public class AuthService : IAuthService
                 : request.DisplayName.Trim(),
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
-            Roles = ["Author"],
+            Roles = ["User"],
             EmailConfirmed = false
         };
 
@@ -252,6 +254,13 @@ public class AuthService : IAuthService
             throw new UnauthorizedAuthException("Refresh token has expired.");
         }
 
+        if (!storedToken.User.IsActive)
+        {
+            await _refreshTokenRepository.RevokeAllForUserAsync(storedToken.UserId);
+            await _unitOfWork.SaveChangesAsync();
+            throw new UnauthorizedAuthException("Account is inactive.");
+        }
+
         var response = await CreateAuthResponseAsync(storedToken.User, ipAddress);
 
         await _refreshTokenRepository.RevokeAsync(tokenHash, DateTimeOffset.UtcNow, _jwtTokenGenerator.HashToken(response.RefreshToken));
@@ -376,7 +385,7 @@ public class AuthService : IAuthService
             _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.CurrentPassword)
                 == PasswordVerificationResult.Failed)
         {
-            throw new UnauthorizedAuthException("Current password is incorrect.");
+            throw new BadRequestException("Current password is incorrect.");
         }
 
         user.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
@@ -394,7 +403,7 @@ public class AuthService : IAuthService
         }
 
         var token = _jwtTokenGenerator.GeneratePasswordResetToken(user, TimeSpan.FromHours(1));
-        var resetUrl = $"{_jwtSettings.Issuer.Replace("api", "").TrimEnd('/')}/reset-password?token={Uri.EscapeDataString(token)}";
+        var resetUrl = $"{_frontendBaseUrl.TrimEnd('/')}/reset-password?token={Uri.EscapeDataString(token)}";
         try
         {
             await _emailService.SendAsync(new EmailMessage(
@@ -406,6 +415,7 @@ public class AuthService : IAuthService
         {
             _logger.LogError(exception, "Could not send password reset email for user {UserId}", user.Id);
         }
+
     }
 
     public async Task ResetPasswordAsync(ResetPasswordRequest request)
@@ -463,6 +473,44 @@ public class AuthService : IAuthService
         return true;
     }
 
+    public async Task<bool> UpdateAuthorRoleAsync(Guid adminUserId, Guid targetUserId, bool enabled)
+    {
+        var adminUser = await _userRepository.GetByIdAsync(adminUserId);
+        if (adminUser is null || !adminUser.Roles.Contains("Admin"))
+        {
+            throw new ForbiddenException("Only administrators can change author roles.");
+        }
+
+        var targetUser = await _userRepository.GetByIdAsync(targetUserId)
+            ?? throw new NotFoundException("User not found.");
+        var roles = (targetUser.Roles ?? []).ToList();
+        var hasAuthorRole = roles.Contains("Author", StringComparer.OrdinalIgnoreCase);
+
+        if (enabled && !hasAuthorRole)
+        {
+            roles.Add("Author");
+        }
+        else if (!enabled && hasAuthorRole)
+        {
+            roles.RemoveAll(role => role.Equals("Author", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!roles.Any(role => !role.Equals("Author", StringComparison.OrdinalIgnoreCase)))
+        {
+            roles.Add("User");
+        }
+
+        if (hasAuthorRole == enabled)
+        {
+            return false;
+        }
+
+        targetUser.Roles = roles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        await _userRepository.UpdateAsync(targetUser);
+        await _unitOfWork.SaveChangesAsync();
+        return true;
+    }
+
     private async Task SendWelcomeEmailAsync(ApplicationUser user)
     {
         try
@@ -501,7 +549,8 @@ public class AuthService : IAuthService
     {
         try
         {
-            var confirmUrl = $"{_jwtSettings.Issuer.Replace("api", "").TrimEnd('/')}/auth/confirm-email?token={Uri.EscapeDataString(token)}";
+            var confirmUrl =
+                $"{_frontendBaseUrl.TrimEnd('/')}/confirm-email?userId={user.Id}&token={Uri.EscapeDataString(token)}";
             
             var subject = "Xác thực email tài khoản CulinaryBlog";
             var htmlBody = $@"

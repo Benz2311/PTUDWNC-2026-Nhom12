@@ -26,16 +26,18 @@ export default function RootLayout({
           Chuyển thẳng đến nội dung chính
         </a>
 
-        {/* Global Navigation Header */}
-        <Header />
+        <AppProviders>
+          {/* Global Navigation Header */}
+          <Header />
 
-        {/* Main Content Area */}
-        <main id="main-content" className="flex-1 w-full">
-          <AppProviders>{children}</AppProviders>
-        </main>
+          {/* Main Content Area */}
+          <main id="main-content" className="flex-1 w-full">
+            {children}
+          </main>
 
-        {/* Global Footer */}
-        <Footer />
+          {/* Global Footer */}
+          <Footer />
+        </AppProviders>
       </body>
     </html>
   );

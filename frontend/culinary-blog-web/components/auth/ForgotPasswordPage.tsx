@@ -40,9 +40,7 @@ export default function ForgotPasswordPage() {
     setIsSubmitting(true);
     try {
       await authApi.forgotPassword({ email: values.email });
-      showSuccessToast(
-        "Yêu cầu đã được gửi. Vui lòng kiểm tra email của bạn."
-      );
+      showSuccessToast("Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi.");
     } catch (err) {
       if (err instanceof ApiError) {
         applyFieldErrors(err, setError);

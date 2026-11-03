@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ApiError } from "@/lib/api/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/toast";
+import { Eye, EyeOff } from "lucide-react";
 
 const schema = z
   .object({
@@ -23,6 +24,7 @@ export default function ChangePasswordCard() {
   const [values, setValues] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [visibleFields, setVisibleFields] = useState<Record<string, boolean>>({});
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,7 +41,9 @@ export default function ChangePasswordCard() {
       success("Đổi mật khẩu thành công");
     } catch (requestError) {
       const text = requestError instanceof ApiError
-        ? requestError.title || requestError.message
+        ? requestError.status === 401
+          ? "Mật khẩu hiện tại không đúng hoặc phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại rồi thử lại."
+          : requestError.message || requestError.title || "Không thể đổi mật khẩu."
         : "Không thể đổi mật khẩu.";
       error(text);
       setMessage(text);
@@ -59,13 +63,23 @@ export default function ChangePasswordCard() {
         ] as const).map(([name, label]) => (
           <label key={name} className="text-sm font-medium text-gray-700">
             {label}
-            <input
-              type="password"
-              value={values[name]}
-              onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))}
-              className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2"
-              autoComplete="new-password"
-            />
+            <div className="relative">
+              <input
+                type={visibleFields[name] ? "text" : "password"}
+                value={values[name]}
+                onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))}
+                className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2 pr-10"
+                autoComplete={name === "currentPassword" ? "current-password" : "new-password"}
+              />
+              <button
+                type="button"
+                onClick={() => setVisibleFields((current) => ({ ...current, [name]: !current[name] }))}
+                aria-label={visibleFields[name] ? `Ẩn ${label.toLowerCase()}` : `Hiện ${label.toLowerCase()}`}
+                className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-gray-500 hover:text-teal-700"
+              >
+                {visibleFields[name] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </label>
         ))}
         <div className="md:col-span-3">

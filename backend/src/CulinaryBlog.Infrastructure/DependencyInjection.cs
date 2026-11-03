@@ -93,7 +93,20 @@ public static class DependencyInjection
         {
             services.AddStackExchangeRedisCache(options =>
             {
-                options.Configuration = redisConnection;
+                try
+                {
+                    var configOptions = StackExchange.Redis.ConfigurationOptions.Parse(redisConnection);
+                    configOptions.ConnectTimeout = 1000;
+                    configOptions.SyncTimeout = 1000;
+                    configOptions.AsyncTimeout = 1000;
+                    configOptions.AbortOnConnectFail = false;
+                    configOptions.ConnectRetry = 1;
+                    options.ConfigurationOptions = configOptions;
+                }
+                catch
+                {
+                    options.Configuration = redisConnection;
+                }
                 options.InstanceName = "CulinaryBlog:";
             });
         }

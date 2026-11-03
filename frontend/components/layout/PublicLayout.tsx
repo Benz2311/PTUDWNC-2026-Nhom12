@@ -9,6 +9,8 @@ export interface PublicLayoutProps {
   categories?: SidebarCategoryItem[];
   activeCategorySlug?: string;
   isLoadingCategories?: boolean;
+  categoriesError?: string | null;
+  onRetryCategories?: () => void;
   showSidebar?: boolean;
   sidebarPosition?: "left" | "right";
   className?: string;
@@ -19,8 +21,10 @@ export function PublicLayout({
   categories = [],
   activeCategorySlug,
   isLoadingCategories = false,
+  categoriesError = null,
+  onRetryCategories,
   showSidebar = true,
-  sidebarPosition = "right",
+  sidebarPosition = "left",
   className,
 }: PublicLayoutProps) {
   return (
@@ -32,6 +36,8 @@ export function PublicLayout({
             categories={categories}
             activeCategorySlug={activeCategorySlug}
             isLoading={isLoadingCategories}
+            error={categoriesError}
+            onRetry={onRetryCategories}
           />
         )}
 
@@ -40,12 +46,14 @@ export function PublicLayout({
           {children}
         </section>
 
-        {/* Right Sidebar (default) */}
+        {/* Right Sidebar */}
         {showSidebar && sidebarPosition === "right" && (
           <PublicSidebar
             categories={categories}
             activeCategorySlug={activeCategorySlug}
             isLoading={isLoadingCategories}
+            error={categoriesError}
+            onRetry={onRetryCategories}
           />
         )}
       </div>

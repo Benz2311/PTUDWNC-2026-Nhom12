@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
+import Image from "next/image";
 import type { SubmitHandler } from "react-hook-form";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -228,9 +229,12 @@ export default function ProfilePage({ initialUser }: ProfilePageProps) {
               <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-teal-100 text-xl font-bold text-teal-600 ring-4 ring-teal-100">
                 <span>{getInitials(currentUser.displayName, currentUser.userName)}</span>
                 {currentUser.avatarUrl && (
-                  <img
+                  <Image
                     src={currentUser.avatarUrl}
                     alt={currentUser.displayName}
+                    width={80}
+                    height={80}
+                    unoptimized
                     className="absolute inset-0 h-full w-full rounded-full object-cover"
                     onError={(event) => {
                       event.currentTarget.classList.add("hidden");
@@ -328,14 +332,17 @@ export default function ProfilePage({ initialUser }: ProfilePageProps) {
                             <span>
                               {getInitials(currentUser.displayName, currentUser.userName)}
                             </span>
-                            <img
-                              src={currentUser.avatarUrl}
-                              alt={currentUser.displayName}
-                              className="absolute inset-0 h-full w-full rounded-full object-cover"
-                              onError={(event) => {
-                                event.currentTarget.classList.add("hidden");
-                              }}
-                            />
+                            <Image
+                    src={currentUser.avatarUrl}
+                    alt={currentUser.displayName}
+                    width={80}
+                    height={80}
+                    unoptimized
+                    className="absolute inset-0 h-full w-full rounded-full object-cover"
+                    onError={(event) => {
+                      event.currentTarget.classList.add("hidden");
+                    }}
+                  />
                           </span>
                           <a
                             href={currentUser.avatarUrl}
@@ -425,9 +432,12 @@ export default function ProfilePage({ initialUser }: ProfilePageProps) {
                         <span>
                           {getInitials(currentUser.displayName, currentUser.userName)}
                         </span>
-                        <img
+                        <Image
                           src={watchedValues.avatarUrl}
                           alt="Xem trước ảnh đại diện"
+                          width={64}
+                          height={64}
+                          unoptimized
                           className="absolute inset-0 h-full w-full rounded-full object-cover"
                           onError={(event) => {
                             event.currentTarget.classList.add("hidden");
