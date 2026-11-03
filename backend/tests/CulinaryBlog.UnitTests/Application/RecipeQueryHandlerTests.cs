@@ -1,6 +1,7 @@
 using CulinaryBlog.Application.Contracts.Persistence;
 using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipeBySlug;
+using CulinaryBlog.Application.Features.Recipes.Queries.GetDeletedRecipes;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipes;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipesByCategory;
 using CulinaryBlog.Domain.Enums;
@@ -62,7 +63,7 @@ public class RecipeQueryHandlerTests
         var paged = MakePaged(items, total: 2);
 
         _recipeRepoMock
-            .Setup(r => r.GetPublishedAsync(1, 12, It.IsAny<RecipeListOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetListAsync(1, 12, It.IsAny<RecipeListOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(paged);
 
         var handler = new GetRecipesQueryHandler(_recipeRepoMock.Object);
@@ -79,15 +80,38 @@ public class RecipeQueryHandlerTests
     }
 
     [Fact]
+    public async Task GetDeletedRecipes_PassesPaginationToRepository()
+    {
+        var expected = new PagedResultDto<RecipeTrashItemDto>([], 0, 2, 6, 0);
+        _recipeRepoMock
+            .Setup(repository => repository.GetDeletedAsync(
+                2,
+                6,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+
+        var handler = new GetDeletedRecipesQueryHandler(_recipeRepoMock.Object);
+        var result = await handler.Handle(
+            new GetDeletedRecipesQuery(2, 6),
+            CancellationToken.None);
+
+        result.Should().BeSameAs(expected);
+    }
+
+    [Fact]
     public async Task GetRecipes_WithSearchOption_PassesOptionsToRepository()
     {
         // Arrange
-        var options = new RecipeListOptions(Search: "phở");
+        var authorId = Guid.NewGuid();
+        var options = new RecipeListOptions(
+            Search: "phở",
+            AuthorId: authorId,
+            Status: RecipeStatus.Draft);
         var paged = MakePaged(new List<RecipeListItemDto> { MakeListItem("Phở Bò", "pho-bo") });
 
         RecipeListOptions? capturedOptions = null;
         _recipeRepoMock
-            .Setup(r => r.GetPublishedAsync(
+            .Setup(r => r.GetListAsync(
                 It.IsAny<int>(), It.IsAny<int>(),
                 It.IsAny<RecipeListOptions>(), It.IsAny<CancellationToken>()))
             .Callback<int, int, RecipeListOptions, CancellationToken>(
@@ -102,6 +126,8 @@ public class RecipeQueryHandlerTests
         // Assert
         capturedOptions.Should().NotBeNull();
         capturedOptions!.Search.Should().Be("phở");
+        capturedOptions.AuthorId.Should().Be(authorId);
+        capturedOptions.Status.Should().Be(RecipeStatus.Draft);
     }
 
     [Fact]
@@ -112,7 +138,7 @@ public class RecipeQueryHandlerTests
 
         RecipeListOptions? capturedOptions = null;
         _recipeRepoMock
-            .Setup(r => r.GetPublishedAsync(
+            .Setup(r => r.GetListAsync(
                 It.IsAny<int>(), It.IsAny<int>(),
                 It.IsAny<RecipeListOptions>(), It.IsAny<CancellationToken>()))
             .Callback<int, int, RecipeListOptions, CancellationToken>(
@@ -146,7 +172,7 @@ public class RecipeQueryHandlerTests
 
         RecipeListOptions? captured = null;
         _recipeRepoMock
-            .Setup(r => r.GetPublishedAsync(
+            .Setup(r => r.GetListAsync(
                 It.IsAny<int>(), It.IsAny<int>(),
                 It.IsAny<RecipeListOptions>(), It.IsAny<CancellationToken>()))
             .Callback<int, int, RecipeListOptions, CancellationToken>(
@@ -171,7 +197,7 @@ public class RecipeQueryHandlerTests
             new List<RecipeListItemDto>(), total: 25, page: 1, pageSize: 12);
 
         _recipeRepoMock
-            .Setup(r => r.GetPublishedAsync(
+            .Setup(r => r.GetListAsync(
                 It.IsAny<int>(), It.IsAny<int>(),
                 It.IsAny<RecipeListOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(paged);
@@ -305,8 +331,8 @@ public class RecipeQueryHandlerTests
         var response = new CategoryRecipesResponseDto(categoryDto, paged);
 
         _recipeRepoMock
-            .Setup(r => r.GetPublishedByCategorySlugAsync(
-                "mon-chinh", 1, 12, It.IsAny<CancellationToken>()))
+            .Setup(r => r.GetByCategorySlugAsync(
+                "mon-chinh", 1, 12, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(response);
 
         var handler = new GetRecipesByCategoryQueryHandler(_recipeRepoMock.Object);
@@ -331,8 +357,9 @@ public class RecipeQueryHandlerTests
     {
         // Arrange
         _recipeRepoMock
-            .Setup(r => r.GetPublishedByCategorySlugAsync(
+            .Setup(r => r.GetByCategorySlugAsync(
                 "category-khong-ton-tai", It.IsAny<int>(), It.IsAny<int>(),
+                It.IsAny<Guid?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((CategoryRecipesResponseDto?)null);
 
@@ -357,11 +384,12 @@ public class RecipeQueryHandlerTests
 
         int capturedPage = 0, capturedPageSize = 0;
         _recipeRepoMock
-            .Setup(r => r.GetPublishedByCategorySlugAsync(
+            .Setup(r => r.GetByCategorySlugAsync(
                 It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>(),
+                It.IsAny<Guid?>(),
                 It.IsAny<CancellationToken>()))
-            .Callback<string, int, int, CancellationToken>(
-                (_, p, ps, _) => { capturedPage = p; capturedPageSize = ps; })
+            .Callback<string, int, int, Guid?, CancellationToken>(
+                (_, p, ps, _, _) => { capturedPage = p; capturedPageSize = ps; })
             .ReturnsAsync(response);
 
         var handler = new GetRecipesByCategoryQueryHandler(_recipeRepoMock.Object);
@@ -387,7 +415,7 @@ public class RecipeQueryHandlerTests
 
         RecipeListOptions? captured = null;
         _recipeRepoMock
-            .Setup(r => r.GetPublishedAsync(
+            .Setup(r => r.GetListAsync(
                 It.IsAny<int>(), It.IsAny<int>(),
                 It.IsAny<RecipeListOptions>(), It.IsAny<CancellationToken>()))
             .Callback<int, int, RecipeListOptions, CancellationToken>(

@@ -9,6 +9,7 @@ import {
   recipeStepSchema,
   recipeSummarySchema,
   recipeStatusSchema,
+  recipeTrashPageSchema,
   type RecipeDetail,
   type RecipeDraftRequest,
   type RecipeIngredient,
@@ -16,6 +17,7 @@ import {
   type RecipeStatus,
   type RecipeStep,
   type RecipeSummary,
+  type RecipeTrashPage,
 } from '@/types/recipe';
 
 export type RecipeSort = 'newest' | 'oldest' | 'title' | 'cooktime';
@@ -27,6 +29,8 @@ export type RecipeQuery = {
   categoryId?: string;
   status?: RecipeStatus;
   sort?: RecipeSort;
+  mine?: boolean;
+  allStatuses?: boolean;
 };
 
 export type RecipeIngredientInput = {
@@ -55,6 +59,7 @@ export function buildRecipeQuery(query: RecipeQuery = {}): string {
   if (query.search?.trim()) params.set('search', query.search.trim());
   if (query.categoryId) params.set('categoryId', query.categoryId);
   if (query.status) params.set('status', query.status);
+  if (query.mine !== undefined) params.set('mine', String(query.mine));
   if (query.sort) params.set('sort', query.sort);
 
   const serialized = params.toString();
@@ -72,13 +77,38 @@ function requireEtag(etag: string): string {
 function jsonHeaders(etag?: string): HeadersInit {
   return {
     'Content-Type': 'application/json',
-    ...(etag ? { 'If-Match': requireEtag(etag) } : {}),
+    ...(etag !== undefined ? { 'If-Match': requireEtag(etag) } : {}),
   };
 }
 
 export async function getRecipes(query: RecipeQuery = {}, withAuth = true): Promise<RecipePage> {
-  const result = await apiFetch<unknown>(`${recipeBasePath}${buildRecipeQuery(query)}`, {}, withAuth);
-  return recipePageSchema.parse(result);
+  const path = query.allStatuses ? '/api/v1/admin/recipes' : recipeBasePath;
+  const result = await apiFetch<unknown>(`${path}${buildRecipeQuery(query)}`, {}, withAuth);
+  return recipePageSchema.parse(normalizeRecipePage(result));
+}
+
+function normalizeRecipePage(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+
+  const envelope = value as {
+    data?: unknown;
+    items?: unknown;
+    meta?: {
+      page?: unknown;
+      pageSize?: unknown;
+      total?: unknown;
+    };
+  };
+
+  if (Array.isArray(envelope.items)) return value;
+  if (!Array.isArray(envelope.data)) return value;
+
+  return {
+    items: envelope.data,
+    page: typeof envelope.meta?.page === 'number' ? envelope.meta.page : 1,
+    pageSize: typeof envelope.meta?.pageSize === 'number' ? envelope.meta.pageSize : envelope.data.length,
+    totalCount: typeof envelope.meta?.total === 'number' ? envelope.meta.total : envelope.data.length,
+  };
 }
 
 export async function searchRecipes(
@@ -87,9 +117,16 @@ export async function searchRecipes(
   withAuth = false,
 ): Promise<RecipePage> {
   const params = new URLSearchParams(buildRecipeQuery(query).slice(1));
-  params.set('query', search.trim());
+  params.set('q', search.trim());
   const result = await apiFetch<unknown>(`${recipeBasePath}/search?${params.toString()}`, {}, withAuth);
-  return recipePageSchema.parse(result);
+  return recipePageSchema.parse(normalizeRecipePage(result));
+}
+
+export async function getDeletedRecipes(page = 1, pageSize = 12): Promise<RecipeTrashPage> {
+  const result = await apiFetch<unknown>(
+    `/api/v1/admin/recipes/trash?page=${page}&pageSize=${pageSize}`,
+  );
+  return recipeTrashPageSchema.parse(result);
 }
 
 export async function getRecipeBySlug(
@@ -124,10 +161,7 @@ export async function updateRecipe(
     `${recipeBasePath}/${encodeURIComponent(id)}`,
     {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'If-Match': requireEtag(etag),
-      },
+      headers: jsonHeaders(etag),
       body: JSON.stringify(request),
     },
   );

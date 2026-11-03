@@ -25,14 +25,25 @@ public class RecipeConfiguration
         builder.Property(r => r.Description)
             .HasColumnType("text");
 
+        builder.Property(r => r.Servings)
+            .IsRequired()
+            .HasDefaultValue(1);
+
         builder.Property(r => r.xmin)
             .IsRowVersion()
             .HasColumnType("xid");
+
+        builder.Property(r => r.RowVersion)
+            .IsRequired()
+            .IsConcurrencyToken()
+            .ValueGeneratedNever();
 
 
 
         builder.HasIndex(r => r.Slug)
             .IsUnique();
+
+        builder.HasIndex(r => r.AuthorId);
 
         builder.HasIndex(r => r.CategoryId);
 

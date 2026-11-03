@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getRecipeBySlug } from './recipes';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getDeletedRecipes, getRecipeBySlug, getRecipes, searchRecipes } from './recipes';
 import * as apiModule from '@/lib/api';
 import type { RecipeDetail } from '@/types/recipe';
 
@@ -105,6 +105,10 @@ describe('Recipe Detail API and display contract tests', () => {
     vi.restoreAllMocks();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('fetches and validates a published recipe with full details and nutrition', async () => {
     const mockHeaders = new Headers({ etag: '"sample-etag-123"' });
     vi.spyOn(apiModule, 'apiFetchWithResponse').mockResolvedValueOnce({
@@ -125,6 +129,80 @@ describe('Recipe Detail API and display contract tests', () => {
     expect(result.data.nutrition?.calories).toBe(450);
     expect(result.data.nutrition?.sodium).toBe(1200);
     expect(result.headers.get('etag')).toBe('"sample-etag-123"');
+  });
+
+  it('normalizes the current backend recipe detail contract', async () => {
+    const backendRecipe = {
+      ...mockBaseRecipe,
+      categoryId: undefined,
+      category: {
+        id: '22222222-2222-4222-8222-222222222222',
+        name: 'Món nước',
+        slug: 'mon-nuoc',
+      },
+      author: {
+        id: '66666666-6666-4666-8666-666666666666',
+        displayName: 'Nguyễn Văn Đầu Bếp',
+        avatarUrl: null,
+      },
+      images: [{
+        id: '55555555-5555-4555-8555-555555555551',
+        originalUrl: '/sample-images/pho-primary.jpg',
+        mediumUrl: null,
+        thumbnailUrl: null,
+        altText: 'Bát phở bò',
+        isPrimary: true,
+        orderIndex: 0,
+      }],
+    };
+    vi.spyOn(apiModule, 'apiFetchWithResponse').mockResolvedValueOnce({
+      data: backendRecipe,
+      headers: new Headers({ etag: '"backend-etag"' }),
+    });
+
+    const result = await getRecipeBySlug('pho-bo-ha-noi', true);
+
+    expect(result.data.categoryId).toBe('22222222-2222-4222-8222-222222222222');
+    expect(result.data.category).toBe('Món nước');
+    expect(result.data.author).toBe('Nguyễn Văn Đầu Bếp');
+    expect(result.data.images[0]).toMatchObject({
+      url: '/sample-images/pho-primary.jpg',
+      sortOrder: 0,
+    });
+  });
+
+  it('uses the author and admin recipe list routes and the backend search query key', async () => {
+    const emptyPage = { items: [], page: 1, pageSize: 12, totalCount: 0 };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => new Response(JSON.stringify(emptyPage), { status: 200 }));
+
+    await getRecipes({ page: 1, pageSize: 12, mine: true });
+    await getRecipes({ page: 1, pageSize: 12, allStatuses: true });
+    await searchRecipes('phở bò', { page: 1, pageSize: 12 });
+
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('/api/v1/recipes?page=1&pageSize=12&mine=true');
+    expect(String(fetchSpy.mock.calls[1][0])).toContain('/api/v1/admin/recipes?page=1&pageSize=12');
+    expect(String(fetchSpy.mock.calls[2][0])).toContain('/api/v1/recipes/search?page=1&pageSize=12&q=ph%E1%BB%9F+b%C3%B2');
+  });
+
+  it('parses the paginated admin trash response', async () => {
+    const item = {
+      id: '11111111-1111-4111-8111-111111111111',
+      title: 'Recipe in trash',
+      slug: 'recipe-in-trash',
+      status: 'Published',
+      deletedAt: '2026-11-01T10:00:00Z',
+    };
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(
+      JSON.stringify({ items: [item], totalCount: 13, page: 2, pageSize: 12, totalPages: 2 }),
+      { status: 200 },
+    ));
+
+    const result = await getDeletedRecipes(2, 12);
+
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('/api/v1/admin/recipes/trash?page=2&pageSize=12');
+    expect(result.items).toEqual([item]);
+    expect(result.totalCount).toBe(13);
   });
 
   it('accepts recipe without images and handles primary vs secondary ordering', async () => {

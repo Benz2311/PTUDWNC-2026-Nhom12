@@ -23,6 +23,38 @@ describe('Recipe API contracts', () => {
     expect(recipeSummarySchema.parse(recipeSummary)).toEqual(recipeSummary);
   });
 
+  it('normalizes the recipe list DTO returned by the API', () => {
+    const parsed = recipeSummarySchema.parse({
+      ...recipeSummary,
+      category: {
+        id: '22222222-2222-4222-8222-222222222222',
+        name: 'Vegetarian',
+        slug: 'vegetarian',
+        description: null,
+      },
+      primaryImageUrl: null,
+      imageUrl: '/images/vegetable-soup.jpg',
+    });
+
+    expect(parsed).toEqual({
+      ...recipeSummary,
+      primaryImageUrl: '/images/vegetable-soup.jpg',
+    });
+  });
+
+  it('normalizes published search results with categoryName and authorName', () => {
+    const parsed = recipeSummarySchema.parse({
+      ...recipeSummary,
+      category: undefined,
+      author: undefined,
+      status: undefined,
+      categoryName: 'Vegetarian',
+      authorName: 'Demo Author',
+    });
+
+    expect(parsed).toEqual(recipeSummary);
+  });
+
   it('rejects backend enum values outside the declared API contract', () => {
     expect(() => recipeSummarySchema.parse({ ...recipeSummary, difficulty: 'Impossible' })).toThrow();
   });

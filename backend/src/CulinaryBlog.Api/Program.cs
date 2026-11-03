@@ -1,12 +1,16 @@
 using System.Text;
 using System.Threading.RateLimiting;
-using CulinaryBlog.Api.Endpoints.Files;
+using System.Text.Json.Serialization;
+using CulinaryBlog.API.Extensions;
 using CulinaryBlog.Api.Endpoints.Auth;
 using CulinaryBlog.Api.Endpoints.Categories;
+using CulinaryBlog.Api.Endpoints.Files;
 using CulinaryBlog.Api.Endpoints.Health;
 using CulinaryBlog.Api.Endpoints.Recipes;
 using CulinaryBlog.Api.Endpoints.Sitemap;
+using CulinaryBlog.Api.Extensions;
 using CulinaryBlog.Api.Jobs;
+using CulinaryBlog.Api.Middleware;
 using CulinaryBlog.Application;
 using CulinaryBlog.Infrastructure;
 using CulinaryBlog.Infrastructure.Persistence;
@@ -18,7 +22,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
-using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -73,6 +76,7 @@ builder.Services.AddRateLimiter(options =>
         limiter.AutoReplenishment = true;
     });
 });
+builder.Services.AddRateLimitingConfiguration(builder.Configuration);
 builder.Services.AddProblemDetails();
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -89,7 +93,7 @@ builder.Services.AddOpenApi(options =>
             Type = SecuritySchemeType.Http,
             Scheme = "bearer",
             BearerFormat = "JWT",
-            Description = "Paste an access token returned by POST /api/v1/auth/login. Do not include the 'Bearer ' prefix.",
+            Description = "Paste an access token returned by POST /api/v1/auth/login. Do not include the 'Bearer ' prefix."
         };
         return Task.CompletedTask;
     });
@@ -124,8 +128,8 @@ builder.Services.AddOpenApi(options =>
         [
             new OpenApiSecurityRequirement
             {
-                [new OpenApiSecuritySchemeReference("Bearer", context.Document)] = [],
-            },
+                [new OpenApiSecuritySchemeReference("Bearer", context.Document)] = []
+            }
         ];
         return Task.CompletedTask;
     });
@@ -137,7 +141,7 @@ builder.Services.AddHostedService<SitemapGenerationHostedService>();
 
 var app = builder.Build();
 
-app.UseExceptionHandler();
+app.UseExceptionHandling();
 app.UseStatusCodePages();
 app.UseRouting();
 app.UseCors("frontend");
@@ -154,9 +158,11 @@ if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("Api
 app.MapHealthEndpoints();
 app.MapAuthEndpoints();
 app.MapCategoryEndpoints();
-app.MapRecipeEndpoints();
+CulinaryBlog.Api.Endpoints.Dashboard.DashboardEndpoints.MapDashboardEndpoints(app);
+CulinaryBlog.API.Endpoints.RecipeEndpoints.MapRecipeEndpoints(app);
 app.MapFileEndpoints();
 app.MapSitemapEndpoints();
+CulinaryBlog.API.Endpoints.AdminUsersEndpoints.MapAdminUsersEndpoints(app);
 
 app.MapGet("/", () => Results.Ok(new
 {
@@ -169,12 +175,11 @@ if (!app.Environment.IsEnvironment("DesignTime"))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await db.Database.MigrateAsync();
-    await RecipeSeedData.InitializeAsync(db, app.Configuration);
+    if (db.Database.IsRelational())
+    {
+        await db.Database.MigrateAsync();
+        await RecipeSeedData.InitializeAsync(db, app.Configuration);
+    }
 }
 
 app.Run();
-
-public partial class Program
-{
-}

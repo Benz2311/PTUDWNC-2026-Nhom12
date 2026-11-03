@@ -39,7 +39,8 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<string>("Bio")
-                        .HasColumnType("text");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<string>("ConcurrencyStamp")
                         .HasColumnType("text");
@@ -53,7 +54,9 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(256)");
 
                     b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("FullName")
                         .IsRequired()
@@ -62,7 +65,8 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
                         .HasColumnName("DisplayName");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
@@ -84,7 +88,8 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
 
                     b.PrimitiveCollection<string[]>("Roles")
                         .IsRequired()
-                        .HasColumnType("text[]");
+                        .HasColumnType("text[]")
+                        .HasColumnName("Roles");
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
@@ -101,6 +106,8 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("IsActive");
 
                     b.HasIndex("UserName")
                         .IsUnique();
@@ -265,6 +272,7 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasColumnType("bytea");
 
@@ -273,7 +281,9 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
                         .HasColumnName("SearchVector");
 
                     b.Property<int>("Servings")
-                        .HasColumnType("integer");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -594,6 +604,10 @@ namespace CulinaryBlog.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("RevokedAt");
 
                     b.HasIndex("TokenHash")
                         .IsUnique();

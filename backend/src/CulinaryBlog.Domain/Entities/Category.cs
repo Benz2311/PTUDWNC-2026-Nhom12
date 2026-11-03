@@ -96,6 +96,18 @@ public class Category : BaseEntity
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void UpdateDetails(string name, string? description)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Category name cannot be empty.", nameof(name));
+        }
+
+        Name = name;
+        Description = description;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void SoftDelete()
     {
         IsDeleted = true;

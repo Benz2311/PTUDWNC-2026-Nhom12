@@ -1,49 +1,36 @@
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace CulinaryBlog.IntegrationTests.Api;
 
-/// <summary>
-/// Smoke-level integration tests — verifies that the API host boots successfully.
-/// Requires a running database and valid local configuration.
-/// </summary>
-public class CategoriesEndpointTests : IClassFixture<WebApplicationFactory<global::Program>>
+public sealed class CategoriesEndpointTests : IClassFixture<WebApplicationFactory<global::Program>>
 {
-    private readonly HttpClient? _client;
+    private readonly WebApplicationFactory<global::Program> _factory;
 
     public CategoriesEndpointTests(WebApplicationFactory<global::Program> factory)
     {
-        var configuration = new ConfigurationBuilder()
-            .AddEnvironmentVariables()
-            .Build();
-
-        var connectionString = configuration["ConnectionStrings:DefaultConnection"]
-            ?? configuration["TEST_CONNECTION_STRING"];
-
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            _client = null;
-            return;
-        }
-
-        _client = factory.CreateClient();
+        _factory = factory;
     }
 
-    [Fact]
+    [PostgreSqlFact]
     public async Task GetCategories_ReturnsSuccessStatusCode()
     {
-        if (_client is null)
-        {
-            return;
-        }
-
-        // Act
-        var response = await _client.GetAsync("/api/categories");
-
-        // Assert
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/categories");
         response.IsSuccessStatusCode.Should().BeTrue(
             $"GET /api/categories should return 2xx but returned {(int)response.StatusCode}");
+    }
+
+    private sealed class PostgreSqlFactAttribute : FactAttribute
+    {
+        public PostgreSqlFactAttribute()
+        {
+            if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CULINARYBLOG_TEST_CONNECTION")) &&
+                string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TEST_CONNECTION_STRING")))
+            {
+                Skip = "Set CULINARYBLOG_TEST_CONNECTION or TEST_CONNECTION_STRING to a dedicated PostgreSQL database.";
+            }
+        }
     }
 }

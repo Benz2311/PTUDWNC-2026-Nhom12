@@ -1,6 +1,7 @@
 @baseUrl = http://localhost:5000
 @token = replace-with-access-token
 @recipeId = replace-with-recipe-guid
+@userId = replace-with-user-guid
 @ingredientId = replace-with-ingredient-guid
 @etag = "replace-with-current-etag"
 
@@ -91,6 +92,19 @@ Authorization: Bearer {{token}}
 ### Purge a recipe (Admin; destructive)
 DELETE {{baseUrl}}/api/v1/admin/recipes/{{recipeId}}/purge
 Authorization: Bearer {{token}}
+
+### List users for administration
+GET {{baseUrl}}/api/v1/admin/users?page=1&pageSize=100
+Authorization: Bearer {{token}}
+
+### Update user roles (Admin)
+PATCH {{baseUrl}}/api/v1/admin/users/{{userId}}/roles
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roles": ["Author", "Admin"]
+}
 
 ### Reject fractional-string ingredient quantity with 422
 POST {{baseUrl}}/api/v1/recipes/{{recipeId}}/ingredients

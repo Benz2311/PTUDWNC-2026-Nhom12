@@ -9,6 +9,7 @@ namespace CulinaryBlog.Infrastructure.Persistence.Seed;
 public static class RecipeSeedData
 {
     private static readonly Guid DemoUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid NgocPhuocUserId = Guid.Parse("25525525-5255-5255-5255-255255255255");
 
     private static readonly Random Random = new(20260922);
 
@@ -155,7 +156,10 @@ public static class RecipeSeedData
                 FullName = "Culinary Blog Demo",
                 UserName = "culinary-demo",
                 Email = "demo@culinaryblog.local",
-                EmailConfirmed = true
+                EmailConfirmed = true,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                Roles = ["Author"]
             };
             user.PasswordHash = passwordHasher.HashPassword(user, demoPassword);
 
@@ -254,10 +258,295 @@ public static class RecipeSeedData
         });
     }
 }
+        await db.SaveChangesAsync(cancellationToken);
 
-await db.SaveChangesAsync(cancellationToken);
-    await RecipeSampleImageSeeder.EnsureImagesAsync(db, DemoUserId, cancellationToken);
+        await EnsureNgocPhuocRecipesAsync(
+            db,
+            passwordHasher,
+            demoPassword,
+            categoryBySlug,
+            cancellationToken);
+
+        await RecipeSampleImageSeeder.EnsureImagesAsync(db, DemoUserId, cancellationToken);
     }
+
+    private static async Task EnsureNgocPhuocRecipesAsync(
+        ApplicationDbContext db,
+        PasswordHasher<ApplicationUser> passwordHasher,
+        string demoPassword,
+        IReadOnlyDictionary<string, Category> categoryBySlug,
+        CancellationToken cancellationToken)
+    {
+        const string email = "ngocphuoc255@gmail.com";
+
+        var targetUser = await db.Users
+            .SingleOrDefaultAsync(item => item.Email.ToLower() == email, cancellationToken);
+
+        if (targetUser is null)
+        {
+            targetUser = new ApplicationUser
+            {
+                Id = NgocPhuocUserId,
+                FullName = "Ngoc Phuoc",
+                UserName = "ngocphuoc255",
+                NormalizedUserName = "NGOCPHUOC255",
+                Email = email,
+                NormalizedEmail = "NGOCPHUOC255@GMAIL.COM",
+                EmailConfirmed = true,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                Roles = ["Author"]
+            };
+            targetUser.PasswordHash = passwordHasher.HashPassword(targetUser, demoPassword);
+            db.Users.Add(targetUser);
+        }
+        else
+        {
+            var needsUpdate =
+                !targetUser.EmailConfirmed ||
+                !targetUser.IsActive ||
+                string.IsNullOrWhiteSpace(targetUser.FullName) ||
+                targetUser.NormalizedEmail != "NGOCPHUOC255@GMAIL.COM" ||
+                NeedsPasswordReset(targetUser, passwordHasher, demoPassword);
+
+            targetUser.EmailConfirmed = true;
+            targetUser.IsActive = true;
+            targetUser.FullName = string.IsNullOrWhiteSpace(targetUser.FullName) ? "Ngoc Phuoc" : targetUser.FullName;
+            targetUser.NormalizedEmail = "NGOCPHUOC255@GMAIL.COM";
+            targetUser.Roles = ["Author"];
+
+            if (needsUpdate || string.IsNullOrWhiteSpace(targetUser.PasswordHash))
+            {
+                targetUser.PasswordHash = passwordHasher.HashPassword(targetUser, demoPassword);
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        var category = categoryBySlug.Values.First();
+        var existingRecipes = await db.Recipes
+            .Include(item => item.Ingredients)
+            .Include(item => item.Steps)
+            .Include(item => item.Images)
+            .Where(item => item.AuthorId == targetUser.Id && item.Slug.StartsWith("ngocphuoc-mau-"))
+            .ToDictionaryAsync(item => item.Slug, cancellationToken);
+
+        for (var i = 1; i <= 100; i++)
+        {
+            var slug = $"ngocphuoc-mau-{i:000}";
+            if (!existingRecipes.ContainsKey(slug))
+            {
+                var baseName = RecipeBases[(i - 1) % RecipeBases.Length];
+                existingRecipes[slug] = CreateNgocPhuocRecipe(
+                    i,
+                    baseName,
+                    targetUser.Id,
+                    category.Id);
+                db.Recipes.Add(existingRecipes[slug]);
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        var targetRecipes = await db.Recipes
+            .Include(item => item.Ingredients)
+            .Include(item => item.Steps)
+            .Include(item => item.Images)
+            .Where(item => item.AuthorId == targetUser.Id && item.Slug.StartsWith("ngocphuoc-mau-"))
+            .ToListAsync(cancellationToken);
+
+        foreach (var recipe in targetRecipes)
+        {
+            var index = int.TryParse(
+                recipe.Slug.Replace("ngocphuoc-mau-", string.Empty),
+                out var parsedIndex)
+                ? parsedIndex
+                : 1;
+            var baseName = RecipeBases[(index - 1) % RecipeBases.Length];
+            recipe.Title = baseName;
+            recipe.Description =
+                $"Công thức {baseName.ToLowerInvariant()} dành cho thực hành và kiểm thử dữ liệu.";
+            recipe.Content =
+                $"Chuẩn bị nguyên liệu đầy đủ, sơ chế sạch và chế biến {baseName.ToLowerInvariant()} theo từng bước.";
+
+            foreach (var ingredient in recipe.Ingredients
+                         .Where(item => item.Name.StartsWith("Nguyên liệu chính", StringComparison.OrdinalIgnoreCase)))
+            {
+                ingredient.Name = "Nguyên liệu chính";
+            }
+
+            foreach (var image in recipe.Images.Where(item =>
+                         item.AltText != null &&
+                         (item.AltText.Contains("mẫu", StringComparison.OrdinalIgnoreCase) ||
+                          item.AltText.Contains("số", StringComparison.OrdinalIgnoreCase))))
+            {
+                image.AltText = $"Hình ảnh {baseName}";
+            }
+
+            if (recipe.Ingredients.Count < 10)
+            {
+                var startOrder = recipe.Ingredients.Count;
+                var selected = IngredientNames
+                    .Skip((index * 7) % IngredientNames.Length)
+                    .Concat(IngredientNames.Take((index * 7) % IngredientNames.Length))
+                    .Take(10 - startOrder);
+
+                var order = startOrder;
+                foreach (var name in selected)
+                {
+                    db.RecipeIngredients.Add(new RecipeIngredient
+                    {
+                        RecipeId = recipe.Id,
+                        Name = name,
+                        Quantity = RandomQuantity(),
+                        Unit = Units[(index + order) % Units.Length],
+                        Notes = "Sơ chế sạch và điều chỉnh lượng theo khẩu vị.",
+                        SortOrder = order++
+                    });
+                }
+            }
+
+            if (recipe.Steps.Count < 3)
+            {
+                var startOrder = recipe.Steps.Count + 1;
+                for (var stepNumber = startOrder; stepNumber <= 3; stepNumber++)
+                {
+                    db.RecipeSteps.Add(CreateNgocPhuocStep(recipe.Id, stepNumber, index));
+                }
+            }
+
+            if (!recipe.Images.Any(item => item.IsPrimary && !item.IsDeleted))
+            {
+                var primary = recipe.Images
+                    .FirstOrDefault(item => !item.IsDeleted && item.OriginalUrl != string.Empty);
+                if (primary is null)
+                {
+                    db.RecipeImages.Add(new RecipeImage
+                    {
+                        RecipeId = recipe.Id,
+                        OriginalUrl =
+                            $"https://images.unsplash.com/photo-1547592180-85f173990554?w=800&seed=ngocphuoc-{index}",
+                        MediumUrl =
+                            $"https://images.unsplash.com/photo-1547592180-85f173990554?w=800&seed=ngocphuoc-{index}",
+                        ThumbnailUrl =
+                            $"https://images.unsplash.com/photo-1547592180-85f173990554?w=300&seed=ngocphuoc-{index}",
+                        AltText = $"Hình ảnh {baseName}",
+                        IsPrimary = true,
+                        OrderIndex = 0
+                    });
+                }
+                else
+                {
+                    primary.IsPrimary = true;
+                }
+            }
+
+            if (recipe.Nutrition.Calories is null || recipe.Nutrition.Protein is null)
+            {
+                recipe.Nutrition = new RecipeNutrition
+                {
+                    Source = NutritionSource.Manual,
+                    Calories = 250 + (index % 500),
+                    Protein = 10 + (index % 35),
+                    Carbohydrates = 20 + (index % 70),
+                    Fat = 5 + (index % 30),
+                    Fiber = 2 + (index % 10),
+                    Sodium = 200 + (index % 900)
+                };
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static Recipe CreateNgocPhuocRecipe(
+        int index,
+        string baseName,
+        Guid authorId,
+        Guid categoryId)
+    {
+        var recipe = new Recipe
+        {
+            AuthorId = authorId,
+            CategoryId = categoryId,
+            Title = baseName,
+            Slug = $"ngocphuoc-mau-{index:000}",
+            Description =
+                $"Công thức {baseName.ToLowerInvariant()} dành cho thực hành và kiểm thử dữ liệu.",
+            Content =
+                $"Chuẩn bị nguyên liệu đầy đủ, sơ chế sạch, chế biến {baseName.ToLowerInvariant()} theo từng bước và điều chỉnh gia vị trước khi hoàn thiện.",
+            PrepTimeMinutes = 10 + (index % 30),
+            CookTimeMinutes = 20 + (index % 60),
+            Servings = 2 + (index % 6),
+            Difficulty = (DifficultyLevel)(index % 3 + 1),
+            Status = RecipeStatus.Published,
+            PublishedAt = DateTime.UtcNow.AddDays(-(index % 365)),
+            Nutrition = new RecipeNutrition
+            {
+                Source = NutritionSource.Manual,
+                Calories = 250 + (index % 500),
+                Protein = 10 + (index % 35),
+                Carbohydrates = 20 + (index % 70),
+                Fat = 5 + (index % 30),
+                Fiber = 2 + (index % 10),
+                Sodium = 200 + (index % 900)
+            }
+        };
+
+        for (var order = 0; order < 10; order++)
+        {
+            recipe.Ingredients.Add(new RecipeIngredient
+            {
+                RecipeId = recipe.Id,
+                Name = IngredientNames[(index * 7 + order) % IngredientNames.Length],
+                Quantity = RandomQuantity(),
+                Unit = Units[(index + order) % Units.Length],
+                Notes = order == 0 ? "Nguyên liệu chính, sơ chế sạch trước khi nấu." : null,
+                SortOrder = order
+            });
+        }
+
+        for (var stepNumber = 1; stepNumber <= 3; stepNumber++)
+        {
+            recipe.Steps.Add(CreateNgocPhuocStep(recipe.Id, stepNumber, index));
+        }
+
+        recipe.Images.Add(new RecipeImage
+        {
+            RecipeId = recipe.Id,
+            OriginalUrl =
+                $"https://images.unsplash.com/photo-1547592180-85f173990554?w=800&seed=ngocphuoc-{index}",
+            MediumUrl =
+                $"https://images.unsplash.com/photo-1547592180-85f173990554?w=800&seed=ngocphuoc-{index}",
+            ThumbnailUrl =
+                $"https://images.unsplash.com/photo-1547592180-85f173990554?w=300&seed=ngocphuoc-{index}",
+            AltText = $"Hình ảnh {baseName}",
+            IsPrimary = true,
+            OrderIndex = 0
+        });
+
+        return recipe;
+    }
+
+    private static RecipeStep CreateNgocPhuocStep(Guid recipeId, int stepNumber, int index) =>
+        new()
+        {
+            RecipeId = recipeId,
+            StepNumber = stepNumber,
+            Title = stepNumber switch
+            {
+                1 => "Chuẩn bị",
+                2 => "Chế biến",
+                _ => "Hoàn thiện và thưởng thức"
+            },
+            Description = stepNumber switch
+            {
+                1 => "Sơ chế nguyên liệu, căn chỉnh dụng cụ và chuẩn bị gia vị.",
+                2 => $"Nấu trong lửa vừa, đảo đều khoảng {8 + index % 12} phút và kiểm tra độ chín.",
+                _ => "Bày ra đĩa, trang trí đẹp mắt và thưởng thức khi còn ấm."
+            },
+            TimerMinutes = stepNumber == 2 ? 8 + index % 12 : null
+        };
 
     private static Category CreateCategory(
         string slug,
@@ -291,7 +580,7 @@ await db.SaveChangesAsync(cancellationToken);
     {
         var baseName = RecipeBases[Random.Next(RecipeBases.Length)];
 
-        var title = $"{baseName} phiên bản {recipeNumber:000}";
+        var title = baseName;
         var slug = $"recipe-{recipeNumber:000}";
 
         var prepTime = Random.Next(5, 46);

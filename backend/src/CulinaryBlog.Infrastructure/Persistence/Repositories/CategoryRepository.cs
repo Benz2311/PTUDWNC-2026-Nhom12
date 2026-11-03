@@ -15,9 +15,8 @@ public class CategoryRepository : ICategoryRepository
         _db = db;
     }
 
-    public async Task<IReadOnlyList<CategoryDto>>
-        GetAllWithRecipeCountAsync(
-            CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<CategoryDto>> GetAllWithRecipeCountAsync(
+        CancellationToken cancellationToken = default)
     {
         return await _db.Categories
             .AsNoTracking()
@@ -30,115 +29,94 @@ public class CategoryRepository : ICategoryRepository
                 category.Description,
                 category.ImageUrl,
                 category.OrderIndex,
-                category.Recipes.Count(recipe =>
-                    recipe.Status == RecipeStatus.Published)))
+                category.Recipes.Count(recipe => recipe.Status == RecipeStatus.Published)))
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<Category?> GetBySlugAsync(
-        string slug,
-        CancellationToken cancellationToken = default)
-    {
-        return await _db.Categories
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                c => c.Slug == slug,
-                cancellationToken);
-    }
+    public Task<Category?> GetBySlugAsync(string slug, CancellationToken cancellationToken = default) =>
+        _db.Categories.AsNoTracking().FirstOrDefaultAsync(category => category.Slug == slug, cancellationToken);
 
-    public async Task<Category?> GetByIdAsync(
-        Guid id,
-        CancellationToken cancellationToken = default)
-    {
-        return await _db.Categories
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                c => c.Id == id,
-                cancellationToken);
-    }
+    public Task<Category?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        _db.Categories.AsNoTracking().FirstOrDefaultAsync(category => category.Id == id, cancellationToken);
 
-    public async Task<bool> NameExistsAsync(
+    public Task<bool> NameExistsAsync(
         string name,
         Guid? excludeId = null,
+        CancellationToken cancellationToken = default) =>
+        _db.Categories
+            .IgnoreQueryFilters()
+            .AnyAsync(category => category.Name == name && (!excludeId.HasValue || category.Id != excludeId.Value), cancellationToken);
+
+    public Task<bool> SlugExistsAsync(string slug, CancellationToken cancellationToken = default) =>
+        _db.Categories
+            .IgnoreQueryFilters()
+            .AnyAsync(category => category.Slug == slug, cancellationToken);
+
+    public Task<int> CountRecipesAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        _db.Recipes.CountAsync(recipe => recipe.CategoryId == categoryId, cancellationToken);
+
+    public async Task<CategoryStatisticsDto> GetCategoryStatisticsAsync(
         CancellationToken cancellationToken = default)
     {
-        return await _db.Categories
-            .AnyAsync(
-                c =>
-                    c.Name == name &&
-                    (!excludeId.HasValue ||
-                     c.Id != excludeId.Value),
-                cancellationToken);
-    }
+        var totalCategories = await _db.Categories.CountAsync(cancellationToken);
+        var recipeCountsByStatus = await _db.Recipes
+            .AsNoTracking()
+            .GroupBy(recipe => recipe.Status)
+            .Select(group => new { Status = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(item => item.Status, item => item.Count, cancellationToken);
+        var totalRecipes = recipeCountsByStatus.Values.Sum();
+        var publishedRecipes = recipeCountsByStatus.GetValueOrDefault(RecipeStatus.Published);
+        var draftRecipes = recipeCountsByStatus.GetValueOrDefault(RecipeStatus.Draft);
+        var archivedRecipes = recipeCountsByStatus.GetValueOrDefault(RecipeStatus.Archived);
 
-    public async Task<int> CountRecipesAsync(
-        Guid categoryId,
-        CancellationToken cancellationToken = default)
-    {
-        return await _db.Recipes
-            .CountAsync(
-                r => r.CategoryId == categoryId,
-                cancellationToken);
-    }
+        var categoryCounts = await _db.Categories
+            .AsNoTracking()
+            .Select(category => new
+            {
+                category.Id,
+                category.Name,
+                RecipeCount = category.Recipes.Count,
+            })
+            .OrderByDescending(item => item.RecipeCount)
+            .ThenBy(item => item.Name)
+            .ToArrayAsync(cancellationToken);
+        var categories = categoryCounts
+            .Select(item => new CategoryStatisticItemDto(
+                item.Id,
+                item.Name,
+                item.RecipeCount,
+                CalculatePercentage(item.RecipeCount, totalRecipes)))
+            .ToArray();
 
-    public async Task<CulinaryBlog.Application.DTOs.CategoryStatisticsDto> GetCategoryStatisticsAsync(
-        CancellationToken cancellationToken = default)
-    {
-        var totalCategories =
-            await _db.Categories.CountAsync(
-                cancellationToken);
+        var recipeDates = await _db.Recipes
+            .AsNoTracking()
+            .Select(recipe => recipe.CreatedAt)
+            .ToArrayAsync(cancellationToken);
+        var recipesByMonth = recipeDates
+            .GroupBy(date => new { date.Year, date.Month })
+            .Select(group => new RecipeMonthlyStatisticDto(group.Key.Year, group.Key.Month, group.Count()))
+            .OrderBy(item => item.Year)
+            .ThenBy(item => item.Month)
+            .ToArray();
 
-        var totalRecipes =
-            await _db.Recipes.CountAsync(
-                cancellationToken);
-
-        var publishedRecipes =
-            await _db.Recipes.CountAsync(
-                r => r.Status == RecipeStatus.Published,
-                cancellationToken);
-
-        var draftRecipes =
-            await _db.Recipes.CountAsync(
-                r => r.Status == RecipeStatus.Draft,
-                cancellationToken);
-
-        var categories =
-            await _db.Categories
-                .AsNoTracking()
-                .OrderBy(c => c.Name)
-                .Select(c =>
-                    new CulinaryBlog.Application.DTOs.CategoryStatisticItemDto(
-                        c.Id,
-                        c.Name,
-                        c.Recipes.Count(
-                            r => r.Status ==
-                                 RecipeStatus.Published)))
-                .ToArrayAsync(cancellationToken);
-
-        return new CulinaryBlog.Application.DTOs.CategoryStatisticsDto(
+        return new CategoryStatisticsDto(
             totalCategories,
             totalRecipes,
             publishedRecipes,
             draftRecipes,
-            categories);
+            archivedRecipes,
+            categories,
+            categories.Take(5).ToArray(),
+            recipesByMonth);
     }
 
-    public async Task AddAsync(
-        Category category,
-        CancellationToken cancellationToken = default)
-    {
-        await _db.Categories.AddAsync(
-            category,
-            cancellationToken);
-    }
+    public Task AddAsync(Category category, CancellationToken cancellationToken = default) =>
+        _db.Categories.AddAsync(category, cancellationToken).AsTask();
 
-    public void Update(Category category)
-    {
-        _db.Categories.Update(category);
-    }
+    public void Update(Category category) => _db.Categories.Update(category);
 
-    public void Remove(Category category)
-    {
-        _db.Categories.Remove(category);
-    }
+    public void Remove(Category category) => _db.Categories.Remove(category);
+
+    private static decimal CalculatePercentage(int count, int total) =>
+        total == 0 ? 0 : Math.Round(count * 100m / total, 2);
 }

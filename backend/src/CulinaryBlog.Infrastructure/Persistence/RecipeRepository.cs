@@ -36,6 +36,7 @@ public class RecipeRepository : IRecipeRepository
     public Task<Recipe?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return _dbContext.Recipes
+            .IgnoreQueryFilters()
             .Include(recipe => recipe.Ingredients)
             .Include(recipe => recipe.Steps)
             .Include(recipe => recipe.Images)
@@ -84,6 +85,25 @@ public class RecipeRepository : IRecipeRepository
         _dbContext.RecipeIngredients.RemoveRange(recipe.Ingredients);
         _dbContext.RecipeSteps.RemoveRange(recipe.Steps);
         _dbContext.RecipeImages.RemoveRange(recipe.Images);
+
+        foreach (var ingredient in ingredients)
+        {
+            ingredient.RecipeId = recipe.Id;
+            ingredient.Recipe = recipe;
+        }
+
+        foreach (var step in steps)
+        {
+            step.RecipeId = recipe.Id;
+            step.Recipe = recipe;
+        }
+
+        foreach (var image in images)
+        {
+            image.RecipeId = recipe.Id;
+            image.Recipe = recipe;
+        }
+
         recipe.Ingredients = ingredients;
         recipe.Steps = steps;
         recipe.Images = images;
@@ -205,7 +225,7 @@ public class RecipeRepository : IRecipeRepository
         {
             var replacement = images
                 .Where(item => item.Id != imageId)
-                .OrderBy(item => item.SortOrder)
+                .OrderBy(item => item.OrderIndex)
                 .FirstOrDefault();
             if (replacement is not null)
             {

@@ -48,10 +48,12 @@ export default function RecipeList({ admin = false }: { admin?: boolean }) {
       sort,
       search,
       categoryId: categoryId || undefined,
+      mine: admin ? undefined : true,
+      allStatuses: admin,
     })
       .then(setRecipes)
       .catch((reason: Error) => setError(reason.message));
-  }, [page, sort, search, categoryId]);
+  }, [page, sort, search, categoryId, admin]);
 
   useEffect(() => {
     fetchRecipeList();

@@ -2,9 +2,6 @@ using CulinaryBlog.Application.Interfaces;
 using CulinaryBlog.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Minio;
-using Minio.DataModel.Args;
-
 namespace CulinaryBlog.Infrastructure.Persistence;
 
 public sealed class RecipePurgeService : IRecipePurgeService
@@ -12,18 +9,18 @@ public sealed class RecipePurgeService : IRecipePurgeService
     public static readonly TimeSpan RetentionPeriod = TimeSpan.FromDays(30);
 
     private readonly ApplicationDbContext _db;
-    private readonly IMinioClient _minio;
+    private readonly IStorageService? _storageService;
     private readonly IConfiguration _configuration;
     private readonly IRecipeCacheInvalidator _cacheInvalidator;
 
     public RecipePurgeService(
         ApplicationDbContext db,
-        IMinioClient minio,
         IConfiguration configuration,
-        IRecipeCacheInvalidator cacheInvalidator)
+        IRecipeCacheInvalidator cacheInvalidator,
+        IStorageService? storageService = null)
     {
         _db = db;
-        _minio = minio;
+        _storageService = storageService;
         _configuration = configuration;
         _cacheInvalidator = cacheInvalidator;
     }
@@ -36,19 +33,20 @@ public sealed class RecipePurgeService : IRecipePurgeService
             .Include(item => item.Ingredients)
             .Include(item => item.Steps)
             .SingleOrDefaultAsync(item => item.Id == recipeId, cancellationToken);
-        if (recipe is null || !recipe.IsDeleted)
+    if (recipe is null || !recipe.IsDeleted)
         {
             return false;
         }
 
         foreach (var image in recipe.Images)
         {
-            var objectName = GetManagedObjectName(image.Url);
-            if (objectName is not null)
+            var objectName = GetManagedObjectName(image.OriginalUrl);
+            if (objectName is not null && _storageService is not null)
             {
-                await _minio.RemoveObjectAsync(new RemoveObjectArgs()
-                    .WithBucket(_configuration["Minio:BucketName"] ?? "culinary-blog")
-                    .WithObject(objectName), cancellationToken);
+                await _storageService.DeleteAsync(
+                    _configuration["Minio:BucketName"] ?? "culinary-blog",
+                    objectName,
+                    cancellationToken);
             }
         }
 

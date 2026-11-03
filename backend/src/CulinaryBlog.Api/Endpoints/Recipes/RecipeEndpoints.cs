@@ -1,873 +1,1404 @@
+using CulinaryBlog.API.Extensions;
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
+using CulinaryBlog.Application.Common.Interfaces;
+using CulinaryBlog.Application.Common.Models;
+using CulinaryBlog.Application.DTOs;
+using CulinaryBlog.Application.Exceptions;
+using CulinaryBlog.Application.Features.Recipes.Commands.RecipeImages;
+using CulinaryBlog.Application.Features.Recipes.Commands.RecipeSteps;
+using CulinaryBlog.Application.Features.Recipes.Dtos;
+using RecipeImageDto = CulinaryBlog.Application.Features.Recipes.Dtos.RecipeImageDto;
+using RecipeStepDto = CulinaryBlog.Application.Features.Recipes.Dtos.RecipeStepDto;
+using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipeBySlug;
+using CulinaryBlog.Application.Features.Recipes.Queries.GetDeletedRecipes;
+using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipes;
+using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipesByCategory;
+using CulinaryBlog.Application.Features.Search.Dtos;
+using CulinaryBlog.Application.Features.Search.Queries.SearchRecipes;
+using CulinaryBlog.Domain.Enums;
+using MediatR;
+using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using CulinaryBlog.Api.Helpers;
 using CulinaryBlog.Application.Interfaces;
 using CulinaryBlog.Domain.Entities;
-using CulinaryBlog.Domain.Enums;
 using CulinaryBlog.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Distributed;
+using ICacheService = CulinaryBlog.Application.Common.Interfaces.ICacheService;
 
-namespace CulinaryBlog.Api.Endpoints.Recipes;
+namespace CulinaryBlog.API.Endpoints;
 
 public static class RecipeEndpoints
 {
     public static void MapRecipeEndpoints(this WebApplication app)
     {
-        MapRecipeGroup(app.MapGroup("/api/recipes").WithTags("Recipes").RequireRateLimiting("api"));
-        MapRecipeGroup(app.MapGroup("/api/v1/recipes").WithTags("Recipes").RequireRateLimiting("api"));
-        MapAdminRecipeGroup(app.MapGroup("/api/admin/recipes").WithTags("Admin Recipes").RequireRateLimiting("api"));
-        MapAdminRecipeGroup(app.MapGroup("/api/v1/admin/recipes").WithTags("Admin Recipes").RequireRateLimiting("api"));
-    }
+        var group = app.MapGroup("/api/v1/recipes")
+            .WithTags("Recipes")
+            .RequireRateLimiting(RateLimitingExtensions.GeneralPolicy);
 
-    public static string SlugifyForTests(string value) => SlugHelper.Generate(value);
+        // TV2: Danh sách công thức đã xuất bản
+        group.MapGet("/", GetRecipes)
+            .WithName("GetRecipes")
+            .WithSummary("Lấy danh sách công thức đã xuất bản");
 
-    private static void MapAdminRecipeGroup(RouteGroupBuilder group)
-    {
-        group.MapGet("/trash", async (ClaimsPrincipal principal, ApplicationDbContext db, CancellationToken cancellationToken) =>
-        {
-            if (!principal.IsInRole("Admin"))
-            {
-                return Results.Forbid();
-            }
+        app.MapGet("/api/v1/admin/recipes", GetAdminRecipes)
+            .WithTags("AdminRecipes")
+            .RequireRateLimiting(RateLimitingExtensions.GeneralPolicy)
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithName("GetAdminRecipes")
+            .WithSummary("Lấy danh sách công thức mọi trạng thái cho Admin")
+            .Produces<PagedResultDto<RecipeListItemDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
 
-            var recipes = await db.Recipes
-                .IgnoreQueryFilters()
-                .AsNoTracking()
-                .Where(recipe => recipe.IsDeleted)
-                .OrderByDescending(recipe => recipe.DeletedAt ?? recipe.UpdatedAt ?? recipe.CreatedAt)
-                .Select(recipe => new DeletedRecipeResponse(
-                    recipe.Id,
-                    recipe.Title,
-                    recipe.Slug,
-                    recipe.Status.ToString(),
-                    recipe.DeletedAt ?? recipe.UpdatedAt ?? recipe.CreatedAt))
-                .ToListAsync(cancellationToken);
+        app.MapGet("/api/v1/admin/recipes/trash", GetDeletedRecipes)
+            .RequireRateLimiting(RateLimitingExtensions.GeneralPolicy)
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithName("GetDeletedRecipes")
+            .WithSummary("Lấy danh sách công thức đã xóa mềm")
+            .Produces<PagedResultDto<RecipeTrashItemDto>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
 
-            return Results.Ok(recipes);
-        }).RequireAuthorization().Produces<List<DeletedRecipeResponse>>();
+        // TV2: Danh sách công thức theo danh mục
+        group.MapGet("/category/{categorySlug}", GetRecipesByCategory)
+            .WithName("GetRecipesByCategory")
+            .WithSummary("Lấy danh sách công thức theo danh mục");
 
-        group.MapPost("/{id:guid}/restore", async (Guid id, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken) =>
-        {
-            if (!principal.IsInRole("Admin"))
-            {
-                return Results.Forbid();
-            }
+        // TV4: Tìm kiếm toàn văn (FTS) & Trigram Fuzzy Fallback kèm Redis Cache
+        group.MapGet("/search", SearchRecipes)
+            .WithName("SearchRecipes")
+            .WithSummary("Tìm kiếm công thức toàn văn và fuzzy");
 
-            var recipe = await db.Recipes
-                .IgnoreQueryFilters()
-                .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-            if (recipe is null)
-            {
-                return Results.NotFound();
-            }
+        // TV2 + TV4: Chi tiết công thức với AsNoTracking, bảo vệ quyền, sắp xếp Step/Image và Double-Shield Cache
+        group.MapGet("/{slug}", GetRecipeBySlug)
+            .WithName("GetRecipeBySlug")
+            .WithSummary("Lấy chi tiết công thức");
 
-            if (!recipe.IsDeleted)
-            {
-                return Results.UnprocessableEntity(new { error = "Recipe is not soft deleted." });
-            }
+        // TV4: Thêm ảnh cho công thức (Multipart Form Upload / JSON URL)
+        group.MapPost("/{recipeId:guid}/images", AddRecipeImage)
+            .RequireRateLimiting(RateLimitingExtensions.UploadPolicy)
+            .WithName("AddRecipeImage")
+            .WithSummary("Tải lên ảnh cho công thức (Multipart Form hoặc JSON)")
+            .Produces<RecipeImageDto>(StatusCodes.Status201Created)
+            .ProducesValidationProblem()
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .DisableAntiforgery();
 
-            var deletedAt = recipe.DeletedAt ?? recipe.UpdatedAt ?? recipe.CreatedAt;
-            if (DateTime.UtcNow - deletedAt > RecipePurgeService.RetentionPeriod)
-            {
-                return Results.Conflict(new { error = "Recipe retention expired and cannot be restored." });
-            }
+        // TV4: Cập nhật thông tin ảnh công thức (AltText, OrderIndex, IsPrimary)
+        group.MapPatch("/{recipeId:guid}/images/{imageId:guid}", UpdateRecipeImage)
+            .WithName("UpdateRecipeImage")
+            .WithSummary("Cập nhật thông tin ảnh công thức")
+            .Produces<RecipeImageDto>(StatusCodes.Status200OK)
+            .ProducesValidationProblem()
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
-            recipe.IsDeleted = false;
-            recipe.DeletedAt = null;
-            recipe.UpdatedAt = DateTime.UtcNow;
-            await db.RecipeAuditLogs.AddAsync(
-                new RecipeAuditLog
-                {
-                    RecipeId = recipe.Id,
-                    ActorId = GetUserId(principal),
-                    Action = "Restore",
-                    CreatedAt = DateTime.UtcNow,
-                },
-                cancellationToken);
+        // TV4: Đặt ảnh đại diện (Set Primary trong cùng transaction)
+        group.MapPatch("/{recipeId:guid}/images/{imageId:guid}/primary", SetPrimaryRecipeImage)
+            .WithName("SetPrimaryRecipeImage")
+            .WithSummary("Đặt ảnh đại diện cho công thức");
 
-            await db.SaveChangesAsync(cancellationToken);
-            var categorySlug = await db.Categories
-                .Where(category => category.Id == recipe.CategoryId)
-                .Select(category => category.Slug)
-                .SingleOrDefaultAsync(cancellationToken);
-            await invalidator.InvalidateAsync(recipe.Id, recipe.Slug, recipe.CategoryId, categorySlug, cancellationToken);
-            SetRecipeEtag(httpContext, recipe);
-            return Results.Ok(new RecipeStatusResponse(recipe.Id, recipe.Status.ToString()));
-        }).RequireAuthorization()
-        .Produces<RecipeStatusResponse>()
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status409Conflict)
-        .Produces(StatusCodes.Status422UnprocessableEntity);
+        // TV4: Xóa mềm ảnh và tự động chuyển Primary cho ảnh OrderIndex nhỏ nhất
+        group.MapDelete("/{recipeId:guid}/images/{imageId:guid}", DeleteRecipeImage)
+            .WithName("DeleteRecipeImage")
+            .WithSummary("Xóa mềm ảnh công thức")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
-        group.MapDelete("/{id:guid}/purge", async (Guid id, ClaimsPrincipal principal, ApplicationDbContext db, IRecipePurgeService purgeService, CancellationToken cancellationToken) =>
-        {
-            if (!principal.IsInRole("Admin"))
-            {
-                return Results.Forbid();
-            }
+        // Phước: Tạo công thức (Draft)
+        group.MapPost("/", CreateRecipe)
+            .RequireAuthorization()
+            .WithName("CreateRecipe")
+            .WithSummary("Tạo công thức mới (bản nháp)");
 
-            var recipe = await db.Recipes
-                .IgnoreQueryFilters()
-                .AsNoTracking()
-                .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-            if (recipe is null)
-            {
-                return Results.NotFound();
-            }
+        // Phước: Cập nhật công thức
+        group.MapPut("/{id:guid}", UpdateRecipe)
+            .RequireAuthorization()
+            .WithName("UpdateRecipe")
+            .WithSummary("Cập nhật công thức");
 
-            if (!recipe.IsDeleted)
-            {
-                return Results.Conflict(new { error = "Only soft-deleted recipes can be permanently purged." });
-            }
+        // Phước: Xóa mềm công thức
+        group.MapDelete("/{id:guid}", DeleteRecipe)
+            .RequireAuthorization()
+            .WithName("DeleteRecipe")
+            .WithSummary("Xóa mềm công thức");
 
-            if (!await purgeService.PurgeAsync(id, GetUserId(principal), cancellationToken))
-            {
-                return Results.NotFound();
-            }
-
-            return Results.NoContent();
-        }).RequireAuthorization()
-        .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status409Conflict);
-    }
-
-    private static void MapRecipeGroup(RouteGroupBuilder group)
-    {
-        group.MapGet(string.Empty, async ([AsParameters] RecipeQuery query, ClaimsPrincipal principal, ApplicationDbContext db, CancellationToken cancellationToken) =>
-        {
-            if (query.Page is < 1 || query.PageSize is < 1 or > 50)
-            {
-                return Results.UnprocessableEntity(new { error = "Page must be at least 1 and pageSize must be between 1 and 50." });
-            }
-
-            var recipes = db.Recipes
-                .AsNoTracking()
-                .Where(recipe => !recipe.IsDeleted);
-
-            if (!string.IsNullOrWhiteSpace(query.Search))
-            {
-                var search = query.Search.Trim();
-                recipes = recipes.Where(recipe => recipe.Title.Contains(search) ||
-                    (recipe.Description != null && recipe.Description.Contains(search)));
-            }
-
-            if (query.CategoryId.HasValue)
-            {
-                recipes = recipes.Where(recipe => recipe.CategoryId == query.CategoryId.Value);
-            }
-
-            var userId = GetUserId(principal);
-            var isAdmin = principal.IsInRole("Admin");
-            if (isAdmin)
-            {
-                if (query.Status.HasValue)
-                {
-                    recipes = recipes.Where(recipe => recipe.Status == query.Status.Value);
-                }
-            }
-            else if (userId == Guid.Empty)
-            {
-                recipes = recipes.Where(recipe => recipe.Status == RecipeStatus.Published);
-            }
-            else
-            {
-                recipes = recipes.Where(recipe => recipe.Status == RecipeStatus.Published || recipe.AuthorId == userId);
-                if (query.Status.HasValue)
-                {
-                    recipes = recipes.Where(recipe => recipe.Status == query.Status.Value &&
-                        (query.Status.Value == RecipeStatus.Published || recipe.AuthorId == userId));
-                }
-            }
-
-            var total = await recipes.CountAsync(cancellationToken);
-            var page = Math.Max(query.Page ?? 1, 1);
-            var pageSize = Math.Clamp(query.PageSize ?? 12, 1, 50);
-            var sort = query.Sort?.ToLowerInvariant();
-            recipes = sort switch
-            {
-                "oldest" => recipes.OrderBy(recipe => recipe.CreatedAt).ThenBy(recipe => recipe.Id),
-                "title" => recipes.OrderBy(recipe => recipe.Title).ThenBy(recipe => recipe.Id),
-                "cooktime" => recipes.OrderBy(recipe => recipe.CookTimeMinutes).ThenBy(recipe => recipe.Id),
-                _ => recipes.OrderByDescending(recipe => recipe.CreatedAt).ThenByDescending(recipe => recipe.Id),
-            };
-
-            var rows = await recipes
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(recipe => new
-                {
-                    recipe.Id,
-                    recipe.Title,
-                    recipe.Slug,
-                    recipe.Description,
-                    Category = recipe.Category.Name,
-                    Author = recipe.Author.FullName,
-                    recipe.PrepTimeMinutes,
-                    recipe.CookTimeMinutes,
-                    recipe.Servings,
-                    recipe.Difficulty,
-                    recipe.Status,
-                    recipe.CreatedAt,
-                    recipe.PublishedAt,
-                    PrimaryImageUrl = recipe.Images
-                        .OrderBy(image => image.OrderIndex)
-                        .Select(image => image.OriginalUrl)
-                        .FirstOrDefault(),
-                })
-                .ToListAsync(cancellationToken);
-            var items = rows.Select(recipe => new RecipeSummaryResponse(
-                recipe.Id,
-                recipe.Title,
-                recipe.Slug,
-                recipe.Description,
-                recipe.Category,
-                recipe.Author,
-                recipe.PrepTimeMinutes,
-                recipe.CookTimeMinutes,
-                recipe.Servings,
-                recipe.Difficulty.ToString(),
-                recipe.Status.ToString(),
-                recipe.CreatedAt,
-                recipe.PublishedAt,
-                recipe.PrimaryImageUrl)).ToList();
-
-            return Results.Ok(new PagedResponse<RecipeSummaryResponse>(items, page, pageSize, total));
-        })
-        .Produces<PagedResponse<RecipeSummaryResponse>>()
-        .Produces(StatusCodes.Status422UnprocessableEntity);
-
-        group.MapGet("/search", async ([AsParameters] RecipeSearchQuery query, ApplicationDbContext db, IDistributedCache cache, CancellationToken cancellationToken) =>
-        {
-            if (string.IsNullOrWhiteSpace(query.Query) || query.Query.Trim().Length < 2 || query.Page is < 1 || query.PageSize is < 1 or > 50)
-            {
-                return Results.UnprocessableEntity(new { error = "Search query must contain at least 2 characters." });
-            }
-
-            var search = query.Query.Trim();
-            var page = Math.Max(query.Page ?? 1, 1);
-            var pageSize = Math.Clamp(query.PageSize ?? 12, 1, 50);
-            var generation = await cache.GetStringAsync("recipes:search:generation", cancellationToken) ?? "initial";
-            var cacheSeed = $"{search.ToUpperInvariant()}|{query.CategoryId}|{page}|{pageSize}";
-            var cacheHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(cacheSeed)));
-            var cacheKey = $"recipes:search:{generation}:{cacheHash}";
-            var cachedJson = await cache.GetStringAsync(cacheKey, cancellationToken);
-            if (cachedJson is not null)
-            {
-                var cachedResponse = JsonSerializer.Deserialize<PagedResponse<RecipeSummaryResponse>>(cachedJson);
-                if (cachedResponse is not null)
-                {
-                    return Results.Ok(cachedResponse);
-                }
-            }
-
-            var recipes = db.Recipes
-                .AsNoTracking()
-                .Where(recipe => !recipe.IsDeleted && recipe.Status == RecipeStatus.Published)
-                .Where(recipe => recipe.Title.Contains(search) || (recipe.Description != null && recipe.Description.Contains(search)));
-
-            if (query.CategoryId.HasValue)
-            {
-                recipes = recipes.Where(recipe => recipe.CategoryId == query.CategoryId.Value);
-            }
-
-            var total = await recipes.CountAsync(cancellationToken);
-            var rows = await recipes
-                .OrderByDescending(recipe => recipe.CreatedAt)
-                .ThenByDescending(recipe => recipe.Id)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(recipe => new
-                {
-                    recipe.Id,
-                    recipe.Title,
-                    recipe.Slug,
-                    recipe.Description,
-                    Category = recipe.Category.Name,
-                    Author = recipe.Author.FullName,
-                    recipe.PrepTimeMinutes,
-                    recipe.CookTimeMinutes,
-                    recipe.Servings,
-                    recipe.Difficulty,
-                    recipe.Status,
-                    recipe.CreatedAt,
-                    recipe.PublishedAt,
-                    PrimaryImageUrl = recipe.Images
-                        .OrderBy(image => image.OrderIndex)
-                        .Select(image => image.OriginalUrl)
-                        .FirstOrDefault(),
-                })
-                .ToListAsync(cancellationToken);
-            var items = rows.Select(recipe => new RecipeSummaryResponse(
-                recipe.Id,
-                recipe.Title,
-                recipe.Slug,
-                recipe.Description,
-                recipe.Category,
-                recipe.Author,
-                recipe.PrepTimeMinutes,
-                recipe.CookTimeMinutes,
-                recipe.Servings,
-                recipe.Difficulty.ToString(),
-                recipe.Status.ToString(),
-                recipe.CreatedAt,
-                recipe.PublishedAt,
-                recipe.PrimaryImageUrl)).ToList();
-
-            var response = new PagedResponse<RecipeSummaryResponse>(items, page, pageSize, total);
-            await cache.SetStringAsync(
-                cacheKey,
-                JsonSerializer.Serialize(response),
-                new DistributedCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
-                },
-                cancellationToken);
-            return Results.Ok(response);
-        })
-        .Produces<PagedResponse<RecipeSummaryResponse>>()
-        .Produces(StatusCodes.Status422UnprocessableEntity);
-
-        group.MapGet("/{slug}", async (string slug, ClaimsPrincipal principal, HttpContext httpContext, IDistributedCache cache, ApplicationDbContext db, IRecipeRepository recipeRepository, CancellationToken cancellationToken) =>
-        {
-            var generation = await cache.GetStringAsync("recipes:cache:generation", cancellationToken) ?? "initial";
-            var cacheKey = $"recipes:detail:{generation}:{Uri.EscapeDataString(slug)}";
-            var cachedJson = await cache.GetStringAsync(cacheKey, cancellationToken);
-            if (cachedJson is not null)
-            {
-                var cached = JsonSerializer.Deserialize<CachedRecipeDetail>(cachedJson);
-                if (cached is not null)
-                {
-                    httpContext.Response.Headers.ETag = cached.ETag;
-                    return Results.Ok(cached.Detail);
-                }
-            }
-
-            Recipe? recipe = null;
-            foreach (var lookupSlug in GetSlugAliases(slug))
-            {
-                recipe = await recipeRepository.GetBySlugAsync(lookupSlug, includeDeleted: false, cancellationToken);
-                if (recipe is null)
-                {
-                    var historicalRecipeId = await db.RecipeSlugHistories
-                        .AsNoTracking()
-                        .Where(history => history.Slug == lookupSlug)
-                        .Select(history => history.RecipeId)
-                        .FirstOrDefaultAsync(cancellationToken);
-                    if (historicalRecipeId != Guid.Empty)
-                    {
-                        recipe = await recipeRepository.GetByIdAsync(historicalRecipeId, includeDetails: true, cancellationToken);
-                    }
-                }
-
-                if (recipe is not null)
-                {
-                    break;
-                }
-            }
-
-            if (recipe is null)
-            {
-                return Results.NotFound();
-            }
-
-            if (recipe.Status != RecipeStatus.Published && !IsOwnerOrAdmin(principal, recipe.AuthorId))
-            {
-                return Results.Forbid();
-            }
-
-            SetRecipeEtag(httpContext, recipe);
-            var detail = ToDetail(recipe);
-            if (recipe.Status == RecipeStatus.Published)
-            {
-                await cache.SetStringAsync(
-                    cacheKey,
-                    JsonSerializer.Serialize(new CachedRecipeDetail(detail, $"\"{recipe.xmin}\"")),
-                    new DistributedCacheEntryOptions
-                    {
-                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15),
-                    },
-                    cancellationToken);
-            }
-
-            return Results.Ok(detail);
-        })
-        .Produces<RecipeDetailResponse>()
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound);
-
-        group.MapPost(string.Empty, async (RecipeRequest request, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeRepository recipeRepository, IRecipeWriteService recipeWriteService, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken) =>
-        {
-            var authorId = GetUserId(principal);
-            if (authorId == Guid.Empty)
-            {
-                return Results.Unauthorized();
-            }
-
-            request = request with { AuthorId = authorId };
-            var validation = await ValidateRequest(request, db, cancellationToken);
-            if (validation is not null)
-            {
-                return validation == "Recipe slug already exists."
-                    ? Results.Conflict(new { error = validation })
-                    : Results.UnprocessableEntity(new { error = validation });
-            }
-
-            var slug = await GenerateUniqueSlugAsync(request.Slug ?? request.Title, recipeRepository, db, cancellationToken: cancellationToken);
-
-            var recipe = new Recipe
-            {
-                AuthorId = request.AuthorId!.Value,
-                CategoryId = request.CategoryId,
-                Title = request.Title.Trim(),
-                Slug = slug,
-                Description = request.Description?.Trim() ?? string.Empty,
-                Content = request.Content.Trim(),
-                PrepTimeMinutes = request.PrepTimeMinutes,
-                CookTimeMinutes = request.CookTimeMinutes,
-                Servings = request.Servings,
-                Difficulty = request.Difficulty,
-                Status = RecipeStatus.Draft,
-                Nutrition = ToNutrition(request.Nutrition),
-                Images = ToImages(request.Images),
-                Steps = ToSteps(request.Steps),
-            };
-            recipe.Ingredients = ToIngredients(request.Ingredients);
-            await recipeWriteService.CreateAsync(recipe, cancellationToken);
-            await InvalidateRecipeAsync(recipe, db, invalidator, cancellationToken);
-
-            SetRecipeEtag(httpContext, recipe);
-            return Results.Created($"/api/recipes/{recipe.Slug}", new RecipeReferenceResponse(recipe.Id, recipe.Slug));
-        }).RequireAuthorization()
-        .Produces<RecipeReferenceResponse>(StatusCodes.Status201Created)
-        .Produces(StatusCodes.Status401Unauthorized)
-        .Produces(StatusCodes.Status409Conflict)
-        .Produces(StatusCodes.Status422UnprocessableEntity);
-
-        group.MapPut("/{id:guid}", async (Guid id, RecipeRequest request, [FromHeader(Name = "If-Match")] string? ifMatch, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeRepository recipeRepository, IRecipeWriteService recipeWriteService, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken) =>
-        {
-            var recipe = await recipeRepository.GetForUpdateAsync(id, cancellationToken);
-            if (recipe is null)
-            {
-                return Results.NotFound();
-            }
-
-            if (!IsOwnerOrAdmin(principal, recipe.AuthorId))
-            {
-                return Results.Forbid();
-            }
-
-            if (!MatchesIfMatchHeader(recipe, ifMatch))
-            {
-                return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
-            }
-
-            request = request with { AuthorId = recipe.AuthorId };
-            var validation = await ValidateRequest(request, db, cancellationToken);
-            if (validation is not null)
-            {
-                return validation == "Recipe slug already exists."
-                    ? Results.Conflict(new { error = validation })
-                    : Results.UnprocessableEntity(new { error = validation });
-            }
-
-            var requestedSlug = request.Slug is null ? recipe.Slug : Slugify(request.Slug);
-            if ((recipe.Status is RecipeStatus.Published or RecipeStatus.Archived) &&
-                !string.Equals(requestedSlug, recipe.Slug, StringComparison.Ordinal))
-            {
-                return Results.UnprocessableEntity(new { error = "Published or archived recipes cannot change their slug." });
-            }
-
-            var slug = recipe.Status is RecipeStatus.Published or RecipeStatus.Archived
-                ? recipe.Slug
-                : await GenerateUniqueSlugAsync(request.Slug ?? request.Title, recipeRepository, db, id, cancellationToken);
-
-            var previousSlug = recipe.Slug;
-            if (!string.Equals(previousSlug, slug, StringComparison.Ordinal) &&
-                !await db.RecipeSlugHistories.AnyAsync(item => item.RecipeId == recipe.Id && item.Slug == previousSlug, cancellationToken))
-            {
-                db.RecipeSlugHistories.Add(new RecipeSlugHistory
-                {
-                    RecipeId = recipe.Id,
-                    Slug = previousSlug,
-                    CreatedAt = DateTime.UtcNow,
-                });
-            }
-
-            recipe.CategoryId = request.CategoryId;
-            recipe.Title = request.Title.Trim();
-            recipe.Slug = slug;
-            recipe.Description = request.Description?.Trim() ?? string.Empty;
-            recipe.Content = request.Content.Trim();
-            recipe.PrepTimeMinutes = request.PrepTimeMinutes;
-            recipe.CookTimeMinutes = request.CookTimeMinutes;
-            recipe.Servings = request.Servings;
-            recipe.Difficulty = request.Difficulty;
-            recipe.UpdatedAt = DateTime.UtcNow;
-            recipe.Nutrition = ToNutrition(request.Nutrition, recipe.Nutrition);
-            await recipeWriteService.ReplaceContentsAsync(
-                recipe,
-                ToIngredients(request.Ingredients),
-                ToSteps(request.Steps),
-                ToImages(request.Images),
-                cancellationToken);
-            await InvalidateRecipeAsync(recipe, db, invalidator, cancellationToken);
-
-            SetRecipeEtag(httpContext, recipe);
-            return Results.Ok(new RecipeReferenceResponse(recipe.Id, recipe.Slug));
-        }).RequireAuthorization()
-        .Produces<RecipeReferenceResponse>()
-        .Produces(StatusCodes.Status401Unauthorized)
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status409Conflict)
-        .Produces(StatusCodes.Status422UnprocessableEntity);
-
+        // Phước: Quản lý trạng thái công thức
         MapStatusEndpoint(group, "publish", RecipeStatus.Published);
         MapStatusEndpoint(group, "unpublish", RecipeStatus.Draft);
         MapStatusEndpoint(group, "archive", RecipeStatus.Archived);
         MapStatusEndpoint(group, "unarchive", RecipeStatus.Draft);
 
-        group.MapDelete("/{id:guid}", async (Guid id, [FromHeader(Name = "If-Match")] string? ifMatch, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeRepository recipeRepository, IRecipeWriteService recipeWriteService, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken) =>
+        // Phước: Quản lý nguyên liệu
+        group.MapPost("/{id:guid}/ingredients", AddIngredient)
+            .RequireAuthorization()
+            .WithName("AddIngredient")
+            .WithSummary("Thêm nguyên liệu");
+
+        group.MapPut("/{recipeId:guid}/ingredients/{ingredientId:guid}", UpdateIngredient)
+            .RequireAuthorization()
+            .WithName("UpdateIngredient")
+            .WithSummary("Cập nhật nguyên liệu");
+
+        group.MapDelete("/{recipeId:guid}/ingredients/{ingredientId:guid}", DeleteIngredient)
+            .RequireAuthorization()
+            .WithName("DeleteIngredient")
+            .WithSummary("Xóa nguyên liệu");
+
+        // Phước: Admin khôi phục & xóa vĩnh viễn (purge)
+        app.MapPost("/api/v1/admin/recipes/{id:guid}/restore", RestoreRecipe)
+            .RequireRateLimiting(RateLimitingExtensions.GeneralPolicy)
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithName("RestoreRecipe")
+            .WithSummary("Khôi phục công thức đã xóa mềm");
+
+        app.MapDelete("/api/v1/admin/recipes/{id:guid}/purge", PurgeRecipe)
+            .RequireRateLimiting(RateLimitingExtensions.GeneralPolicy)
+            .RequireAuthorization(policy => policy.RequireRole("Admin"))
+            .WithName("PurgeRecipe")
+            .WithSummary("Xóa vĩnh viễn công thức khỏi hệ thống");
+
+        // TV4: Thêm bước cho công thức (Server tự cấp StepNumber)
+        group.MapPost("/{id:guid}/steps", AddRecipeStep)
+            .WithName("AddRecipeStep")
+            .WithSummary("Thêm bước thực hiện cho công thức");
+
+        // Tải lên ảnh cho bước thực hiện (Multipart Form -> MinIO)
+        group.MapPost("/{id:guid}/steps/images", UploadStepImage)
+            .RequireRateLimiting(RateLimitingExtensions.UploadPolicy)
+            .WithName("UploadStepImage")
+            .WithSummary("Tải lên ảnh cho bước thực hiện (Multipart Form)")
+            .Accepts<IFormFile>("multipart/form-data")
+            .Produces(StatusCodes.Status200OK)
+            .ProducesValidationProblem()
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .DisableAntiforgery();
+
+        // TV4: Cập nhật bước thực hiện
+        group.MapPut("/{id:guid}/steps/{stepId:guid}", UpdateRecipeStep)
+            .WithName("UpdateRecipeStep")
+            .WithSummary("Cập nhật bước thực hiện");
+
+        // TV4: Sắp xếp lại các bước thực hiện
+        group.MapPut("/{id:guid}/steps/reorder", ReorderRecipeSteps)
+            .WithName("ReorderRecipeSteps")
+            .WithSummary("Sắp xếp lại các bước thực hiện");
+
+        // TV4: Xóa mềm bước thực hiện và tự động đánh số lại
+        group.MapDelete("/{id:guid}/steps/{stepId:guid}", DeleteRecipeStep)
+            .WithName("DeleteRecipeStep")
+            .WithSummary("Xóa mềm bước thực hiện và tự động đánh số lại");
+    }
+
+    private static async Task<IResult> GetRecipes(
+        int? page,
+        int? pageSize,
+        string? search,
+        string? categorySlug,
+        Guid? categoryId,
+        string? difficulty,
+        int? maxCookTimeMinutes,
+        int? maxTotalTimeMinutes,
+        string? sortBy,
+        string? sortDirection,
+        string? sort,
+        bool? mine,
+        Guid? authorId,
+        string? status,
+        ClaimsPrincipal user,
+        ISender sender,
+        ICacheService cache,
+        CancellationToken cancellationToken)
+    {
+        var validationResult = ValidateListOptions(
+            search,
+            difficulty,
+            maxCookTimeMinutes,
+            maxTotalTimeMinutes,
+            sortBy,
+            sortDirection,
+            sort,
+            out var options);
+
+        if (validationResult is not null)
         {
-            var recipe = await recipeRepository.GetByIdAsync(id, includeDetails: false, cancellationToken);
-            if (recipe is null)
+            return validationResult;
+        }
+
+        var isMine = mine == true;
+        var isAdmin = user.IsInRole("Admin");
+        if (isMine && authorId.HasValue)
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["authorId"] = ["Không thể kết hợp mine=true với authorId."]
+                },
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
+        }
+
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+
+        if (isMine && (!user.IsInRole("Author") || !currentUserId.HasValue))
+        {
+            return Results.Problem(
+                title: "Forbidden",
+                detail: "Chỉ tác giả (Author) mới có quyền xem công thức của chính mình.",
+                statusCode: StatusCodes.Status403Forbidden,
+                type: "RECIPE_FORBIDDEN");
+        }
+
+        if (authorId.HasValue && !isAdmin)
+        {
+            return Results.Problem(
+                title: "Forbidden",
+                detail: "Chỉ Admin mới có quyền lọc theo authorId.",
+                statusCode: StatusCodes.Status403Forbidden,
+                type: "RECIPE_FORBIDDEN");
+        }
+
+        RecipeStatus? parsedStatus = null;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            var statusName = Enum.GetNames<RecipeStatus>()
+                .FirstOrDefault(name => string.Equals(
+                    name,
+                    status.Trim(),
+                    StringComparison.OrdinalIgnoreCase));
+            if (statusName is null ||
+                !Enum.TryParse<RecipeStatus>(statusName, true, out var matchedStatus))
             {
-                return Results.NotFound();
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]>
+                    {
+                        ["status"] = ["Status phải là Draft, Published hoặc Archived."]
+                    },
+                    statusCode: StatusCodes.Status422UnprocessableEntity,
+                    type: "VALIDATION_ERROR");
             }
 
-            if (!IsOwnerOrAdmin(principal, recipe.AuthorId))
+            parsedStatus = matchedStatus;
+            if (!isMine && !authorId.HasValue)
             {
-                return Results.Forbid();
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]>
+                    {
+                        ["status"] = ["Status chỉ được dùng cùng mine=true hoặc authorId của Admin."]
+                    },
+                    statusCode: StatusCodes.Status422UnprocessableEntity,
+                    type: "VALIDATION_ERROR");
+            }
+        }
+
+        var effectivePage = page is > 0 ? page.Value : 1;
+        var effectivePageSize = pageSize is > 0
+            ? Math.Min(pageSize.Value, 100)
+            : 12;
+        var listOptions = options with
+        {
+            CategorySlug = string.IsNullOrWhiteSpace(categorySlug)
+                ? null
+                : categorySlug.Trim(),
+            CategoryId = categoryId,
+            AuthorId = isMine ? currentUserId : authorId,
+            Status = parsedStatus
+        };
+
+        if (isMine || authorId.HasValue)
+        {
+            var privateResult = await sender.Send(
+                new GetRecipesQuery(effectivePage, effectivePageSize, listOptions),
+                cancellationToken);
+            return Results.Ok(privateResult);
+        }
+
+        var cacheKey = CreatePublicRecipeListCacheKey(
+            effectivePage,
+            effectivePageSize,
+            listOptions);
+        var cachedResult = await cache.GetAsync<PagedResultDto<RecipeListItemDto>>(
+            cacheKey,
+            cancellationToken);
+        if (cachedResult is not null)
+        {
+            return Results.Ok(ApiResponse.FromPaged(cachedResult));
+        }
+
+        var result = await sender.Send(
+            new GetRecipesQuery(effectivePage, effectivePageSize, listOptions),
+            cancellationToken);
+        await cache.SetAsync(
+            cacheKey,
+            result,
+            TimeSpan.FromMinutes(1),
+            cancellationToken);
+
+        return Results.Ok(result);
+    }
+
+    private static string CreatePublicRecipeListCacheKey(
+        int page,
+        int pageSize,
+        RecipeListOptions options)
+    {
+        return string.Join(
+            ':',
+            "recipes:list",
+            page,
+            pageSize,
+            Uri.EscapeDataString(options.Search ?? string.Empty),
+            Uri.EscapeDataString(options.CategorySlug ?? string.Empty),
+            options.CategoryId?.ToString("N") ?? string.Empty,
+            options.Difficulty?.ToString() ?? string.Empty,
+            options.MaxCookTimeMinutes?.ToString() ?? string.Empty,
+            options.MaxTotalTimeMinutes?.ToString() ?? string.Empty,
+            options.SortBy,
+            options.SortDescending);
+    }
+
+    private static async Task<IResult> GetAdminRecipes(
+        int? page,
+        int? pageSize,
+        string? search,
+        string? categorySlug,
+        Guid? categoryId,
+        string? difficulty,
+        int? maxCookTimeMinutes,
+        int? maxTotalTimeMinutes,
+        string? sortBy,
+        string? sortDirection,
+        string? sort,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        var validationResult = ValidateListOptions(
+            search,
+            difficulty,
+            maxCookTimeMinutes,
+            maxTotalTimeMinutes,
+            sortBy,
+            sortDirection,
+            sort,
+            out var options);
+
+        if (validationResult is not null)
+        {
+            return validationResult;
+        }
+
+        var effectivePage = page is > 0 ? page.Value : 1;
+        var effectivePageSize = pageSize is > 0 ? Math.Min(pageSize.Value, 100) : 12;
+        var adminOptions = options with
+        {
+            CategorySlug = string.IsNullOrWhiteSpace(categorySlug) ? null : categorySlug.Trim(),
+            CategoryId = categoryId,
+            IncludeAllStatuses = true
+        };
+        var result = await sender.Send(
+            new GetRecipesQuery(effectivePage, effectivePageSize, adminOptions),
+            cancellationToken);
+
+        return Results.Ok(result);
+    }
+
+    private static async Task<IResult> GetRecipesByCategory(
+        string categorySlug,
+        int? page,
+        int? pageSize,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new GetRecipesByCategoryQuery(categorySlug, page ?? 1, pageSize ?? 12),
+            cancellationToken);
+
+        if (result is null)
+        {
+            return Results.Problem(
+                title: "Category not found",
+                detail: $"Category with slug '{categorySlug}' was not found.",
+                statusCode: StatusCodes.Status404NotFound,
+                type: "CATEGORY_NOT_FOUND");
+        }
+
+        return Results.Ok(result);
+    }
+
+    private static async Task<IResult> GetDeletedRecipes(
+        int? page,
+        int? pageSize,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new GetDeletedRecipesQuery(page ?? 1, pageSize ?? 12),
+            cancellationToken);
+
+        return Results.Ok(ApiResponse.Success(result));
+    }
+
+    private static async Task<IResult> SearchRecipes(
+        [FromQuery] string? q,
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        [FromQuery] Guid? categoryId,
+        [FromQuery] string? categorySlug,
+        [FromQuery] string? difficulty,
+        [FromQuery] int? maxCookTimeMinutes,
+        [FromQuery] string? sortBy,
+        ISender sender,
+        ICacheService cache,
+        CancellationToken ct)
+    {
+        var effectivePage = page is > 0 ? page.Value : 1;
+        var effectivePageSize = pageSize is > 0 and <= 100 ? pageSize.Value : 10;
+        var rawQuery = q?.Trim() ?? string.Empty;
+        var normalizedQ = rawQuery.ToLowerInvariant();
+
+        DifficultyLevel? parsedDifficulty = null;
+        if (!string.IsNullOrWhiteSpace(difficulty) && Enum.TryParse<DifficultyLevel>(difficulty, true, out var diff))
+        {
+            parsedDifficulty = diff;
+        }
+
+        // SRS FR-SRCH-001: Cache Redis 1 phút vary theo query, filter, page, pageSize, sort để tránh cache collision
+        var catKey = categoryId?.ToString() ?? (!string.IsNullOrWhiteSpace(categorySlug) ? categorySlug.Trim().ToLowerInvariant() : "all");
+        var diffKey = parsedDifficulty?.ToString() ?? "all";
+        var cookKey = maxCookTimeMinutes?.ToString() ?? "any";
+        var sortKey = string.IsNullOrWhiteSpace(sortBy) ? "relevance" : sortBy.Trim().ToLowerInvariant();
+
+        var cacheKey = $"search:{normalizedQ}:cat={catKey}:diff={diffKey}:cook={cookKey}:sort={sortKey}:p={effectivePage}:sz={effectivePageSize}";
+        var cachedResult = await cache.GetAsync<PagedResult<RecipeSearchResultDto>>(cacheKey, ct);
+        if (cachedResult != null)
+        {
+            return Results.Ok(ApiResponse.FromPaged(cachedResult));
+        }
+
+        var query = new SearchRecipesQuery(
+            rawQuery,
+            effectivePage,
+            effectivePageSize,
+            categoryId,
+            categorySlug,
+            parsedDifficulty,
+            maxCookTimeMinutes,
+            sortKey);
+
+        var result = await sender.Send(query, ct);
+
+        // Lưu cache 1 phút (tự động fail-safe nếu Redis offline)
+        await cache.SetAsync(cacheKey, result, TimeSpan.FromMinutes(1), ct);
+
+        return Results.Ok(ApiResponse.FromPaged(result));
+    }
+
+    private static async Task<IResult> GetRecipeBySlug(
+        string slug,
+        ClaimsPrincipal user,
+        ISender sender,
+        ICacheService cache,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        var normalizedSlug = slug.Trim().ToLowerInvariant();
+        var cacheKey = $"recipe:{normalizedSlug}";
+
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        // Đọc shared cache
+        var cachedRecipe = await cache.GetAsync<CulinaryBlog.Application.Features.Recipes.Dtos.RecipeDetailDto>(cacheKey, ct);
+        if (cachedRecipe != null)
+        {
+            // BẢO VỆ KÉP (Major-01): Nếu shared cache có chứa recipe, chỉ phục vụ nếu là Published
+            if (cachedRecipe.Status == RecipeStatus.Published)
+            {
+                if (!string.IsNullOrEmpty(cachedRecipe.Version))
+                {
+                    httpContext.Response.Headers.ETag = $"\"{cachedRecipe.Version}\"";
+                }
+                return Results.Ok(cachedRecipe);
+            }
+        }
+
+        try
+        {
+            var query = new GetRecipeBySlugQuery(slug, currentUserId, isAdmin);
+            var recipe = await sender.Send(query, ct);
+
+            // Major-01 Fix: CHỈ cache công thức có trạng thái Published
+            if (recipe.Status == RecipeStatus.Published)
+            {
+                await cache.SetAsync(cacheKey, recipe, TimeSpan.FromMinutes(5), ct);
             }
 
-            if (!MatchesIfMatchHeader(recipe, ifMatch))
+            if (!string.IsNullOrEmpty(recipe.Version))
             {
-                return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
+                httpContext.Response.Headers.ETag = $"\"{recipe.Version}\"";
             }
 
-            await recipeWriteService.DeleteAsync(recipe, cancellationToken);
-            await InvalidateRecipeAsync(recipe, db, invalidator, cancellationToken);
+            return Results.Ok(ApiResponse.Success(recipe));
+        }
+        catch (NotFoundException ex)
+        {
+            return Results.Problem(
+                title: "Recipe not found",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status404NotFound,
+                type: "RECIPE_NOT_FOUND");
+        }
+        catch (ForbiddenException ex)
+        {
+            return Results.Problem(
+                title: "Forbidden",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status403Forbidden,
+                type: "RECIPE_FORBIDDEN");
+        }
+    }
+
+    private static async Task<IResult> AddRecipeImage(
+        Guid recipeId,
+        HttpRequest httpRequest,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return Results.Json(
+                new { title = "Unauthorized", status = 401, detail = "Authentication is required to upload images." },
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            if (httpRequest.HasFormContentType)
+            {
+                var form = await httpRequest.ReadFormAsync(ct);
+                var file = form.Files.GetFile("file") ?? (form.Files.Count > 0 ? form.Files[0] : null);
+                if (file == null)
+                {
+                    return Results.ValidationProblem(
+                        new Dictionary<string, string[]> { ["File"] = ["Vui lòng chọn tệp ảnh để tải lên (File is required)."] },
+                        statusCode: StatusCodes.Status400BadRequest);
+                }
+                if (file.Length == 0)
+                {
+                    return Results.ValidationProblem(
+                        new Dictionary<string, string[]> { ["File"] = ["Tệp tải lên không được để trống (File is empty)."] },
+                        statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
+
+                var altText = form["altText"].FirstOrDefault();
+                var isPrimaryStr = form["isPrimary"].FirstOrDefault();
+                bool? isPrimary = bool.TryParse(isPrimaryStr, out var p) ? p : null;
+
+                await using var stream = file.OpenReadStream();
+                var command = new UploadRecipeImageCommand(
+                    recipeId,
+                    stream,
+                    file.FileName,
+                    file.ContentType,
+                    file.Length,
+                    altText,
+                    isPrimary,
+                    currentUserId,
+                    isAdmin);
+
+                var image = await sender.Send(command, ct);
+                return Results.Created($"/api/v1/recipes/{recipeId}/images/{image.Id}", ApiResponse.Success(image));
+            }
+            else
+            {
+                var jsonRequest = await httpRequest.ReadFromJsonAsync<AddRecipeImageRequest>(ct);
+                if (jsonRequest == null || string.IsNullOrWhiteSpace(jsonRequest.OriginalUrl))
+                {
+                    return Results.ValidationProblem(
+                        new Dictionary<string, string[]> { ["File"] = ["Yêu cầu tải lên form multipart hoặc JSON chứa OriginalUrl."] },
+                        statusCode: StatusCodes.Status400BadRequest);
+                }
+
+                var command = new AddRecipeImageCommand(
+                    recipeId,
+                    jsonRequest.OriginalUrl,
+                    jsonRequest.MediumUrl,
+                    jsonRequest.ThumbnailUrl,
+                    jsonRequest.AltText,
+                    jsonRequest.IsPrimary,
+                    jsonRequest.OrderIndex,
+                    currentUserId,
+                    isAdmin);
+
+                var image = await sender.Send(command, ct);
+                return Results.Created($"/api/v1/recipes/{recipeId}/images/{image.Id}", ApiResponse.Success(image));
+            }
+        }
+        catch (NotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+        catch (ValidationException ex)
+        {
+            return Results.ValidationProblem(
+                ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
+                statusCode: StatusCodes.Status422UnprocessableEntity);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "Dịch vụ lưu trữ không khả dụng");
+        }
+    }
+
+    private static async Task<IResult> UpdateRecipeImage(
+        Guid recipeId,
+        Guid imageId,
+        [FromBody] UpdateRecipeImageRequest request,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return Results.Json(
+                new { title = "Unauthorized", status = 401, detail = "Authentication is required to update images." },
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            var command = new UpdateRecipeImageCommand(
+                recipeId,
+                imageId,
+                request.AltText,
+                request.OrderIndex,
+                request.IsPrimary,
+                currentUserId,
+                isAdmin);
+
+            var updated = await sender.Send(command, ct);
+            return Results.Ok(ApiResponse.Success(updated));
+        }
+        catch (NotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+        catch (ValidationException ex)
+        {
+            return Results.ValidationProblem(
+                ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
+                statusCode: StatusCodes.Status422UnprocessableEntity);
+        }
+    }
+
+    private static async Task<IResult> SetPrimaryRecipeImage(
+        Guid recipeId,
+        Guid imageId,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return Results.Json(
+                new { title = "Unauthorized", status = 401, detail = "Authentication is required to set primary image." },
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            var command = new SetPrimaryRecipeImageCommand(recipeId, imageId, currentUserId, isAdmin);
+            var updated = await sender.Send(command, ct);
+
+            return Results.Ok(ApiResponse.Success(updated));
+        }
+        catch (NotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+    }
+
+    private static async Task<IResult> DeleteRecipeImage(
+        Guid recipeId,
+        Guid imageId,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return Results.Json(
+                new { title = "Unauthorized", status = 401, detail = "Authentication is required to delete images." },
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            var command = new DeleteRecipeImageCommand(recipeId, imageId, currentUserId, isAdmin);
+            await sender.Send(command, ct);
+
             return Results.NoContent();
-        }).RequireAuthorization()
-        .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status409Conflict);
-
-        group.MapPost("/{id:guid}/ingredients", async (Guid id, IngredientRequest request, [FromHeader(Name = "If-Match")] string? ifMatch, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeWriteService recipeWriteService, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken) =>
+        }
+        catch (NotFoundException ex)
         {
-            var validation = ValidateIngredient(request);
-            if (validation is not null)
-            {
-                return Results.UnprocessableEntity(new { error = validation });
-            }
-
-            var recipe = await db.Recipes.SingleOrDefaultAsync(item => item.Id == id && !item.IsDeleted, cancellationToken);
-            if (recipe is null)
-            {
-                return Results.NotFound();
-            }
-
-            if (!await CanManageRecipeAsync(id, principal, db, cancellationToken))
-            {
-                return Results.Forbid();
-            }
-
-            if (!MatchesIfMatchHeader(recipe, ifMatch))
-            {
-                return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
-            }
-
-            var ingredient = new RecipeIngredient
-            {
-                RecipeId = id,
-                Name = request.Name.Trim(),
-                Quantity = ReadIngredientQuantity(request.Quantity),
-                Unit = request.Unit?.Trim(),
-                Notes = request.Notes?.Trim(),
-                SortOrder = request.OrderIndex ?? request.SortOrder,
-            };
-            await recipeWriteService.AddIngredientAsync(ingredient, cancellationToken);
-            await TouchRecipeAsync(recipe, db, httpContext, invalidator, cancellationToken);
-            return Results.Created(
-                $"/api/recipes/{id}/ingredients/{ingredient.Id}",
-                new IngredientResponse(ingredient.Id, ingredient.Name, ingredient.Quantity, ingredient.Unit, ingredient.SortOrder, ingredient.Notes, ingredient.SortOrder));
-        }).RequireAuthorization()
-        .Produces<IngredientResponse>(StatusCodes.Status201Created)
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status409Conflict)
-        .Produces(StatusCodes.Status422UnprocessableEntity);
-
-        group.MapPut("/{recipeId:guid}/ingredients/{ingredientId:guid}", async (Guid recipeId, Guid ingredientId, IngredientRequest request, [FromHeader(Name = "If-Match")] string? ifMatch, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeWriteService recipeWriteService, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken) =>
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
         {
-            var validation = ValidateIngredient(request);
-            if (validation is not null)
-            {
-                return Results.UnprocessableEntity(new { error = validation });
-            }
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+    }
 
-            var recipe = await db.Recipes.SingleOrDefaultAsync(item => item.Id == recipeId && !item.IsDeleted, cancellationToken);
-            if (recipe is null)
-            {
-                return Results.NotFound();
-            }
-
-            if (!await CanManageRecipeAsync(recipeId, principal, db, cancellationToken))
-            {
-                return Results.Forbid();
-            }
-
-            if (!MatchesIfMatchHeader(recipe, ifMatch))
-            {
-                return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
-            }
-
-            var ingredient = await db.RecipeIngredients.SingleOrDefaultAsync(item => item.Id == ingredientId && item.RecipeId == recipeId, cancellationToken);
-            if (ingredient is null)
-            {
-                return Results.NotFound();
-            }
-
-            ingredient.Name = request.Name.Trim();
-            ingredient.Quantity = ReadIngredientQuantity(request.Quantity);
-            ingredient.Unit = request.Unit?.Trim();
-            ingredient.Notes = request.Notes?.Trim();
-            ingredient.SortOrder = request.OrderIndex ?? request.SortOrder;
-            await recipeWriteService.UpdateIngredientAsync(ingredient, cancellationToken);
-            await TouchRecipeAsync(recipe, db, httpContext, invalidator, cancellationToken);
-            return Results.Ok(new IngredientResponse(ingredient.Id, ingredient.Name, ingredient.Quantity, ingredient.Unit, ingredient.SortOrder, ingredient.Notes, ingredient.SortOrder));
-        }).RequireAuthorization()
-        .Produces<IngredientResponse>()
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status409Conflict)
-        .Produces(StatusCodes.Status422UnprocessableEntity);
-
-        group.MapDelete("/{recipeId:guid}/ingredients/{ingredientId:guid}", async (Guid recipeId, Guid ingredientId, [FromHeader(Name = "If-Match")] string? ifMatch, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeWriteService recipeWriteService, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken) =>
+    private static async Task<IResult> AddRecipeStep(
+        Guid id,
+        [FromBody] CreateRecipeStepRequest request,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
         {
-            var recipe = await db.Recipes.SingleOrDefaultAsync(item => item.Id == recipeId && !item.IsDeleted, cancellationToken);
-            if (recipe is null)
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            var command = new CreateRecipeStepCommand(
+                id,
+                request.Title,
+                request.Description,
+                request.TimerMinutes,
+                request.ImageUrl,
+                currentUserId,
+                isAdmin);
+
+            var step = await sender.Send(command, ct);
+
+            return Results.Created($"/api/v1/recipes/{id}/steps/{step.Id}", ApiResponse.Success(step));
+        }
+        catch (NotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+        catch (ValidationException ex)
+        {
+            return Results.ValidationProblem(
+                ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+    }
+
+    private static async Task<IResult> UpdateRecipeStep(
+        Guid id,
+        Guid stepId,
+        [FromBody] UpdateRecipeStepRequest request,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            var command = new UpdateRecipeStepCommand(
+                id,
+                stepId,
+                request.Title,
+                request.Description,
+                request.TimerMinutes,
+                request.ImageUrl,
+                currentUserId,
+                isAdmin);
+
+            var step = await sender.Send(command, ct);
+
+            return Results.Ok(ApiResponse.Success(step));
+        }
+        catch (NotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+        catch (ValidationException ex)
+        {
+            return Results.ValidationProblem(
+                ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+    }
+
+    private static async Task<IResult> ReorderRecipeSteps(
+        Guid id,
+        [FromBody] ReorderRecipeStepsRequest request,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            var command = new ReorderRecipeStepsCommand(
+                id,
+                request.StepIds,
+                currentUserId,
+                isAdmin);
+
+            var steps = await sender.Send(command, ct);
+
+            return Results.Ok(ApiResponse.Success(steps));
+        }
+        catch (NotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+        catch (ValidationException ex)
+        {
+            return Results.ValidationProblem(
+                ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+    }
+
+    private static async Task<IResult> UploadStepImage(
+        Guid id,
+        HttpRequest httpRequest,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            if (!httpRequest.HasFormContentType)
             {
-                return Results.NotFound();
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]> { ["File"] = ["Yêu cầu form multipart/form-data chứa trường 'file'."] },
+                    statusCode: StatusCodes.Status400BadRequest);
             }
 
-            if (!await CanManageRecipeAsync(recipeId, principal, db, cancellationToken))
+            var form = await httpRequest.ReadFormAsync(ct);
+            var file = form.Files.GetFile("file") ?? (form.Files.Count > 0 ? form.Files[0] : null);
+            if (file == null || file.Length == 0)
             {
-                return Results.Forbid();
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]> { ["File"] = ["Vui lòng chọn tệp ảnh để tải lên (File is required)."] },
+                    statusCode: StatusCodes.Status400BadRequest);
             }
 
-            if (!MatchesIfMatchHeader(recipe, ifMatch))
-            {
-                return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
-            }
+            await using var stream = file.OpenReadStream();
+            var command = new UploadRecipeStepImageCommand(
+                id,
+                stream,
+                file.FileName,
+                file.ContentType,
+                file.Length,
+                currentUserId,
+                isAdmin);
 
-            var ingredient = await db.RecipeIngredients.SingleOrDefaultAsync(item => item.Id == ingredientId && item.RecipeId == recipeId, cancellationToken);
-            if (ingredient is null)
-            {
-                return Results.NotFound();
-            }
+            var result = await sender.Send(command, ct);
+            return Results.Ok(ApiResponse.Success(new { url = result.Url }));
+        }
+        catch (NotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+        catch (ValidationException ex)
+        {
+            return Results.ValidationProblem(
+                ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Problem(
+                detail: ex.Message,
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "Dịch vụ lưu trữ không khả dụng");
+        }
+    }
 
-            await recipeWriteService.DeleteIngredientAsync(ingredient, cancellationToken);
-            await TouchRecipeAsync(recipe, db, httpContext, invalidator, cancellationToken);
+    private static async Task<IResult> DeleteRecipeStep(
+        Guid id,
+        Guid stepId,
+        ClaimsPrincipal user,
+        ISender sender,
+        CancellationToken ct)
+    {
+        Guid? currentUserId = null;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value;
+        if (Guid.TryParse(userIdClaim, out var parsedUserId))
+        {
+            currentUserId = parsedUserId;
+        }
+        bool isAdmin = user.IsInRole("Admin");
+
+        try
+        {
+            var command = new DeleteRecipeStepCommand(
+                id,
+                stepId,
+                currentUserId,
+                isAdmin);
+
+            await sender.Send(command, ct);
+
             return Results.NoContent();
-        }).RequireAuthorization()
-        .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status409Conflict);
-
-        group.MapPost("/{id:guid}/steps", async (Guid id, StepRequest request, [FromHeader(Name = "If-Match")] string? ifMatch, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeWriteService recipeWriteService, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken) =>
+        }
+        catch (NotFoundException ex)
         {
-            var validation = ValidateStep(request);
-            if (validation is not null)
-            {
-                return Results.UnprocessableEntity(new { error = validation });
-            }
-
-            var recipe = await db.Recipes.Include(item => item.Steps).SingleOrDefaultAsync(item => item.Id == id && !item.IsDeleted, cancellationToken);
-            if (recipe is null)
-            {
-                return Results.NotFound();
-            }
-
-            if (!IsOwnerOrAdmin(principal, recipe.AuthorId))
-            {
-                return Results.Forbid();
-            }
-
-            if (!MatchesIfMatchHeader(recipe, ifMatch))
-            {
-                return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
-            }
-
-            var step = new RecipeStep
-            {
-                RecipeId = id,
-                StepNumber = recipe.Steps.Count == 0 ? 1 : recipe.Steps.Max(item => item.StepNumber) + 1,
-                Title = request.Title?.Trim() ?? string.Empty,
-                Description = request.Description.Trim(),
-                TimerMinutes = request.TimerMinutes,
-                ImageUrl = request.ImageUrl,
-            };
-            await recipeWriteService.AddStepAsync(step, cancellationToken);
-            await TouchRecipeAsync(recipe, db, httpContext, invalidator, cancellationToken);
-            return Results.Created(
-                $"/api/recipes/{id}/steps/{step.Id}",
-                new StepResponse(step.Id, step.StepNumber, step.Title, step.Description, step.TimerMinutes, step.ImageUrl));
-        }).RequireAuthorization()
-        .Produces<StepResponse>(StatusCodes.Status201Created)
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status409Conflict)
-        .Produces(StatusCodes.Status422UnprocessableEntity);
-
-        group.MapPut("/{recipeId:guid}/steps/{stepId:guid}", async (Guid recipeId, Guid stepId, StepRequest request, [FromHeader(Name = "If-Match")] string? ifMatch, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeWriteService recipeWriteService, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken) =>
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (ForbiddenException ex)
         {
-            var recipe = await db.Recipes.SingleOrDefaultAsync(item => item.Id == recipeId && !item.IsDeleted, cancellationToken);
-            if (recipe is null)
-            {
-                return Results.NotFound();
-            }
-
-            if (!await CanManageRecipeAsync(recipeId, principal, db, cancellationToken))
-            {
-                return Results.Forbid();
-            }
-
-            if (!MatchesIfMatchHeader(recipe, ifMatch))
-            {
-                return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
-            }
-
-            var validation = ValidateStep(request);
-            if (validation is not null)
-            {
-                return Results.UnprocessableEntity(new { error = validation });
-            }
-
-            var step = await db.RecipeSteps.SingleOrDefaultAsync(item => item.Id == stepId && item.RecipeId == recipeId, cancellationToken);
-            if (step is null)
-            {
-                return Results.NotFound();
-            }
-
-            step.Title = request.Title?.Trim() ?? string.Empty;
-            step.Description = request.Description.Trim();
-            step.TimerMinutes = request.TimerMinutes;
-            step.ImageUrl = request.ImageUrl;
-            await recipeWriteService.UpdateStepAsync(step, cancellationToken);
-            await TouchRecipeAsync(recipe, db, httpContext, invalidator, cancellationToken);
-            return Results.Ok(new StepResponse(step.Id, step.StepNumber, step.Title, step.Description, step.TimerMinutes, step.ImageUrl));
-        }).RequireAuthorization()
-        .Produces<StepResponse>()
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status409Conflict)
-        .Produces(StatusCodes.Status422UnprocessableEntity);
-
-        group.MapDelete("/{recipeId:guid}/steps/{stepId:guid}", async (Guid recipeId, Guid stepId, [FromHeader(Name = "If-Match")] string? ifMatch, ClaimsPrincipal principal, HttpContext httpContext, IRecipeWriteService recipeWriteService, ApplicationDbContext db, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken) =>
+            return Results.Json(new { error = ex.Message }, statusCode: 403);
+        }
+        catch (ValidationException ex)
         {
-            var recipe = await db.Recipes.SingleOrDefaultAsync(item => item.Id == recipeId && !item.IsDeleted, cancellationToken);
-            if (recipe is null)
-            {
-                return Results.NotFound();
-            }
+            return Results.ValidationProblem(
+                ex.Errors.Count > 0 ? ex.Errors : new Dictionary<string, string[]> { ["error"] = [ex.Message] },
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+    }
 
-            if (!await CanManageRecipeAsync(recipeId, principal, db, cancellationToken))
-            {
-                return Results.Forbid();
-            }
+    private static IResult? ValidateListOptions(
+        string? search,
+        string? difficulty,
+        int? maxCookTimeMinutes,
+        int? maxTotalTimeMinutes,
+        string? sortBy,
+        string? sortDirection,
+        string? sort,
+        out RecipeListOptions options)
+    {
+        options = new RecipeListOptions();
 
-            if (!MatchesIfMatchHeader(recipe, ifMatch))
-            {
-                return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
-            }
-
-            if (!await recipeWriteService.DeleteStepAndReorderAsync(recipeId, stepId, cancellationToken))
-            {
-                return Results.NotFound();
-            }
-
-            await TouchRecipeAsync(recipe, db, httpContext, invalidator, cancellationToken);
-            return Results.NoContent();
-        }).RequireAuthorization()
-        .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status409Conflict);
-
-        group.MapPatch("/{recipeId:guid}/images/{imageId:guid}/primary", async (Guid recipeId, Guid imageId, [FromHeader(Name = "If-Match")] string? ifMatch, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeWriteService recipeWriteService, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken) =>
+        if (search?.Length > 200)
         {
-            var recipe = await db.Recipes.SingleOrDefaultAsync(item => item.Id == recipeId && !item.IsDeleted, cancellationToken);
-            if (recipe is null)
-            {
-                return Results.NotFound();
-            }
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["search"] = ["Từ khóa tìm kiếm không được vượt quá 200 ký tự."]
+                },
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
+        }
 
-            if (!await CanManageRecipeAsync(recipeId, principal, db, cancellationToken))
-            {
-                return Results.Forbid();
-            }
-
-            if (!MatchesIfMatchHeader(recipe, ifMatch))
-            {
-                return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
-            }
-
-            if (!await recipeWriteService.SetPrimaryImageAsync(recipeId, imageId, cancellationToken))
-            {
-                return Results.NotFound();
-            }
-
-            await TouchRecipeAsync(recipe, db, httpContext, invalidator, cancellationToken);
-            return Results.Ok(new PrimaryImageResponse(imageId, true));
-        }).RequireAuthorization()
-        .Produces<PrimaryImageResponse>()
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status409Conflict);
-
-        group.MapDelete("/{recipeId:guid}/images/{imageId:guid}", async (Guid recipeId, Guid imageId, [FromHeader(Name = "If-Match")] string? ifMatch, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeWriteService recipeWriteService, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken) =>
+        DifficultyLevel? parsedDifficulty = null;
+        if (!string.IsNullOrWhiteSpace(difficulty))
         {
-            var recipe = await db.Recipes.SingleOrDefaultAsync(item => item.Id == recipeId && !item.IsDeleted, cancellationToken);
-            if (recipe is null)
+            var difficultyName = Enum.GetNames<DifficultyLevel>()
+                .FirstOrDefault(name => string.Equals(
+                    name,
+                    difficulty.Trim(),
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (difficultyName is null ||
+                !Enum.TryParse<DifficultyLevel>(difficultyName, true, out var matchedDifficulty))
             {
-                return Results.NotFound();
+                return Results.ValidationProblem(
+                    new Dictionary<string, string[]>
+                    {
+                        ["difficulty"] = ["Difficulty phải là Easy, Medium, Hard hoặc Expert."]
+                    },
+                    statusCode: StatusCodes.Status422UnprocessableEntity,
+                    type: "VALIDATION_ERROR");
             }
 
-            if (!await CanManageRecipeAsync(recipeId, principal, db, cancellationToken))
-            {
-                return Results.Forbid();
-            }
+            parsedDifficulty = matchedDifficulty;
+        }
 
-            if (!MatchesIfMatchHeader(recipe, ifMatch))
-            {
-                return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
-            }
+        if (maxCookTimeMinutes.HasValue && maxCookTimeMinutes.Value <= 0)
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["maxCookTimeMinutes"] = ["Thời gian nấu phải lớn hơn 0."]
+                },
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
+        }
 
-            if (!await recipeWriteService.DeleteImageAsync(recipeId, imageId, cancellationToken))
-            {
-                return Results.NotFound();
-            }
+        if (maxTotalTimeMinutes.HasValue && maxTotalTimeMinutes.Value <= 0)
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["maxTotalTimeMinutes"] = ["Tổng thời gian phải lớn hơn 0."]
+                },
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
+        }
 
-            await TouchRecipeAsync(recipe, db, httpContext, invalidator, cancellationToken);
-            return Results.NoContent();
-        }).RequireAuthorization()
-        .Produces(StatusCodes.Status204NoContent)
-        .Produces(StatusCodes.Status403Forbidden)
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status409Conflict);
+        if (!string.IsNullOrWhiteSpace(sort))
+        {
+            var trimmedSort = sort.Trim();
+            if (string.Equals(trimmedSort, "newest", StringComparison.OrdinalIgnoreCase))
+            {
+                sortBy = "publishedAt";
+                sortDirection = "desc";
+            }
+            else if (string.Equals(trimmedSort, "oldest", StringComparison.OrdinalIgnoreCase))
+            {
+                sortBy = "publishedAt";
+                sortDirection = "asc";
+            }
+            else if (trimmedSort.StartsWith('-'))
+            {
+                sortDirection = "desc";
+                sortBy = trimmedSort[1..];
+            }
+            else
+            {
+                sortDirection = "asc";
+                sortBy = trimmedSort;
+            }
+        }
+
+        var sortByValue = string.IsNullOrWhiteSpace(sortBy)
+            ? "publishedat"
+            : sortBy.Trim().ToLowerInvariant();
+
+        if (sortByValue is "createdat" or "-createdat")
+        {
+            sortByValue = "publishedat";
+        }
+
+        var parsedSortBy = sortByValue switch
+        {
+            "publishedat" => RecipeSortField.PublishedAt,
+            "title" => RecipeSortField.Title,
+            "preptime" => RecipeSortField.PrepTime,
+            "cooktime" => RecipeSortField.CookTime,
+            "totaltime" => RecipeSortField.TotalTime,
+            _ => (RecipeSortField?)null
+        };
+
+        if (!parsedSortBy.HasValue)
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["sortBy"] = ["SortBy phải là publishedAt, createdAt, title, prepTime, cookTime hoặc totalTime."]
+                },
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
+        }
+
+        var sortDirectionValue = string.IsNullOrWhiteSpace(sortDirection)
+            ? "desc"
+            : sortDirection.Trim().ToLowerInvariant();
+        var parsedSortDirection = sortDirectionValue switch
+        {
+            "asc" => false,
+            "desc" => true,
+            _ => (bool?)null
+        };
+
+        if (!parsedSortDirection.HasValue)
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["sortDirection"] = ["SortDirection phải là asc hoặc desc."]
+                },
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
+        }
+
+        options = new RecipeListOptions(
+            string.IsNullOrWhiteSpace(search) ? null : search.Trim(),
+            Difficulty: parsedDifficulty,
+            MaxTotalTimeMinutes: maxTotalTimeMinutes,
+            SortBy: parsedSortBy.Value,
+            SortDescending: parsedSortDirection.Value,
+            MaxCookTimeMinutes: maxCookTimeMinutes);
+        return null;
+    }
+
+    private static async Task<IResult> CreateRecipe(
+        RecipeRequest request,
+        ClaimsPrincipal principal,
+        HttpContext httpContext,
+        ApplicationDbContext db,
+        CulinaryBlog.Application.Interfaces.IRecipeRepository recipeRepository,
+        IRecipeWriteService recipeWriteService,
+        CancellationToken cancellationToken)
+    {
+        var authorId = GetUserId(principal);
+        if (authorId == Guid.Empty)
+        {
+            return Results.Unauthorized();
+        }
+
+        request = request with { AuthorId = authorId };
+        var validation = await ValidateRequest(request, db, cancellationToken);
+        if (validation is not null)
+        {
+            return validation == "Recipe slug already exists."
+                ? Results.Conflict(new { error = validation })
+                : Results.UnprocessableEntity(new { error = validation });
+        }
+
+        var slug = await GenerateUniqueSlugAsync(request.Slug ?? request.Title, recipeRepository, db, cancellationToken: cancellationToken);
+
+        var recipe = new Recipe
+        {
+            AuthorId = request.AuthorId!.Value,
+            CategoryId = request.CategoryId,
+            Title = request.Title.Trim(),
+            Slug = slug,
+            Description = request.Description?.Trim() ?? string.Empty,
+            Content = request.Content.Trim(),
+            PrepTimeMinutes = request.PrepTimeMinutes,
+            CookTimeMinutes = request.CookTimeMinutes,
+            Servings = request.Servings,
+            Difficulty = request.Difficulty,
+            Status = RecipeStatus.Draft,
+            Nutrition = ToNutrition(request.Nutrition),
+            Images = ToImages(request.Images),
+            Steps = ToSteps(request.Steps)
+        };
+        recipe.Ingredients = ToIngredients(request.Ingredients);
+        await recipeWriteService.CreateAsync(recipe, cancellationToken);
+
+        SetRecipeEtag(httpContext, recipe);
+        return Results.Created($"/api/v1/recipes/{recipe.Slug}", ApiResponse.Success(new { recipe.Id, recipe.Slug, version = recipe.xmin.ToString() }));
+    }
+
+    private static async Task<IResult> UpdateRecipe(
+        Guid id,
+        RecipeRequest request,
+        ClaimsPrincipal principal,
+        HttpContext httpContext,
+        ApplicationDbContext db,
+        CulinaryBlog.Application.Interfaces.IRecipeRepository recipeRepository,
+        IRecipeWriteService recipeWriteService,
+        CancellationToken cancellationToken)
+    {
+        var recipe = await recipeRepository.GetForUpdateAsync(id, cancellationToken);
+        if (recipe is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (!IsOwnerOrAdmin(principal, recipe.AuthorId))
+        {
+            return Results.Forbid();
+        }
+
+        if (!MatchesIfMatchHeader(recipe, httpContext.Request.Headers.IfMatch.ToString()))
+        {
+            return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
+        }
+
+        request = request with { AuthorId = recipe.AuthorId };
+        var validation = await ValidateRequest(request, db, cancellationToken, id);
+        if (validation is not null)
+        {
+            return validation == "Recipe slug already exists."
+                ? Results.Conflict(new { error = validation })
+                : Results.UnprocessableEntity(new { error = validation });
+        }
+
+        var requestedSlug = request.Slug is null ? recipe.Slug : Slugify(request.Slug);
+        if ((recipe.Status is RecipeStatus.Published or RecipeStatus.Archived) &&
+            !string.Equals(requestedSlug, recipe.Slug, StringComparison.Ordinal))
+        {
+            return Results.UnprocessableEntity(new { error = "Published or archived recipes cannot change their slug." });
+        }
+
+        var slug = recipe.Status is RecipeStatus.Published or RecipeStatus.Archived
+            ? recipe.Slug
+            : await GenerateUniqueSlugAsync(request.Slug ?? request.Title, recipeRepository, db, id, cancellationToken);
+
+        var previousSlug = recipe.Slug;
+        recipe.CategoryId = request.CategoryId;
+        recipe.Title = request.Title.Trim();
+        recipe.Slug = slug;
+        recipe.Description = request.Description?.Trim() ?? string.Empty;
+        recipe.Content = request.Content.Trim();
+        recipe.PrepTimeMinutes = request.PrepTimeMinutes;
+        recipe.CookTimeMinutes = request.CookTimeMinutes;
+        recipe.Servings = request.Servings;
+        recipe.Difficulty = request.Difficulty;
+        recipe.UpdatedAt = DateTime.UtcNow;
+        recipe.Nutrition = ToNutrition(request.Nutrition, recipe.Nutrition);
+        if (recipe.Status == RecipeStatus.Draft &&
+            !string.Equals(previousSlug, slug, StringComparison.Ordinal))
+        {
+            var historyExists = await db.RecipeSlugHistories.AnyAsync(
+                history => history.RecipeId == recipe.Id && history.Slug == previousSlug,
+                cancellationToken);
+            if (!historyExists)
+            {
+                db.RecipeSlugHistories.Add(new RecipeSlugHistory
+                {
+                    RecipeId = recipe.Id,
+                    Slug = previousSlug,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+        }
+        await recipeWriteService.ReplaceContentsAsync(
+            recipe,
+            ToIngredients(request.Ingredients),
+            ToSteps(request.Steps),
+            ToImages(request.Images),
+            cancellationToken);
+
+        SetRecipeEtag(httpContext, recipe);
+        return Results.Ok(ApiResponse.Success(new { recipe.Id, recipe.Slug, version = recipe.xmin.ToString() }));
+    }
+
+    private static async Task<IResult> DeleteRecipe(
+        Guid id,
+        ClaimsPrincipal principal,
+        HttpContext httpContext,
+        CulinaryBlog.Application.Interfaces.IRecipeRepository recipeRepository,
+        IRecipeWriteService recipeWriteService,
+        CancellationToken cancellationToken)
+    {
+        var recipe = await recipeRepository.GetByIdAsync(id, includeDetails: false, cancellationToken);
+        if (recipe is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (!IsOwnerOrAdmin(principal, recipe.AuthorId))
+        {
+            return Results.Forbid();
+        }
+
+        if (!MatchesIfMatchHeader(recipe, httpContext.Request.Headers.IfMatch.ToString()))
+        {
+            return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
+        }
+
+        await recipeWriteService.DeleteAsync(recipe, cancellationToken);
+        return Results.NoContent();
     }
 
     private static void MapStatusEndpoint(RouteGroupBuilder group, string action, RecipeStatus status)
     {
-        async Task<IResult> UpdateStatus(Guid id, [FromHeader(Name = "If-Match")] string? ifMatch, ClaimsPrincipal principal, HttpContext httpContext, ApplicationDbContext db, IRecipeWriteService recipeWriteService, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken)
+        async Task<IResult> UpdateStatus(
+            Guid id,
+            ClaimsPrincipal principal,
+            HttpContext httpContext,
+            ApplicationDbContext db,
+            IRecipeWriteService recipeWriteService,
+            IRecipeCacheInvalidator invalidator,
+            CancellationToken cancellationToken)
         {
             var recipe = await db.Recipes
                 .Include(item => item.Ingredients)
@@ -879,12 +1410,12 @@ public static class RecipeEndpoints
                 return Results.NotFound();
             }
 
-            if (!IsOwnerOrAdmin(principal, recipe.AuthorId))
+            if (!await CanManageRecipeAsync(id, principal, db, cancellationToken))
             {
                 return Results.Forbid();
             }
 
-            if (!MatchesIfMatchHeader(recipe, ifMatch))
+            if (!MatchesIfMatchHeader(recipe, httpContext.Request.Headers.IfMatch.ToString()))
             {
                 return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
             }
@@ -906,7 +1437,7 @@ public static class RecipeEndpoints
             if (recipe.Status == status)
             {
                 SetRecipeEtag(httpContext, recipe);
-                return Results.Ok(new RecipeStatusResponse(recipe.Id, recipe.Status.ToString()));
+                return Results.Ok(ApiResponse.Success(new { recipe.Id, status = recipe.Status.ToString(), version = recipe.xmin.ToString() }));
             }
 
             if ((action == "unpublish" && recipe.Status != RecipeStatus.Published) ||
@@ -920,120 +1451,262 @@ public static class RecipeEndpoints
             {
                 recipe.PublishedAt ??= DateTime.UtcNow;
             }
-
             recipe.UpdatedAt = DateTime.UtcNow;
-            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             await recipeWriteService.UpdateAsync(recipe, cancellationToken);
             db.RecipeAuditLogs.Add(new RecipeAuditLog
             {
                 RecipeId = recipe.Id,
                 ActorId = GetUserId(principal),
                 Action = action,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
             });
             await db.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            await InvalidateRecipeAsync(recipe, db, invalidator, cancellationToken);
+            var categorySlug = recipe.Category?.Slug;
+            await invalidator.InvalidateAsync(recipe.Id, recipe.Slug, recipe.CategoryId, categorySlug, cancellationToken);
             SetRecipeEtag(httpContext, recipe);
-            return Results.Ok(new RecipeStatusResponse(recipe.Id, recipe.Status.ToString()));
+            return Results.Ok(ApiResponse.Success(new { recipe.Id, status = recipe.Status.ToString(), version = recipe.xmin.ToString() }));
         }
 
-        group.MapPost("/{id:guid}/" + action, UpdateStatus)
-            .RequireAuthorization()
-            .Produces<RecipeStatusResponse>()
-            .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status404NotFound)
-            .Produces(StatusCodes.Status409Conflict)
-            .Produces(StatusCodes.Status422UnprocessableEntity);
-        group.MapPatch("/{id:guid}/" + action, UpdateStatus)
-            .RequireAuthorization()
-            .Produces<RecipeStatusResponse>()
-            .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status404NotFound)
-            .Produces(StatusCodes.Status409Conflict)
-            .Produces(StatusCodes.Status422UnprocessableEntity);
+        group.MapPost("/{id:guid}/" + action, UpdateStatus).RequireAuthorization();
     }
 
-    private static async Task<string?> ValidateRequest(RecipeRequest request, ApplicationDbContext db, CancellationToken cancellationToken)
+    private static async Task<IResult> AddIngredient(
+        Guid id,
+        IngredientRequest request,
+        ClaimsPrincipal principal,
+        HttpContext httpContext,
+        ApplicationDbContext db,
+        IRecipeWriteService recipeWriteService,
+        CancellationToken cancellationToken)
     {
-        if (!request.AuthorId.HasValue || request.AuthorId.Value == Guid.Empty || request.CategoryId == Guid.Empty || string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Content))
+        var validation = ValidateIngredient(request);
+        if (validation is not null)
         {
-            return "AuthorId, CategoryId, Title and Content are required.";
+            return Results.UnprocessableEntity(new { error = validation });
         }
 
-        if (request.Title.Trim().Length < 5 || request.Title.Trim().Length > 200)
+        var recipe = await db.Recipes.SingleOrDefaultAsync(item => item.Id == id && !item.IsDeleted, cancellationToken);
+        if (recipe is null)
         {
-            return "Title must be between 5 and 200 characters.";
+            return Results.NotFound();
         }
 
-        if (request.Description?.Length > 2000)
+        if (!await CanManageRecipeAsync(id, principal, db, cancellationToken))
         {
-            return "Description must be at most 2000 characters.";
+            return Results.Forbid();
         }
 
-        if (request.PrepTimeMinutes <= 0 || request.CookTimeMinutes < 0 || request.Servings <= 0)
+        if (!MatchesIfMatchHeader(recipe, httpContext.Request.Headers.IfMatch.ToString()))
         {
-            return "PrepTimeMinutes must be greater than zero, CookTimeMinutes cannot be negative, and Servings must be greater than zero.";
+            return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
         }
 
-        if (!Enum.IsDefined(request.Difficulty))
+        var ingredient = new RecipeIngredient
         {
-            return "Difficulty is invalid.";
-        }
-
-        if (request.Nutrition is not null && new[]
-            {
-                request.Nutrition.Calories,
-                request.Nutrition.Protein,
-                request.Nutrition.Carbohydrates,
-                request.Nutrition.Fat,
-                request.Nutrition.Fiber,
-                request.Nutrition.Sodium,
-            }.Any(value => value < 0))
-        {
-            return "Nutrition values cannot be negative.";
-        }
-
-        foreach (var ingredient in request.Ingredients ?? [])
-        {
-            var ingredientError = ValidateIngredient(ingredient);
-            if (ingredientError is not null)
-            {
-                return ingredientError;
-            }
-        }
-
-        if (!await db.Users.AnyAsync(user => user.Id == request.AuthorId!.Value, cancellationToken))
-        {
-            return "Author was not found.";
-        }
-
-        if (!await db.Categories.AnyAsync(category => category.Id == request.CategoryId && !category.IsDeleted, cancellationToken))
-        {
-            return "Category was not found.";
-        }
-
-        return null;
+            RecipeId = id,
+            Name = request.Name.Trim(),
+            Quantity = ReadIngredientQuantity(request.Quantity),
+            Unit = request.Unit?.Trim(),
+            Notes = request.Notes?.Trim(),
+            SortOrder = request.OrderIndex ?? request.SortOrder
+        };
+        await recipeWriteService.AddIngredientAsync(ingredient, cancellationToken);
+        await TouchRecipeAsync(recipe, db, httpContext, cancellationToken);
+        return Results.Created($"/api/v1/recipes/{id}/ingredients/{ingredient.Id}", ApiResponse.Success(ingredient));
     }
 
-    private static async Task<string> GenerateUniqueSlugAsync(string value, IRecipeRepository repository, ApplicationDbContext db, Guid? excludeId = null, CancellationToken cancellationToken = default)
+    private static async Task<IResult> UpdateIngredient(
+        Guid recipeId,
+        Guid ingredientId,
+        IngredientRequest request,
+        ClaimsPrincipal principal,
+        HttpContext httpContext,
+        ApplicationDbContext db,
+        IRecipeWriteService recipeWriteService,
+        CancellationToken cancellationToken)
     {
-        var baseSlug = Slugify(value);
-        if (string.IsNullOrWhiteSpace(baseSlug))
+        var validation = ValidateIngredient(request);
+        if (validation is not null)
         {
-            baseSlug = "recipe";
+            return Results.UnprocessableEntity(new { error = validation });
         }
 
-        var candidate = baseSlug[..Math.Min(baseSlug.Length, 220)];
-        var suffix = 2;
-        while (await repository.ExistsBySlugAsync(candidate, excludeId, cancellationToken) ||
-           await db.RecipeSlugHistories.AnyAsync(history => history.Slug == candidate && history.RecipeId != excludeId, cancellationToken))
+        var recipe = await db.Recipes.SingleOrDefaultAsync(item => item.Id == recipeId && !item.IsDeleted, cancellationToken);
+        if (recipe is null)
         {
-            var suffixText = $"-{suffix++}";
-            candidate = $"{baseSlug[..Math.Min(baseSlug.Length, 220 - suffixText.Length)]}{suffixText}";
+            return Results.NotFound();
         }
 
-        return candidate;
+        if (!await CanManageRecipeAsync(recipeId, principal, db, cancellationToken))
+        {
+            return Results.Forbid();
+        }
+
+        if (!MatchesIfMatchHeader(recipe, httpContext.Request.Headers.IfMatch.ToString()))
+        {
+            return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
+        }
+
+        var ingredient = await db.RecipeIngredients.SingleOrDefaultAsync(item => item.Id == ingredientId && item.RecipeId == recipeId, cancellationToken);
+        if (ingredient is null)
+        {
+            return Results.NotFound();
+        }
+
+        ingredient.Name = request.Name.Trim();
+        ingredient.Quantity = ReadIngredientQuantity(request.Quantity);
+        ingredient.Unit = request.Unit?.Trim();
+        ingredient.Notes = request.Notes?.Trim();
+        ingredient.SortOrder = request.OrderIndex ?? request.SortOrder;
+        await recipeWriteService.UpdateIngredientAsync(ingredient, cancellationToken);
+        await TouchRecipeAsync(recipe, db, httpContext, cancellationToken);
+        return Results.Ok(ApiResponse.Success(ingredient));
+    }
+
+    private static async Task<IResult> DeleteIngredient(
+        Guid recipeId,
+        Guid ingredientId,
+        ClaimsPrincipal principal,
+        HttpContext httpContext,
+        ApplicationDbContext db,
+        IRecipeWriteService recipeWriteService,
+        CancellationToken cancellationToken)
+    {
+        var recipe = await db.Recipes.SingleOrDefaultAsync(item => item.Id == recipeId && !item.IsDeleted, cancellationToken);
+        if (recipe is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (!await CanManageRecipeAsync(recipeId, principal, db, cancellationToken))
+        {
+            return Results.Forbid();
+        }
+
+        if (!MatchesIfMatchHeader(recipe, httpContext.Request.Headers.IfMatch.ToString()))
+        {
+            return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
+        }
+
+        var ingredient = await db.RecipeIngredients.SingleOrDefaultAsync(item => item.Id == ingredientId && item.RecipeId == recipeId, cancellationToken);
+        if (ingredient is null)
+        {
+            return Results.NotFound();
+        }
+
+        await recipeWriteService.DeleteIngredientAsync(ingredient, cancellationToken);
+        await TouchRecipeAsync(recipe, db, httpContext, cancellationToken);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> RestoreRecipe(
+        Guid id,
+        ClaimsPrincipal principal,
+        HttpContext httpContext,
+        ApplicationDbContext db,
+        IRecipeCacheInvalidator invalidator,
+        CancellationToken cancellationToken)
+    {
+        var recipe = await db.Recipes.IgnoreQueryFilters().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (recipe is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (!recipe.IsDeleted)
+        {
+            return Results.UnprocessableEntity(new { error = "Recipe is not soft deleted." });
+        }
+
+        var deletedAt = recipe.DeletedAt ?? recipe.UpdatedAt ?? recipe.CreatedAt;
+        if (DateTime.UtcNow - deletedAt > RecipePurgeService.RetentionPeriod)
+        {
+            return Results.Conflict(new { error = "Recipe retention expired and cannot be restored." });
+        }
+
+        recipe.IsDeleted = false;
+        recipe.DeletedAt = null;
+        recipe.UpdatedAt = DateTime.UtcNow;
+        await db.RecipeAuditLogs.AddAsync(new RecipeAuditLog
+        {
+            RecipeId = recipe.Id,
+            ActorId = GetUserId(principal),
+            Action = "Restore",
+            CreatedAt = DateTime.UtcNow
+        }, cancellationToken);
+
+        await db.SaveChangesAsync(cancellationToken);
+        var categorySlug = await db.Categories
+            .Where(category => category.Id == recipe.CategoryId)
+            .Select(category => category.Slug)
+            .SingleOrDefaultAsync(cancellationToken);
+        await invalidator.InvalidateAsync(recipe.Id, recipe.Slug, recipe.CategoryId, categorySlug, cancellationToken);
+        SetRecipeEtag(httpContext, recipe);
+        return Results.Ok(new { recipe.Id, status = recipe.Status.ToString() });
+    }
+
+    private static async Task<IResult> PurgeRecipe(
+        Guid id,
+        ClaimsPrincipal principal,
+        IRecipePurgeService purgeService,
+        CancellationToken cancellationToken)
+    {
+        if (!await purgeService.PurgeAsync(id, GetUserId(principal), cancellationToken))
+        {
+            return Results.NotFound();
+        }
+        return Results.NoContent();
+    }
+
+    private static bool CanPublishRecipe(Recipe recipe, ApplicationUser author)
+    {
+        if (string.IsNullOrWhiteSpace(recipe.Title) || recipe.Title.Trim().Length is < 5 or > 200 ||
+            string.IsNullOrWhiteSpace(recipe.Content) || recipe.PrepTimeMinutes <= 0 ||
+            recipe.CookTimeMinutes < 0 || recipe.Servings <= 0 || !Enum.IsDefined(recipe.Difficulty) ||
+            recipe.Description.Length > 2000 ||
+            recipe.CategoryId == Guid.Empty ||
+            recipe.Category is { IsDeleted: true } ||
+            recipe.Ingredients.Count == 0 ||
+            recipe.Ingredients.Any(ingredient => string.IsNullOrWhiteSpace(ingredient.Name) || ingredient.Name.Trim().Length > 200) ||
+            recipe.Steps.Count == 0 ||
+            recipe.Steps.Any(step => string.IsNullOrWhiteSpace(step.Description) || step.Description.Trim().Length > 2000 || step.Title.Trim().Length > 200))
+        {
+            return false;
+        }
+
+        if (!author.EmailConfirmed)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool MatchesIfMatchHeader(Recipe recipe, string? ifMatchHeader)
+    {
+        if (string.IsNullOrWhiteSpace(ifMatchHeader))
+        {
+            return false;
+        }
+
+        var candidate = ifMatchHeader.Trim();
+        if (candidate.StartsWith("W/", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = candidate[2..];
+        }
+
+        candidate = candidate.Trim('"');
+        return uint.TryParse(candidate, out var version) && version == recipe.xmin;
+    }
+
+    private static void SetRecipeEtag(HttpContext httpContext, Recipe recipe) =>
+        httpContext.Response.Headers.ETag = $"\"{recipe.xmin}\"";
+
+    private static async Task TouchRecipeAsync(Recipe recipe, ApplicationDbContext db, HttpContext httpContext, CancellationToken cancellationToken)
+    {
+        recipe.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        SetRecipeEtag(httpContext, recipe);
     }
 
     private static string? ValidateIngredient(IngredientRequest request)
@@ -1109,6 +1782,90 @@ public static class RecipeEndpoints
         return null;
     }
 
+    private static async Task<string?> ValidateRequest(RecipeRequest request, ApplicationDbContext db, CancellationToken cancellationToken, Guid? existingId = null)
+    {
+        if (!request.AuthorId.HasValue || request.AuthorId.Value == Guid.Empty || request.CategoryId == Guid.Empty || string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Content))
+        {
+            return "AuthorId, CategoryId, Title and Content are required.";
+        }
+
+        if (request.Title.Trim().Length < 5 || request.Title.Trim().Length > 200)
+        {
+            return "Title must be between 5 and 200 characters.";
+        }
+
+        if (request.Description?.Length > 2000)
+        {
+            return "Description must be at most 2000 characters.";
+        }
+
+        if (request.PrepTimeMinutes <= 0 || request.CookTimeMinutes < 0 || request.Servings <= 0)
+        {
+            return "PrepTimeMinutes must be greater than zero, CookTimeMinutes cannot be negative, and Servings must be greater than zero.";
+        }
+
+        if (!Enum.IsDefined(request.Difficulty))
+        {
+            return "Difficulty is invalid.";
+        }
+
+        if (request.Nutrition is not null && new[]
+            {
+                request.Nutrition.Calories,
+                request.Nutrition.Protein,
+                request.Nutrition.Carbohydrates,
+                request.Nutrition.Fat,
+                request.Nutrition.Fiber,
+                request.Nutrition.Sodium
+            }.Any(value => value < 0))
+        {
+            return "Nutrition values cannot be negative.";
+        }
+
+        foreach (var ingredient in request.Ingredients ?? [])
+        {
+            var ingredientError = ValidateIngredient(ingredient);
+            if (ingredientError is not null)
+            {
+                return ingredientError;
+            }
+        }
+
+        if (!await db.Users.AnyAsync(user => user.Id == request.AuthorId!.Value, cancellationToken))
+        {
+            return "Author was not found.";
+        }
+
+        if (!await db.Categories.AnyAsync(category => category.Id == request.CategoryId && !category.IsDeleted, cancellationToken))
+        {
+            return "Category was not found.";
+        }
+
+        return null;
+    }
+
+    private static string Slugify(string value) => SlugHelper.Generate(value);
+
+    private static async Task<string> GenerateUniqueSlugAsync(string value, CulinaryBlog.Application.Interfaces.IRecipeRepository repository, ApplicationDbContext db, Guid? excludeId = null, CancellationToken cancellationToken = default)
+    {
+        var baseSlug = Slugify(value);
+        if (string.IsNullOrWhiteSpace(baseSlug))
+        {
+            baseSlug = "recipe";
+        }
+
+        var candidate = baseSlug[..Math.Min(baseSlug.Length, 220)];
+        var suffix = 2;
+        while (await repository.ExistsBySlugAsync(candidate, excludeId, cancellationToken) ||
+               await db.RecipeSlugHistories.AnyAsync(history => history.Slug == candidate && history.RecipeId != excludeId, cancellationToken))
+        {
+            var suffixText = $"-{suffix++}";
+            candidate = $"{baseSlug[..Math.Min(baseSlug.Length, 220 - suffixText.Length)]}{suffixText}";
+        }
+
+        return candidate;
+    }
+
     private static RecipeNutrition ToNutrition(NutritionRequest? request, RecipeNutrition? existing = null)
     {
         var nutrition = existing ?? new RecipeNutrition();
@@ -1127,66 +1884,6 @@ public static class RecipeEndpoints
         return nutrition;
     }
 
-    private static bool CanPublishRecipe(Recipe recipe, ApplicationUser author)
-    {
-        if (string.IsNullOrWhiteSpace(recipe.Title) || recipe.Title.Trim().Length is < 5 or > 200 ||
-            string.IsNullOrWhiteSpace(recipe.Content) || recipe.PrepTimeMinutes <= 0 ||
-            recipe.CookTimeMinutes < 0 || recipe.Servings <= 0 || !Enum.IsDefined(recipe.Difficulty) ||
-            recipe.Description.Length > 2000 ||
-            recipe.Category is null || recipe.Category.IsDeleted ||
-            recipe.Ingredients.Count == 0 || recipe.Steps.Count == 0 ||
-            new[] { recipe.Nutrition.Calories, recipe.Nutrition.Protein, recipe.Nutrition.Carbohydrates, recipe.Nutrition.Fat, recipe.Nutrition.Fiber, recipe.Nutrition.Sodium }.Any(value => value < 0) ||
-            recipe.Ingredients.Any(ingredient => string.IsNullOrWhiteSpace(ingredient.Name) || ingredient.Name.Trim().Length > 200 || ingredient.Quantity is <= 0 || ingredient.Unit?.Length > 50 || ingredient.Notes?.Length > 500 || ingredient.SortOrder < 0) ||
-            recipe.Steps.Any(step => string.IsNullOrWhiteSpace(step.Description) || step.Description.Trim().Length > 2000 || step.Title.Trim().Length > 200))
-        {
-            return false;
-        }
-
-        if (!author.EmailConfirmed)
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool MatchesIfMatchHeader(Recipe recipe, string? ifMatchHeader)
-    {
-        if (string.IsNullOrWhiteSpace(ifMatchHeader))
-        {
-            return false;
-        }
-
-        var candidate = ifMatchHeader.Trim();
-        if (candidate.StartsWith("W/", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = candidate[2..];
-        }
-
-        candidate = candidate.Trim('"');
-        return uint.TryParse(candidate, out var version) && version == recipe.xmin;
-    }
-
-    private static void SetRecipeEtag(HttpContext httpContext, Recipe recipe) =>
-        httpContext.Response.Headers.ETag = $"\"{recipe.xmin}\"";
-
-    private static async Task TouchRecipeAsync(Recipe recipe, ApplicationDbContext db, HttpContext httpContext, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken)
-    {
-        recipe.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
-        await InvalidateRecipeAsync(recipe, db, invalidator, cancellationToken);
-        SetRecipeEtag(httpContext, recipe);
-    }
-
-    private static async Task InvalidateRecipeAsync(Recipe recipe, ApplicationDbContext db, IRecipeCacheInvalidator invalidator, CancellationToken cancellationToken)
-    {
-        var categorySlug = await db.Categories
-            .Where(category => category.Id == recipe.CategoryId)
-            .Select(category => category.Slug)
-            .SingleOrDefaultAsync(cancellationToken);
-        await invalidator.InvalidateAsync(recipe.Id, recipe.Slug, recipe.CategoryId, categorySlug, cancellationToken);
-    }
-
     private static List<RecipeIngredient> ToIngredients(IEnumerable<IngredientRequest>? requests) =>
         (requests ?? []).Select((request, index) => new RecipeIngredient
         {
@@ -1194,7 +1891,7 @@ public static class RecipeEndpoints
             Quantity = ReadIngredientQuantity(request.Quantity),
             Unit = request.Unit?.Trim(),
             Notes = request.Notes?.Trim(),
-            SortOrder = (request.OrderIndex ?? request.SortOrder) == 0 ? index : request.OrderIndex ?? request.SortOrder,
+            SortOrder = (request.OrderIndex ?? request.SortOrder) == 0 ? index : request.OrderIndex ?? request.SortOrder
         }).ToList();
 
     private static List<RecipeImage> ToImages(IEnumerable<ImageRequest>? requests) =>
@@ -1205,7 +1902,7 @@ public static class RecipeEndpoints
                 Url = request.Url.Trim(),
                 AltText = request.AltText?.Trim(),
                 SortOrder = index,
-                IsPrimary = index == 0,
+                IsPrimary = index == 0
             })
             .ToList();
 
@@ -1218,29 +1915,9 @@ public static class RecipeEndpoints
                 Title = request.Title?.Trim() ?? string.Empty,
                 Description = request.Description.Trim(),
                 TimerMinutes = request.TimerMinutes,
-                ImageUrl = request.ImageUrl,
+                ImageUrl = string.IsNullOrWhiteSpace(request.ImageUrl) ? null : request.ImageUrl.Trim()
             })
             .ToList();
-
-    private static RecipeDetailResponse ToDetail(Recipe recipe) =>
-        new(recipe.Id, recipe.Title, recipe.Slug, recipe.Description, recipe.Content, recipe.CategoryId, recipe.Category.Name, recipe.Author.FullName, recipe.PrepTimeMinutes, recipe.CookTimeMinutes, recipe.Servings, recipe.Difficulty.ToString(), recipe.Status.ToString(), recipe.CreatedAt, recipe.PublishedAt, recipe.Ingredients.Select(ingredient => new IngredientResponse(ingredient.Id, ingredient.Name, ingredient.Quantity, ingredient.Unit, ingredient.SortOrder, ingredient.Notes, ingredient.SortOrder)), recipe.Steps.OrderBy(step => step.StepNumber).Select(step => new StepResponse(step.Id, step.StepNumber, step.Title, step.Description, step.TimerMinutes, step.ImageUrl)), recipe.Nutrition is null ? null : new NutritionResponse(recipe.Nutrition.Calories, recipe.Nutrition.Protein, recipe.Nutrition.Carbohydrates, recipe.Nutrition.Fat, recipe.Nutrition.Fiber, recipe.Nutrition.Sodium), recipe.Images.OrderBy(image => image.SortOrder).Select(image => new ImageResponse(image.Id, image.Url, image.AltText, image.IsPrimary, image.SortOrder)));
-
-    private static string Slugify(string value) => SlugHelper.Generate(value);
-
-    private static string[] GetSlugAliases(string slug)
-    {
-        if (slug.StartsWith("rcp-", StringComparison.OrdinalIgnoreCase))
-        {
-            return [slug, $"recipe-{slug[4..]}"];
-        }
-
-        if (slug.StartsWith("recipe-", StringComparison.OrdinalIgnoreCase))
-        {
-            return [slug, $"rcp-{slug[7..]}"];
-        }
-
-        return [slug];
-    }
 
     private static Guid GetUserId(ClaimsPrincipal principal) =>
         Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub"), out var userId)
@@ -1265,3 +1942,42 @@ public static class RecipeEndpoints
         return authorId != Guid.Empty && authorId == GetUserId(principal);
     }
 }
+
+public sealed record RecipeRequest(Guid? AuthorId, Guid CategoryId, string Title, string? Slug, string? Description, string Content, int PrepTimeMinutes, int CookTimeMinutes, int Servings, DifficultyLevel Difficulty, NutritionRequest? Nutrition, IEnumerable<IngredientRequest>? Ingredients, IEnumerable<ImageRequest>? Images, IEnumerable<StepRequest>? Steps = null);
+public sealed record NutritionRequest(decimal Calories, decimal Protein, decimal Carbohydrates, decimal Fat, decimal Fiber, decimal Sodium);
+public sealed record IngredientRequest(string Name, JsonElement Quantity, string? Unit, int SortOrder = 0, string? Notes = null, int? OrderIndex = null);
+public sealed record ImageRequest(string Url, string? AltText);
+public sealed record StepRequest(string? Title, string Description, int? TimerMinutes = null, string? ImageUrl = null);
+
+public record AddRecipeImageRequest(
+    string OriginalUrl,
+    string? MediumUrl = null,
+    string? ThumbnailUrl = null,
+    string? AltText = null,
+    bool? IsPrimary = null,
+    int? OrderIndex = null
+);
+
+public record CreateRecipeStepRequest(
+    string? Title,
+    string Description,
+    int? TimerMinutes = null,
+    string? ImageUrl = null
+);
+
+public record UpdateRecipeStepRequest(
+    string? Title,
+    string Description,
+    int? TimerMinutes = null,
+    string? ImageUrl = null
+);
+
+public record ReorderRecipeStepsRequest(
+    List<Guid> StepIds
+);
+
+public record UpdateRecipeImageRequest(
+    string? AltText = null,
+    int? OrderIndex = null,
+    bool? IsPrimary = null
+);

@@ -2,7 +2,6 @@ import RecipeEditor from '@/components/recipe-management/RecipeEditor';
 
 export default async function EditRecipePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-
   return (
     <>
       <div className="flow-kicker">Chỉnh sửa công thức</div>

@@ -55,4 +55,11 @@ public class Recipe : BaseEntity
     public ICollection<RecipeStep> Steps { get; set; } = new List<RecipeStep>();
     public ICollection<RecipeImage> Images { get; set; } = new List<RecipeImage>();
     public RecipeNutrition Nutrition { get; set; } = new();
+
+    public void SoftDelete()
+    {
+        IsDeleted = true;
+        DeletedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }

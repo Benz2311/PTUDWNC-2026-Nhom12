@@ -1,230 +1,360 @@
-# Culinary Blog
+# Culinary Blog - Recipe & Ingredient Platform
 
-Web application chia sẻ công thức nấu ăn, gồm frontend Next.js, backend ASP.NET Core API, PostgreSQL, Redis và MinIO.
+## 1. Giới thiệu tổng quan
 
-## Chạy toàn bộ ứng dụng
+Culinary Blog là hệ thống chia sẻ công thức nấu ăn gồm Frontend Next.js, Backend ASP.NET Core API, PostgreSQL, Redis, MinIO và dịch vụ hỗ trợ chạy bằng Docker Compose.
 
-Yêu cầu Docker Desktop đang chạy và Docker Compose. Mở PowerShell tại thư mục có `docker-compose.yml`, rồi tạo file cấu hình local:
+README này mô tả toàn bộ nội dung 8 bữa thực hiện cho phạm vi **Recipe / Ingredient của Phạm Nguyễn Ngọc Phước**.
 
-```powershell
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+### Mục tiêu
+
+- Xây dựng đầy đủ mô hình dữ liệu, cấu hình EF Core, repository và migration cho Recipe.
+- Cung cấp API tạo, sửa, xem, lọc, chuyển trạng thái, xóa mềm, khôi phục, xóa vĩnh viễn và quản lý nguyên liệu.
+- Chuẩn hóa tài liệu API, TypeScript types, API utility và shared components.
+- Hoàn thiện Recipe Detail, Create Recipe và Edit Recipe trên giao diện.
+- Bảo đảm dữ liệu 100 công thức trở lên, mỗi công thức có ít nhất 10 nguyên liệu hợp lệ và có thể kiểm thử trên Docker.
+
+### Điều kiện thực hiện
+
+**Input**
+
+- .NET 10 SDK.
+- Node.js 20 và npm.
+- Docker Desktop với Docker Compose.
+- File `.env` được tạo từ `.env.example`.
+- Tài khoản người dùng, danh mục, dữ liệu công thức và JWT token khi kiểm thử API Protected.
+
+**Đầu ra**
+
+- Database PostgreSQL có schema, migration, dữ liệu mẫu và tối thiểu 100 Recipe.
+- API Recipe hoàn chỉnh theo vòng đời Draft, Published, Archived và Deleted.
+- Tài liệu OpenAPI/Scalar có Bearer Authentication.
+- Frontend gồm danh sách, chi tiết, tạo mới và cập nhật công thức.
+- Báo cáo build, lint và test cho backend/frontend.
+
+## 2. Quy trình thực hiện 8 bữa
+
+### Công nghệ và quy trình áp dụng
+
+| Tầng | Công nghệ |
+|---|---|
+| Frontend | Next.js, React, TypeScript, Axios, React Hook Form, Zod, TanStack Query, Zustand |
+| Backend | ASP.NET Core Minimal API, MediatR, EF Core, Npgsql |
+| Database | PostgreSQL 16 |
+| Cache/Job | Redis, Hangfire hoặc hosted background service |
+| Storage | MinIO |
+| Tài liệu API | OpenAPI và Scalar |
+| Container | Docker, Docker Compose |
+| Kiểm thử | xUnit, Jest, Vitest, Playwright |
+
+Nguyên tắc áp dụng:
+
+1. Phân tích yêu cầu và xác định entity, DTO, API, TypeScript type và trạng thái UI.
+2. Thiết kế schema/database trước, sau đó phát triển backend và migration.
+3. Dùng API utility chung và không tạo Axios client trùng lặp.
+4. Component nhận dữ liệu bằng props/state, không hard-code dữ liệu nghiệp vụ.
+5. Tách validation Backend/Frontend và giữ response API đồng nhất.
+6. Kiểm tra quyền truy cập, xóa mềm, ETag/If-Match và dữ liệu quan hệ.
+7. Chạy lint/build/test, rồi kiểm tra luồng bằng API và giao diện.
+
+### Sơ đồ thực thi tổng thể
+
+```mermaid
+flowchart LR
+    U[Người dùng / Admin] --> F[Next.js Frontend]
+    F --> A[Axios API Client]
+    A -->|JWT Bearer| API[ASP.NET Core Minimal API]
+    API --> V[Validation / Authorization / Lifecycle]
+    V --> R[Repository / Unit of Work]
+    R --> DB[(PostgreSQL)]
+    R --> C[(Redis Cache)]
+    API --> M[(MinIO Media)]
+    API --> J[Background Job / Sitemap]
 ```
 
-Điền các giá trị bắt buộc trong `.env` (đặc biệt `POSTGRES_PASSWORD`, `JWT_KEY` tối thiểu 32 ký tự, thông tin MinIO và `DEMO_PASSWORD`). Khởi động toàn bộ stack:
+### Quy trình chi tiết từng bữa
 
-```powershell
-docker compose up --build
+#### Bữa 1 - Recipe Entity và dữ liệu ban đầu
+
+- Xác định `Recipe`, `RecipeIngredient`, `RecipeNutrition`, `RecipeStatus`, `DifficultyLevel`.
+- Hoàn thiện quan hệ Recipe - Author - Category - Ingredient.
+- Thiết lập các trường cốt lõi: Title, Slug, Description, Content, Prep/Cook Time, Servings, PublishedAt.
+- Chuẩn bị dữ liệu mẫu cho công thức, nguyên liệu và dinh dưỡng.
+- **Output:** Entity/domain model và dữ liệu đầu vào phục vụ EF Core.
+
+#### Bữa 2 - EF Core Configuration và Database Seeding
+
+- Cấu hình bảng, độ dài, default value, unique index và composite index.
+- Đặt `Servings` mặc định bằng 1.
+- Ánh xạ `RecipeNutrition` dưới dạng Owned Entity.
+- Cấu hình global query filter cho soft delete và optimistic concurrency.
+- Seed ít nhất 100 Recipe, mỗi Recipe ít nhất 10 nguyên liệu hợp lệ.
+- **Output:** Migration/database schema và dữ liệu seed trực tiếp trong PostgreSQL.
+
+#### Bữa 3 - Repository, Unit of Work và truy vấn
+
+- Rà soát toàn vẹn quan hệ User - Category - Recipe - Ingredient.
+- Hoàn thiện repository, `SaveChangesAsync`, transaction và các thao tác thay thế dữ liệu con.
+- Kiểm tra trùng slug, lọc, phân trang, split query và soft-delete query filter.
+- Xử lý RowVersion/xmin và phát hiện update xung đột.
+- **Output:** Tầng ghi dữ liệu nhất quán và truy vấn Recipe có hiệu quả.
+
+#### Bữa 4 - Recipe Lifecycle API và giao diện luồng
+
+- Triển khai Create, Update, Publish, Unpublish, Archive, Unarchive và soft Delete.
+- Triển khai Admin Restore/Purge.
+- Publish kiểm tra EmailConfirmed, Ingredient, Step và Category active.
+- Dùng ETag/`If-Match`; trả `409 Conflict` khi xung đột.
+- Lưu `RecipeSlugHistory`, Nutrition Source, sitemap job và dọn tài nguyên purged Recipe.
+- Hoàn thiện Ingredient CRUD và quantity validation.
+- **Output:** API lifecycle đầy đủ; giao diện xác nhận, trạng thái và thông báo lỗi.
+
+#### Bữa 5 - API Documentation và Frontend Foundation
+
+- Cấu hình OpenAPI và Scalar.
+- Thêm Bearer Authentication cho API Documentation.
+- Kiểm tra Method, Route, Parameter, Request và Response.
+- Cài Axios, validation, form state, UI và thư viện test.
+- Tạo `Recipe`, `RecipeSummary`, `RecipeDetail`, `RecipeIngredient`, `RecipeNutrition`, `RecipeStatus`, `DifficultyLevel`.
+- Bảo đảm TypeScript types khớp DTO Backend.
+- **Output:** Tài liệu API trực tuyến và frontend foundation có kiểu dữ liệu thống nhất.
+
+#### Bữa 6 - API Utilities và Shared Components
+
+- Tiếp tục dùng API client chung; chuẩn hóa GET, POST, PUT, PATCH, DELETE và query parameter.
+- Hoàn thiện `lib/api/recipes.ts`.
+- Xây dựng `RecipeCard`, `RecipeList`, `RecipeMeta`, `RecipeStatusBadge`, `DifficultyBadge`, `RecipeTimeInfo`.
+- Layout Recipe Detail/Form tĩnh cho các bữa tiếp theo.
+- **Output:** API utilities và component Recipe tái sử dụng được.
+
+#### Bữa 7 - Recipe Detail Page
+
+- Gọi `GET /api/v1/recipes/{slug}`.
+- Hiển thị title, description, content, author, category, difficulty, time, servings, published date.
+- Hiển thị ảnh chính/gallery, ingredients theo thứ tự, nutrition và steps theo số thứ tự.
+- Tích hợp Step/Image ở chế độ hiển thị mà không sửa logic của component khác.
+- Xử lý Loading Skeleton, 404, 403, Error và Empty state.
+- **Output:** Trang chi tiết công thức responsive, phân quyền và đầy đủ dữ liệu.
+
+#### Bữa 8 - Recipe Create, Update và Lifecycle UI
+
+- Tạo Draft bằng `POST /api/v1/recipes`.
+- Chỉnh sửa bằng `/recipes/[slug]/edit` và `PUT /api/v1/recipes/{id}`.
+- Form đầy đủ Recipe Basic Information, Nutrition, Ingredient, Step và Image layout.
+- Cập nhật các nút Publish, Unpublish, Archive, Unarchive, Delete.
+- Nạp ETag và gửi `If-Match`; hiển thị thông báo conflict `409`.
+- Kiểm thử Create, Save Draft, Edit, Publish, Archive, Delete và Restore/Purge.
+- **Output:** Luồng quản lý vòng đời Recipe hoàn chỉnh ở Frontend và Backend.
+
+### Luồng xử lý thực thi một Recipe
+
+```text
+Người dùng nhập Recipe Form
+        |
+        v
+Frontend validate Title/Category/Quantity/Steps
+        |
+        v
+POST/PUT /api/v1/recipes
+        |
+        v
+Backend authorize + validate DTO
+        |
+        v
+RecipeRepository/UnitOfWork lưu Recipe và children
+        |
+        +---- Gửi/ghi ETag/xmin
+        +---- Ghi nutrition, ingredients và steps
+        +---- Migration/seed đã áp dụng trên database
+        |
+        v
+Publish lifecycle -> kiểm tra ingredient + step + category + email
+        |
+        v
+Frontend cập nhật Status Badge / điều hướng chi tiết
 ```
 
-Lệnh trên giữ log ở cửa sổ hiện tại. Để chạy nền, xem trạng thái/log và dừng ứng dụng:
+## 3. Lệnh chạy dự án và thực thi nội dung 8 bữa
+
+### 3.1 Cấu hình Docker và Database
+
+Mở terminal tại thư mục gốc chứa `docker-compose.yml`.
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Điền tối thiểu:
+
+- `POSTGRES_PASSWORD`
+- `JWT_KEY` với ít nhất 32 ký tự
+- `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`
+- `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`
+- `DEMO_PASSWORD`
+
+Khởi động toàn bộ hệ thống và build image:
 
 ```powershell
 docker compose up --build -d
 docker compose ps
-docker compose logs -f
+docker compose logs -f backend
+docker compose logs -f frontend
+```
+
+Backend tự chạy EF migration và seed dữ liệu khi khởi động.
+
+```powershell
+docker compose restart backend
+docker compose exec postgres psql -U postgres -d "PTUDWNC-2026-Nhom12"
+```
+
+Database được publish ra máy chủ tại `localhost:5433`; bên trong network Docker backend kết nối PostgreSQL qua `postgres:5432`.
+
+Kiểm tra số Recipe và số nguyên liệu:
+
+```sql
+SELECT COUNT(*) AS recipe_count FROM "Recipes";
+
+SELECT r."Id", r."Title", COUNT(i."Id") AS ingredient_count
+FROM "Recipes" r
+LEFT JOIN "RecipeIngredients" i ON i."RecipeId" = r."Id"
+GROUP BY r."Id", r."Title"
+ORDER BY ingredient_count ASC
+LIMIT 20;
+```
+
+Dừng stack nhưng giữ dữ liệu Docker volume:
+
+```powershell
 docker compose down
 ```
 
-`docker compose down` dừng và xóa các container nhưng giữ dữ liệu trong named volumes. Không dùng `docker compose down -v` trừ khi muốn xóa cả dữ liệu PostgreSQL và MinIO.
+Không sử dụng `docker compose down -v` nếu không muốn xóa toàn bộ PostgreSQL/MinIO data.
 
-Địa chỉ local:
+### 3.2 Lệnh chạy từng phần khi phát triển
 
-| Thành phần | Địa chỉ |
-|---|---|
-| Web | http://localhost:3000 |
-| API | http://localhost:5000 |
-| API health | http://localhost:5000/health |
-| API readiness | http://localhost:5000/health/ready |
-| PostgreSQL | localhost:5432 |
-| Redis | localhost:6380 |
-| MinIO API / Console | http://localhost:9000 / http://localhost:9001 |
-
-Không commit `.env` hoặc thông tin đăng nhập thật. Compose khởi động PostgreSQL, Redis, MinIO, API và web; API tự áp dụng EF migrations và dữ liệu seed khi khởi động.
-
-## Tài liệu
-
-- [Chi tiết Recipe & Ingredient và luồng thực thi](./docs/RECIPE_INGREDIENT_FLOW.md): mô hình dữ liệu, API, UI, concurrency, seed, lifecycle và các phần cần hoàn thiện.
-- [Hướng dẫn dự án](./docs/PROJECT_GUIDE.md): kiến trúc, module, API, dữ liệu, cấu hình, chạy và kiểm thử.
-- [Các phần còn thiếu / cần hoàn thiện](./docs/IMPLEMENTATION_GAPS.md): phát hiện theo mức ưu tiên, kèm vị trí code và tác động.
-- [Tổng quan kiến trúc](./ARCHITECTURE.md): các tầng và luồng dữ liệu.
-- [Phân tích truy vấn Category](./docs/database/explain-analyze-category-recipe.md).
-
-## Báo cáo tiến độ và công việc hoàn thành của Phạm Nguyễn Ngọc Phước (Bữa 1 - Bữa 8)
-
-Toàn bộ các nhiệm vụ của **Phạm Nguyễn Ngọc Phước** qua 8 bữa phát triển hệ thống Culinary Blog đều đã được thực hiện, tích hợp và kiểm thử đạt **100%** chất lượng yêu cầu:
-
----
-
-### Bữa 1 - Xây dựng cấu trúc dữ liệu ban đầu (Recipe & Ingredient)
-1. **Xác định cấu trúc dữ liệu và các trường cốt lõi của Recipe**:
-   - Hoàn thiện thực thể `Recipe` kế thừa `BaseEntity` với các thuộc tính: `Id`, `Title`, `Slug`, `Description`, `Content`, `PrepTimeMinutes`, `CookTimeMinutes`, `Servings`, `PublishedAt`, `DeletedAt`, `xmin` (concurrency token).
-2. **Định nghĩa các Enum nghiệp vụ**:
-   - `RecipeStatus`: `Draft`, `Published`, `Archived`.
-   - `DifficultyLevel`: `Easy`, `Medium`, `Hard` (mở rộng `Expert` theo quy tắc Domain).
-3. **Thiết lập thực thể `RecipeIngredient`**:
-   - Đầy đủ các trường: `Id`, `RecipeId`, `Name`, `Quantity` (`decimal?`), `Unit`, `Notes`, `SortOrder` (ánh xạ `OrderIndex`).
-4. **Thiết lập đối tượng giá trị `RecipeNutrition` (Value Object)**:
-   - Đầy đủ 6 chỉ số dinh dưỡng: `Calories`, `Protein`, `Carbohydrates`, `Fat`, `Fiber`, `Sodium` và trường nguồn gốc `Source` (`NutritionSource.Manual`).
-5. **Quan hệ và ràng buộc thực thể**:
-   - Thiết lập liên kết giữa Recipe với tác giả `ApplicationUser` (`AuthorId`, `Author`) và danh mục `Category` (`CategoryId`, `Category`).
-   - Thiết lập quan hệ 1-N giữa `Recipe` và `RecipeIngredient` (`Recipe.Ingredients`).
-6. **Chuẩn bị dữ liệu mẫu ban đầu** cho công thức, định lượng nguyên liệu và bảng giá trị dinh dưỡng.
-
----
-
-### Bữa 2 - Hoàn thiện cấu hình dữ liệu và tạo dữ liệu kiểm thử (EF Core & Seeder)
-1. **Xây dựng `RecipeConfiguration`**:
-   - Ánh xạ bảng `Recipes`, cấu hình độ dài và ràng buộc: `Title` (max 200, bắt buộc), `Slug` (max 220, Unique Index), `Description` (kiểu `text`), `Servings` (mặc định 1).
-   - Cấu hình chỉ mục tối ưu: `CategoryId`, `Status`, `CreatedAt`, Composite Index `(IsDeleted, Status, CreatedAt)` và `(CategoryId, IsDeleted, Status, CreatedAt)`.
-   - Cấu hình Global Query Filter xóa mềm: `HasQueryFilter(r => !r.IsDeleted)`.
-2. **Xây dựng `RecipeIngredientConfiguration`**:
-   - Ánh xạ bảng `RecipeIngredients`, cấu hình `Name` (max 200, bắt buộc), `Quantity` có độ chính xác `precision(10, 3)`, `Unit` (max 50), `Notes` (max 500), `OrderIndex` (từ `SortOrder`).
-   - Cấu hình khóa ngoại đến `Recipes` với `DeleteBehavior.Cascade` và Index trên `RecipeId`.
-3. **Xây dựng `RecipeNutritionConfiguration`**:
-   - Ánh xạ `RecipeNutrition` dưới dạng Owned Entity (`OwnsOne`), ánh xạ các cột dinh dưỡng `Nutrition_Calories`, `Nutrition_Protein`, `Nutrition_Carbohydrates`, `Nutrition_Fat`, `Nutrition_Fiber`, `Nutrition_Sodium` với kiểu `decimal precision(8, 2)`.
-4. **Kiểm soát xung đột đồng thời**:
-   - Cấu hình `RowVersion` cho `RecipeIngredient` (`IsConcurrencyToken`) và PostgreSQL `xmin` cho `Recipe`.
-5. **Dữ liệu kiểm thử ngẫu nhiên (`RecipeSeedData`)**:
-   - Đảm bảo cơ sở dữ liệu sau khi khởi tạo và seed có ít nhất **100 Recipes** và mỗi Recipe có ít nhất **10 nguyên liệu** hợp lệ.
-
----
-
-### Bữa 3 - Thiết kế dữ liệu và tối ưu truy vấn (Repository & Unit of Work)
-1. **Rà soát và củng cố toàn vẹn dữ liệu**:
-   - Kiểm tra quan hệ giữa Recipe với User, Category và RecipeIngredient, bảo đảm tính toàn vẹn khi ghi dữ liệu.
-   - Kiểm tra cấu hình `RecipeNutrition` dưới dạng Owned Entity, đảm bảo ánh xạ chuẩn xác các cột trong bảng Recipes.
-2. **Hoàn thiện `RecipeRepository` (phần ghi dữ liệu)**:
-   - Cung cấp các phương thức `AddAsync`, `UpdateAsync`, `DeleteAsync`, `ReplaceChildren`, `AddIngredientAsync`, `UpdateIngredientAsync`, `DeleteIngredientAsync`, `SetPrimaryImageAsync`.
-   - Tích hợp `IUnitOfWork` và quản lý `SaveChangesAsync()` trong transaction đa thực thể.
-3. **Tối ưu hóa truy vấn**:
-   - Tối ưu truy vấn kiểm tra trùng lặp Slug (`ExistsBySlugAsync`) bao gồm kiểm tra trong cả bảng `Recipes` và `RecipeSlugHistories`.
-   - Sử dụng `AsSplitQuery()` khi nạp Recipe kèm các tập hợp con (Ingredients, Steps, Images, Nutrition) để tránh Cartesian product.
-4. **Kiểm thử Unit test ghi dữ liệu**:
-   - Chạy thành công toàn bộ bộ test `RecipePersistenceModelTests`, `RecipeWriteServiceTests`, `RecipePersistenceIntegrationTests`.
-
----
-
-### Bữa 4 - Hoàn thiện API Endpoints và Giao diện (Minimal API & UI Flow)
-1. **API vòng đời Recipe**:
-   - `POST /api/v1/recipes`: Tạo Recipe ở trạng thái Draft.
-   - `PUT /api/v1/recipes/{id}`: Cập nhật Recipe kèm kiểm tra ETag/If-Match.
-   - `POST /api/v1/recipes/{id}/publish`: Xuất bản Recipe (kiểm tra email tác giả đã xác thực, có ít nhất 1 nguyên liệu, ít nhất 1 bước, danh mục hoạt động).
-   - `POST /api/v1/recipes/{id}/unpublish`: Hủy xuất bản về Draft.
-   - `POST /api/v1/recipes/{id}/archive` & `/unarchive`: Lưu trữ và mở lại lưu trữ.
-   - `DELETE /api/v1/recipes/{id}`: Xóa mềm Recipe.
-   - `POST /api/v1/admin/recipes/{id}/restore` & `DELETE /api/v1/admin/recipes/{id}/purge`: Khôi phục và xóa vĩnh viễn (xóa tệp MinIO, thực thể con và ghi AuditLog).
-2. **Xử lý Optimistic Concurrency**:
-   - Sinh ETag từ PostgreSQL `xmin`, yêu cầu header `If-Match` cho mọi thao tác ghi, trả về `409 Conflict` khi dữ liệu bị xung đột.
-3. **Lưu vết định tuyến và SEO**:
-   - Tự động lưu slug cũ vào `RecipeSlugHistories` khi đổi tiêu đề công thức Draft; hỗ trợ background job `SitemapGenerationHostedService`.
-4. **API quản lý nguyên liệu**:
-   - Thêm, sửa, xóa nguyên liệu; validate Name (1–200 ký tự), Quantity (chấp nhận số thập phân decimal, từ chối chuỗi phân số "1/2" trả về 422 Unprocessable Entity), Unit, Notes, OrderIndex.
-   - Khóa chặt `Nutrition.Source = Manual` ở phía hệ thống.
-5. **Xây dựng khung giao diện ban đầu**:
-   - Form thông tin cơ bản, Nutrition, IngredientEditor, thanh hành động và Confirmation Dialog trước thao tác nguy hiểm.
-
----
-
-### Bữa 5 - Hoàn thiện bảo mật, tài liệu API và nền tảng Front-end (OpenAPI & Types)
-1. **Tài liệu hóa API**:
-   - Tích hợp OpenAPI và `Scalar.AspNetCore` (`app.MapScalarApiReference()`).
-   - Cấu hình Bearer Authentication trong tài liệu API, cho phép thử nghiệm trực tiếp Public API và Protected API.
-2. **Cài đặt thư viện Front-end**:
-   - Cấu hình `package.json` với Next.js 14, React 18, TypeScript 5, Zod validation, Vitest testing framework.
-3. **Xây dựng hệ thống TypeScript Types chuẩn xác (`frontend/types/recipe.ts`)**:
-   - `Recipe`, `RecipeSummary`, `RecipeDetail`, `RecipeIngredient`, `RecipeNutrition`, `RecipeStatus`, `DifficultyLevel`, `RecipeDraftRequest`.
-   - Sử dụng Zod schema để runtime parse và validate toàn bộ dữ liệu trả về từ Backend API.
-
----
-
-### Bữa 6 - Hoàn thiện tiện ích dùng chung và giao diện tĩnh (Shared Components)
-1. **API Utilities (`frontend/lib/api/recipes.ts`)**:
-   - Chuẩn hóa các hàm gọi API: `getRecipes`, `getRecipeBySlug`, `createRecipe`, `updateRecipe`, `changeRecipeStatus`, `deleteRecipe`, `addRecipeIngredient`, `updateRecipeIngredient`, `deleteRecipeIngredient`.
-   - Tự động xử lý query string, phân trang, lọc danh mục, tìm kiếm và ánh xạ header ETag.
-2. **Bộ Shared Components Recipe (`frontend/components/recipes/`)**:
-   - `RecipeCard`: Hiển thị ảnh bìa, tiêu đề, danh mục, tác giả, độ khó, thời gian nấu, ngày xuất bản.
-   - `RecipeList`: Hiển thị danh sách thẻ responsive, hỗ trợ chế độ xem kèm trạng thái và custom actions.
-   - `RecipeMeta`, `RecipeStatusBadge`, `DifficultyBadge`, `RecipeTimeInfo`: Các badge hiển thị trực quan thông tin món ăn.
-   - `RecipeFormLayout`: Khung layout hiển thị trạng thái Recipe cho form.
-3. **Đảm bảo tính module hóa**:
-   - Các component nhận dữ liệu qua props, không hard-code, tương thích 100% với types Bữa 5.
-
----
-
-### Bữa 7 - Hoàn thiện chức năng người dùng và các trang Public chính (Recipe Detail)
-1. **Trang xem chi tiết công thức (`/recipes/[slug]`)**:
-   - Gọi API `GET /api/v1/recipes/{slug}` với xác thực `withAuth = true`.
-   - Hiển thị đầy đủ thông tin: Title, Description, Content, Author, Category, Difficulty, PrepTime, CookTime, Servings, PublishedAt.
-2. **Thư viện hình ảnh**:
-   - Hiển thị ảnh Primary nổi bật kèm caption, bộ sưu tập ảnh phụ tương tác theo thứ tự `sortOrder`, giao diện fallback khi chưa có ảnh.
-3. **Nguyên liệu & Dinh dưỡng**:
-   - Sắp xếp nguyên liệu theo `OrderIndex`, hiển thị Name, Quantity, Unit, Notes.
-   - Hiển thị bảng dinh dưỡng đầy đủ 6 chỉ số: Calories, Protein, Carbohydrates, Fat, Fiber và Sodium.
-4. **Các bước nấu & Tích hợp**:
-   - Hiển thị các bước theo `StepNumber`, kèm Title, Description, thời gian hẹn giờ `TimerMinutes` (⏱ X phút) và ảnh bước nấu.
-   - Tái sử dụng component `RecipeSteps` của Võ Hùng Mạnh, liên kết sang chế độ nấu tương tác `CookingGuide`.
-5. **Trạng thái & Phân quyền**:
-   - Xử lý 404 Not Found trang nhã khi không tìm thấy công thức.
-   - Xử lý 403 Forbidden giải thích rõ lý do khi người dùng không phải tác giả/Admin cố truy cập công thức Draft/Archived.
-   - Xây dựng `RecipeDetailSkeleton` với hiệu ứng shimmer và Error State kèm nút "Thử lại".
-6. **Kiểm thử tự động**:
-   - Bộ test `recipe-detail.test.ts` (6 kịch bản) kiểm thử đầy đủ các trường hợp hiển thị và phân quyền.
-
----
-
-### Bữa 8 - Hoàn thiện quản lý Recipe, Upload Image, Admin và Logging (Recipe Create / Edit / Lifecycle)
-1. **Hoàn thiện trang Tạo mới (`/recipes/new`) & Cập nhật (`/recipes/[slug]/edit`)**:
-   - Kết nối trực tiếp `POST /api/v1/recipes` và `PUT /api/v1/recipes/{id}`.
-   - Tạo mới tự động khởi tạo ở trạng thái `Draft`; chỉnh sửa nạp ETag và cập nhật dữ liệu với cơ chế phát hiện xung đột.
-2. **Recipe Form đầy đủ 8 trường thông tin cốt lõi (`RecipeForm.tsx`)**:
-   - `Title` (5-200 ký tự), `Description` (tối đa 2.000 ký tự), `Content`, `CategoryId` (danh mục hợp lệ), `PrepTimeMinutes` (> 0), `CookTimeMinutes` (≥ 0), `Servings` (> 0), `Difficulty` (4 mức).
-3. **Tích hợp `IngredientEditor` với OrderIndex**:
-   - Thêm, sửa, xóa, sắp xếp thứ tự nguyên liệu với nút ↑/↓ tự động tính lại `orderIndex`, hiển thị badge số thứ tự và đếm tổng số nguyên liệu.
-4. **Xây dựng `NutritionEditor` chuyên biệt**:
-   - Quản lý đầy đủ 6 chỉ số: Calories, Protein, Carbohydrates, Fat, Fiber và Sodium. Ràng buộc số không âm, giao diện thẻ card responsive.
-5. **Tích hợp module của Võ Hùng Mạnh**:
-   - Tích hợp `StepEditor` vào Form mà không can thiệp logic nội bộ component.
-   - Tích hợp `ImageManager`: Phước phụ trách bố trí layout và gửi upload multipart qua `POST /api/v1/files/images`, Mạnh phụ trách logic quản lý file/preview.
-6. **Toàn bộ vòng đời Recipe (Lifecycle) & Điều kiện Publish**:
-   - Chuyển trạng thái: `Draft → Published`, `Published → Unpublished` (về Draft), `Published → Archived`, `Archived → Unarchive` (về Draft), `Recipe → Deleted` (xóa mềm).
-   - Kiểm tra điều kiện nghiêm ngặt trước khi Publish: danh mục hợp lệ, ≥ 1 nguyên liệu, ≥ 1 bước, thông tin hợp lệ, tác giả đã xác thực email (`EmailConfirmed == true`).
-   - Cập nhật tức thời `Status Badge` ngay sau khi thao tác thành công.
-7. **Xử lý Optimistic Concurrency (ETag / If-Match & 409 Conflict)**:
-   - Gửi tiêu đề `If-Match: "<xmin>"`. Khi nhận mã 409 Conflict, hiển thị banner cảnh báo trực quan kèm nút **`🔄 Tải lại dữ liệu mới nhất`** (`onReload`).
-8. **Confirmation Dialog Modal**:
-   - Xây dựng component `ConfirmationDialog` dạng modal accessible (hỗ trợ phím ESC, focus trap, backdrop blur) thay thế hoàn toàn `window.confirm`.
-9. **Hoàn thiện các action tại My Recipes (`/recipes`)**:
-   - Cung cấp đầy đủ action: *Xem chi tiết*, *Chỉnh sửa*, *Xuất bản*, *Hủy xuất bản*, *Lưu trữ*, *Mở lưu trữ*, *Xóa* kèm Confirmation Dialog và cập nhật giao diện trực tiếp.
-10. **Rà soát Thùng rác Quản trị viên (`/admin/recipes/trash`)**:
-    - Tích hợp Confirmation Dialog cho thao tác *Khôi phục (Restore)* và *Xóa vĩnh viễn (Purge)*, xử lý mã 404 và 409 khi hết hạn lưu trữ 30 ngày.
-11. **Bộ kiểm thử tự động toàn diện**:
-    - Bộ test tự động `recipe-lifecycle.test.ts` (14 test cases) kiểm thử toàn bộ vòng đời Create, Save Draft, Edit, Publish, Unpublish, Archive, Unarchive, Delete, ETag Concurrency và Ingredient OrderIndex.
-
----
-
-### Tổng kết kết quả kiểm định chất lượng hệ thống (Bữa 1 - Bữa 8)
-- **Frontend Tests (`npm test`)**: **25/25 unit tests PASS 100%** (trong cả 4 tệp `recipes.test.ts`, `types/recipe.test.ts`, `recipe-detail.test.ts`, `recipe-lifecycle.test.ts`).
-- **Frontend Linter (`npm run lint`)**: **0 lỗi, 0 cảnh báo** (`✔ No ESLint warnings or errors`).
-- **Frontend TypeCheck (`npx tsc --noEmit`)**: Hoàn thành mã 0, không có lỗi kiểu dữ liệu.
-- **Frontend Production Build (`npm run build`)**: Biên dịch và tối ưu thành công **21/21 routes**.
-- **Backend Unit Tests (`dotnet test`)**: **80/80 tests PASS 100%**, 0 lỗi.
-
-## Kiểm thử backend
+#### Backend
 
 ```powershell
-dotnet test backend/tests/CulinaryBlog.UnitTests/CulinaryBlog.UnitTests.csproj --nologo
+cd backend
+dotnet restore CulinaryBlog.sln
+dotnet build CulinaryBlog.sln
+dotnet run --project src/CulinaryBlog.Api/CulinaryBlog.API.csproj
 ```
 
-Một số kiểm thử PostgreSQL cần biến `CULINARYBLOG_TEST_CONNECTION` trỏ đến database thử nghiệm riêng có tên kết thúc bằng `_test`. Xem [Hướng dẫn dự án](./docs/PROJECT_GUIDE.md#kiểm-thử).
+#### Frontend chính của hệ thống
 
-## Frontend local
+Hai thư mục Frontend được phân biệt như sau:
 
-Để chạy riêng frontend ở chế độ phát triển, trước tiên cần có API truy cập được tại `http://localhost:5000`. Mở một cửa sổ PowerShell:
+- `frontend/` là ứng dụng được Docker Compose build và chạy tại cổng `3000`.
+- `frontend/culinary-blog-web/` là ứng dụng Next.js 15 đang được sử dụng cho chức năng Recipe chi tiết, tạo mới và chỉnh sửa.
+
+Chạy ứng dụng Next.js trong thư mục `frontend/`:
 
 ```powershell
-Set-Location .\frontend
+cd frontend
 npm install
 npm run dev
 ```
 
-Frontend Docker và lệnh trên dùng ứng dụng ở `frontend/`. `frontend/culinary-blog-web/` là một project Next.js riêng, nhỏ hơn và không phải build context của Compose.
+Frontend subproject đã hoàn thiện Recipe Create/Edit và Recipe Detail:
+
+```powershell
+cd frontend/culinary-blog-web
+npm install
+npm run dev
+```
+
+### 3.3 Địa chỉ dịch vụ
+
+| Thành phần | Địa chỉ |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:5000 |
+| Health check | http://localhost:5000/health |
+| Readiness | http://localhost:5000/health/ready |
+| Scalar/OpenAPI UI | http://localhost:5000/scalar/v1 hoặc route Scalar được cấu hình |
+| OpenAPI JSON | http://localhost:5000/openapi/v1.json |
+| PostgreSQL | localhost:5433 |
+| Redis | localhost:6380 |
+| MinIO API / Console | http://localhost:9000 / http://localhost:9001 |
+| Mailpit | http://localhost:8025 |
+
+### 3.4 Lệnh thực thi kiểm tra nội dung 8 bữa
+
+Build và lint Frontend Recipe:
+
+```powershell
+cd frontend/culinary-blog-web
+npm run lint
+npm run build
+npm run test
+npm run test:e2e
+```
+
+Chạy unit/integration test Backend:
+
+```powershell
+cd backend
+dotnet test CulinaryBlog.sln
+dotnet test tests/CulinaryBlog.UnitTests/CulinaryBlog.UnitTests.csproj
+dotnet test tests/CulinaryBlog.IntegrationTests/CulinaryBlog.IntegrationTests.csproj
+```
+
+Kiểm tra Public API:
+
+```powershell
+curl.exe http://localhost:5000/api/v1/recipes?page=1&pageSize=10
+curl.exe http://localhost:5000/api/v1/recipes/ngocphuoc-mau-091
+curl.exe http://localhost:5000/openapi/v1.json
+```
+
+Kiểm tra Protected API không token:
+
+```powershell
+curl.exe -i -X POST http://localhost:5000/api/v1/recipes -H "Content-Type: application/json" -d "{}"
+```
+
+Kết quả mong đợi là `401 Unauthorized`.
+
+Kiểm tra Protected API có token:
+
+```powershell
+$token = "<ACCESS_TOKEN>"
+$headers = @{ Authorization = "Bearer $token" }
+Invoke-RestMethod -Uri "http://localhost:5000/api/v1/recipes" -Method Get -Headers $headers
+```
+
+Kiểm tra CRUD/lifecycle bằng file HTTP của dự án:
+
+```text
+backend/recipes.http
+```
+
+Các request nên được chạy theo thứ tự:
+
+1. Public `GET /api/v1/recipes`.
+2. `POST /api/v1/recipes` để tạo Draft.
+3. `PUT /api/v1/recipes/{id}` để cập nhật.
+4. `POST /api/v1/recipes/{id}/publish`.
+5. `POST /api/v1/recipes/{id}/unpublish`.
+6. `POST /api/v1/recipes/{id}/archive`.
+7. `POST /api/v1/recipes/{id}/unarchive`.
+8. `DELETE /api/v1/recipes/{id}` để xóa mềm.
+9. Admin `POST /api/v1/admin/recipes/{id}/restore`.
+10. Admin `DELETE /api/v1/admin/recipes/{id}/purge`.
+
+Đối với request có ETag, truyền header:
+
+```text
+If-Match: "<ETAG>"
+```
+
+Nếu Recipe version thay đổi, Backend trả `409 Conflict`.
+
+## Tài liệu liên quan
+
+- [Kiến trúc hệ thống](./ARCHITECTURE.md)
+- [Hướng dẫn mã nguồn](./docs/SOURCE_CODE_GUIDE.md)
+- [Hướng dẫn chạy và kiểm thử](./docs/PROJECT_GUIDE.md)
+- [API Documentation](./docs/API_DOCUMENTATION.md)
