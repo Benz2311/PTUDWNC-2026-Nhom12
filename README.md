@@ -1,3 +1,41 @@
+# TASK 7: RECIPE SEARCH SYSTEM HOÀN THIỆN TOÀN DIỆN — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-task7-search`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu & 16 ảnh minh chứng:** [docs/README_TASK7_SEARCH.md](docs/README_TASK7_SEARCH.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-task7-search`
+- **Hoàn thiện giao diện tìm kiếm (Search UI):** Xây dựng trang tìm kiếm hoàn chỉnh tại `/search` (`app/search/page.tsx` và `SearchContainer.tsx`), kết nối API tìm kiếm toàn văn Backend.
+- **Bộ lọc đa tiêu chí & Sắp xếp:** Tích hợp bộ lọc danh mục (`category`), độ khó (`difficulty`: Easy/Medium/Hard), và sắp xếp theo thời gian nấu (`cookTimeAsc`/`cookTimeDesc`).
+- **Đồng bộ trạng thái URL (Two-way URL State Sync):** Mọi thao tác tìm kiếm, lọc và phân trang đều được phản ánh tức thì vào URL query parameters (`?q=&category=&difficulty=&sort=&page=`), đảm bảo khi người dùng tải lại trang (F5) hoặc bấm nút Back/Forward trên trình duyệt thì trạng thái tìm kiếm vẫn được giữ nguyên vẹn.
+- **Xử lý trải nghiệm người dùng (UX):** Debounce 400ms giảm tải request lên server, hiển thị Skeleton khi tải dữ liệu, thông báo Empty State thân thiện khi không tìm thấy kết quả và Error State khi mất kết nối.
+- **Minh chứng kiểm thử:** Đã nghiệm thu và lưu trữ đầy đủ 16 ảnh chụp màn hình kiểm thử thực tế tại thư mục `docs/task7-search/screenshots/`.
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Trang tìm kiếm & Container điều phối | `app/search/page.tsx`, `SearchContainer.tsx` | `61bdf93` | Minh chứng: `docs/task7-search/screenshots/01_initial_search_page.png` | **PASS** |
+| 2 | Tìm kiếm toàn văn tiếng Việt có dấu & không dấu | `SearchBox.tsx`, API `search.ts` | `61bdf93` | Minh chứng: `docs/task7-search/screenshots/02_search_pho_bo_enter.png` | **PASS** |
+| 3 | Lọc theo danh mục món ăn | `SearchContainer.tsx` | `61bdf93` | Minh chứng: `docs/task7-search/screenshots/04_filter_category.png` | **PASS** |
+| 4 | Lọc theo độ khó (Easy/Medium/Hard) | `SearchContainer.tsx` | `61bdf93` | Minh chứng: `docs/task7-search/screenshots/05_filter_difficulty.png` | **PASS** |
+| 5 | Sắp xếp theo thời gian nấu | `SearchContainer.tsx` | `61bdf93` | Minh chứng: `docs/task7-search/screenshots/06_sort_cook_time.png` | **PASS** |
+| 6 | Phân trang kết quả tìm kiếm | `SearchContainer.tsx` | `61bdf93` | Minh chứng: `docs/task7-search/screenshots/07_pagination_next_page.png` | **PASS** |
+| 7 | Tải lại trang giữ nguyên trạng thái (URL Sync) | `SearchContainer.tsx`, `useRecipeSearch.ts` | `61bdf93` | Minh chứng: `docs/task7-search/screenshots/08_reload_url_state_preserved.png` | **PASS** |
+| 8 | Điều hướng Back/Forward trên trình duyệt | `SearchContainer.tsx` | `61bdf93` | Minh chứng: `docs/task7-search/screenshots/09_browser_back_forward.png` | **PASS** |
+| 9 | Giao diện rỗng (Empty State) khi không có món | `SearchEmptyState.tsx` | `61bdf93` | Minh chứng: `docs/task7-search/screenshots/11_empty_state_not_found.png` | **PASS** |
+| 10 | Responsive hiển thị trên Desktop, Tablet, Mobile | Toàn bộ giao diện tìm kiếm | `61bdf93` | Minh chứng: `docs/task7-search/screenshots/13, 14, 15_responsive_*.png` | **PASS** |
+
+### 3. Hướng dẫn chạy chương trình & Kiểm thử
+- **Chạy Frontend:**
+  ```bash
+  cd frontend/culinary-blog-web
+  npm run dev
+  ```
+- **Truy cập:** `http://localhost:3000/search`
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12
