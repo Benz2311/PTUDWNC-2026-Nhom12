@@ -1,3 +1,25 @@
+# DỊCH VỤ LƯU TRỮ TỆP TIN MINIO OBJECT STORAGE — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-file-storage`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu:** [docs/README_FILE_STORAGE.md](docs/README_FILE_STORAGE.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-file-storage`
+- Triển khai dịch vụ lưu trữ đối tượng MinIO (S3-compatible) thông qua interface `IStorageService` và `MinioStorageService`.
+- Cấu hình HTTP signature tương thích MinIO HTTP endpoint thông qua Signed Payloads.
+- Xử lý tiện ích đường dẫn tệp tin `StoragePathHelper` và phân loại ngoại lệ `StorageExceptions`.
+- Tích hợp bucket `culinary-blog` trên Docker container phục vụ lưu trữ hình ảnh độc lập.
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Interface & Cấu hình Storage | `IStorageService.cs, StorageExceptions.cs` | `72dcf54` | Kiểm thử Unit Test MinIO client | **PASS** |
+| 2 | MinioStorageService & Signed Payloads | `MinioStorageService.cs, Program.cs` | `72dcf54` | Upload tệp thực tế lên MinIO bucket | **PASS** |
+| 3 | Tiện ích phân tách đường dẫn | `StoragePathHelper.cs` | `72dcf54` | Unit Test xử lý path an toàn | **PASS** |
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12

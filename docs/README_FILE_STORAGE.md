@@ -1,5 +1,10 @@
 # Dịch vụ lưu trữ tệp tin MinIO Object Storage (File Storage)
 
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-file-storage`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+
+
 ## 1. Mục tiêu
 Branch `feat/vohungmanh-file-storage` giải quyết việc xây dựng phân hệ lưu trữ tệp tin đối tượng (**Object Storage**) chuẩn công nghiệp cho nền tảng CulinaryBlog thuộc Task 4:
 - Tách rời hoàn toàn việc lưu trữ dữ liệu nhị phân (Binary Large Objects - BLOBs) như hình ảnh công thức ra khỏi cơ sở dữ liệu quan hệ PostgreSQL, giúp database nhẹ nhàng, tối ưu hóa I/O và dễ sao lưu.
