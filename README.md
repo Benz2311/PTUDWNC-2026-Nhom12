@@ -1,3 +1,39 @@
+# TASK 6: RECIPE STEP MANAGEMENT (CHUẨN HÓA SRS v1.2.0) — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-task6-step`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu (459 dòng & Traceability Matrix):** [docs/README_TASK6_STEP.md](docs/README_TASK6_STEP.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-task6-step`
+- **Chuẩn hóa quản lý bước nấu ăn theo SRS v1.2.0:** Xây dựng component `StepEditor.tsx`, `StepItem.tsx`, custom hook `useRecipeSteps.ts` và module API `steps.ts`.
+- **Hỗ trợ 2 chế độ hoạt động:** Direct API Mode (gọi trực tiếp HTTP RESTful khi có `recipeId`) và Controlled Local Mode (quản lý state cục bộ khi tạo mới công thức trong form cha).
+- **Ràng buộc dữ liệu & Validation:** Tuân thủ Bảng 7.3 SRS v1.2.0 (mô tả bắt buộc 1-2000 ký tự, tiêu đề tối đa 200 ký tự, timer 0-1440 phút, URL ảnh tối đa 500 ký tự, tự động đánh số thứ tự hai chữ số 01, 02...).
+- **Kiểm thử tự động & Nghiệm thu:** Đạt 100% tỷ lệ pass trên bộ kiểm thử Jest trong `StepEditor.test.tsx`, TypeScript và Next.js build thành công.
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Render StepNumber định dạng 2 chữ số (01, 02) | `StepItem.tsx`, `StepEditor.tsx` | `b200e08` | Jest Test #1: hiển thị số thứ tự chuẩn | **PASS** |
+| 2 | Empty State thân thiện khi chưa có bước | `StepEditor.tsx` | `b200e08` | Jest Test #2: kiểm tra text gợi ý | **PASS** |
+| 3 | Validation Description bắt buộc & max 2000 ký tự | `StepEditor.tsx` | `b200e08` | Jest Test #3: chặn nhập rỗng / >2000 chars | **PASS** |
+| 4 | Validation Title tối đa 200 ký tự | `StepEditor.tsx` | `b200e08` | Jest Test #4: chặn tiêu đề quá dài | **PASS** |
+| 5 | Validation TimerMinutes 0 - 1440 phút | `StepEditor.tsx` | `b200e08` | Jest Test #5: chặn số âm / >1440 | **PASS** |
+| 6 | Validation ImageUrl hợp lệ & max 500 ký tự (SRS 7.3) | `StepEditor.tsx` | `b200e08` | Jest Test #6: kiểm tra regex & max 500 chars | **PASS** |
+| 7 | Thêm bước mới trong Direct API mode | `StepEditor.tsx`, `steps.ts` | `b200e08` | Jest Test #7: gọi POST createRecipeStep | **PASS** |
+| 8 | Cập nhật bước nấu ăn | `StepEditor.tsx`, `steps.ts` | `b200e08` | Jest Test #8: gọi PUT updateRecipeStep | **PASS** |
+| 9 | Modal xác nhận trước khi xóa bước | `StepEditor.tsx` | `b200e08` | Jest Test #9: mở modal xác nhận | **PASS** |
+| 10 | Sắp xếp thứ tự bước (Move Up / Down) | `StepEditor.tsx`, `steps.ts` | `b200e08` | Jest Test #10: gửi mảng IDs sắp xếp lại | **PASS** |
+
+### 3. Hướng dẫn chạy kiểm thử
+- **Chạy Unit Test:**
+  ```bash
+  cd frontend/culinary-blog-web
+  npm test -- components/recipe-management/__tests__/StepEditor.test.tsx
+  ```
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12
