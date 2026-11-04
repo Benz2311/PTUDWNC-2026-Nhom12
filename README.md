@@ -1,3 +1,25 @@
+# TÌM KIẾM TOÀN VĂN & FUZZY SEARCH POSTGRESQL — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-full-text-search`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu:** [docs/README_FULL_TEXT_SEARCH.md](docs/README_FULL_TEXT_SEARCH.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-full-text-search`
+- Triển khai PostgreSQL Full-Text Search sử dụng `to_tsvector` và chỉ mục GIN trên bảng Recipes.
+- Tích hợp PostgreSQL extension `unaccent` hỗ trợ tìm kiếm tiếng Việt không dấu (tìm 'pho bo' thấy 'Phở bò').
+- Mở rộng thuật toán Fuzzy Search với extension `pg_trgm` xử lý lỗi gõ sai nhẹ (tìm 'phoo bo' vẫn thấy).
+- Đóng gói truy vấn tìm kiếm bằng MediatR Query `SearchRecipesQuery` kèm bộ nhớ đệm Resilient Cache.
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Full-Text Search Vector & GIN Index | `RecipeConfiguration.cs, Migration` | `256f928` | Explain Analyze truy vấn GIN index | **PASS** |
+| 2 | Unaccent & Fuzzy Search (pg_trgm) | `SearchRecipesQuery.cs` | `256f928` | Unit Test tìm kiếm tiếng Việt & gõ sai | **PASS** |
+| 3 | Endpoint tìm kiếm công thức | `RecipeEndpoints.cs` | `256f928` | Curl GET /api/v1/recipes/search?q=pho+bo | **PASS** |
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12

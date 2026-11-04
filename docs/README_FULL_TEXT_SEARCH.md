@@ -1,5 +1,10 @@
 # Tìm kiếm toàn văn và tìm kiếm mờ công thức nấu ăn (Full-Text Search & Fuzzy Recipe Search)
 
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-full-text-search`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+
+
 ## 1. Mục tiêu
 Branch `feat/vohungmanh-full-text-search` giải quyết việc xây dựng công cụ tìm kiếm công thức ẩm thực chuyên sâu, hiệu năng cao và chính xác cho nền tảng CulinaryBlog thuộc Task 4 và đặc tả SRS v1.2.0:
 - Tìm kiếm cơ bản bằng mệnh đề `LIKE '%keyword%'` trên cơ sở dữ liệu quan hệ thường quét toàn bộ bảng (Full Table Scan), không xử lý được tiếng Việt có dấu/không dấu, không có khả năng xếp hạng độ liên quan và cực kỳ chậm chạp khi dữ liệu lớn.
