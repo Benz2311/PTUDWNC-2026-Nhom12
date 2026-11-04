@@ -1,5 +1,10 @@
 # Quản lý bước thực hiện công thức (Recipe Step)
 
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-recipe-step`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+
+
 ## 1. Mục tiêu
 Branch `feat/vohungmanh-recipe-step` giải quyết việc xây dựng phân hệ quản lý các bước thực hiện công thức nấu ăn (`RecipeStep`) cho nền tảng CulinaryBlog:
 - Cho phép tác giả phân rã quá trình nấu ăn thành chuỗi các bước tuần tự, trực quan và dễ tiếp cận cho người đọc.

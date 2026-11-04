@@ -1,3 +1,25 @@
+# QUẢN LÝ BƯỚC THỰC HIỆN CÔNG THỨC (RECIPE STEP BACKEND) — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-recipe-step`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu:** [docs/README_RECIPE_STEP.md](docs/README_RECIPE_STEP.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-recipe-step`
+- Triển khai các API Endpoints CRUD cho các bước nấu ăn của công thức: `GET`, `POST`, `PUT`, `DELETE /recipes/{id}/steps`.
+- Xây dựng endpoint sắp xếp thứ tự bước `PUT /recipes/{id}/steps/reorder` tự động cập nhật `StepNumber` tuần tự.
+- Ràng buộc nghiệp vụ: kiểm tra quyền tác giả, mô tả bắt buộc, hẹn giờ hợp lệ và đánh số thứ tự liên tục.
+- Viết bộ Unit Test kiểm tra toàn diện các kịch bản thêm, sửa, xóa và sắp xếp lại bước nấu.
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | API Endpoints Recipe Steps | `RecipeEndpoints.cs` | `15bc94e` | Swagger / Postman test CRUD endpoints | **PASS** |
+| 2 | Reorder Steps Command & Logic | `RecipeStepCommands.cs` | `15bc94e` | Kiểm tra sắp xếp lại vị trí 1..N | **PASS** |
+| 3 | Unit Tests phân hệ RecipeStep | `RecipeStepTests.cs` | `15bc94e` | Chạy dotnet test RecipeStepTests | **PASS** |
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12
