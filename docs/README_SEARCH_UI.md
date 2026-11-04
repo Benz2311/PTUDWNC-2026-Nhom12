@@ -1,5 +1,10 @@
 # Giao diện Tìm kiếm công thức (Recipe Search UI)
 
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-search-ui`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+
+
 ## 1. Mục tiêu
 
 Module Giao diện Tìm kiếm công thức (`Recipe Search UI`) được phát triển nhằm đáp ứng nhu cầu tra cứu công thức nấu ăn nhanh chóng, chính xác và trực quan cho người dùng CulinaryBlog:

@@ -1,3 +1,25 @@
+# GIAO DIỆN TÌM KIẾM CÔNG THỨC (SEARCH UI) — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-search-ui`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu:** [docs/README_SEARCH_UI.md](docs/README_SEARCH_UI.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-search-ui`
+- Xây dựng component ô tìm kiếm `SearchBox.tsx` tích hợp kỹ thuật debounce 400ms tối ưu hóa request.
+- Xây dựng `SearchContainer.tsx` kết nối API tìm kiếm, đồng bộ tham số truy vấn lên URL trình duyệt.
+- Hiển thị kết quả tìm kiếm qua `SearchResultCard.tsx`, xử lý các trạng thái rỗng và đang tải.
+- Viết bộ kiểm thử giao diện `SearchUI.test.tsx` xác minh hành vi debounce và nhập liệu.
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | SearchBox Component & Debounce 400ms | `SearchBox.tsx` | `9d2418e` | Vitest test debounce không spam API | **PASS** |
+| 2 | SearchContainer & URL Sync | `SearchContainer.tsx` | `9d2418e` | Vitest test đồng bộ ?q= vào URL | **PASS** |
+| 3 | Kết quả tìm kiếm & Empty State | `SearchResultCard.tsx, SearchEmptyState.tsx` | `9d2418e` | Vitest test hiển thị thẻ món ăn | **PASS** |
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12
