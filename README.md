@@ -1,3 +1,25 @@
+# OBSERVABILITY & STRUCTURED LOGGING SYSTEM — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-observability`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu:** [docs/README_OBSERVABILITY.md](docs/README_OBSERVABILITY.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-observability`
+- Tích hợp Serilog Structured Logging với định dạng ngữ cảnh (Enrichers, MachineName, ThreadId).
+- Triển khai `CorrelationIdMiddleware` tự động sinh hoặc kế thừa mã vết `X-Correlation-ID` xuyên suốt chu kỳ HTTP request.
+- Xây dựng `LoggingBehavior` trong MediatR pipeline đo thời gian thực thi lệnh và phát hiện truy vấn chậm.
+- Cung cấp giao diện telemetry `ICulinaryBlogTelemetry` theo dõi số liệu vận hành hệ thống.
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Correlation ID Tracking Middleware | `CorrelationIdMiddleware.cs` | `bc2e823` | Kiểm tra header X-Correlation-ID | **PASS** |
+| 2 | MediatR Logging & Metric Pipeline | `LoggingBehavior.cs` | `bc2e823` | Ghi log thời gian xử lý command/query | **PASS** |
+| 3 | Cấu hình Serilog tập trung | `Program.cs, appsettings.json` | `bc2e823` | Log console & file có cấu trúc JSON | **PASS** |
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12

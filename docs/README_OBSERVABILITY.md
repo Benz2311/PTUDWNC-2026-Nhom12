@@ -1,5 +1,10 @@
 # Observability & Structured Logging System
 
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-observability`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+
+
 ## 1. Mục tiêu
 
 Hệ thống Observability (Khả năng quan sát) của dự án CulinaryBlog được xây dựng nhằm giải quyết các bài toán giám sát, chẩn đoán sự cố và đo lường hiệu năng của ứng dụng theo chuẩn Production-Ready:
