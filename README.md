@@ -1,4 +1,4 @@
-# QUẢN LÝ HÌNH THỨC CÔNG THỨC (RECIPE IMAGE BACKEND) — VÕ HÙNG MẠNH (2312687)
+# QUẢN LÝ HÌNH ẢNH CÔNG THỨC (RECIPE IMAGE BACKEND) — VÕ HÙNG MẠNH (2312687)
 
 > **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
 > **Nhánh Git:** `feat/vohungmanh-recipe-image`
