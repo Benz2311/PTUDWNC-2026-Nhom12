@@ -1,3 +1,25 @@
+# GIAO DIỆN QUẢN LÝ CÁC BƯỚC NẤU ĂN (STEP UI) — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-step-ui`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu:** [docs/README_STEP_UI.md](docs/README_STEP_UI.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-step-ui`
+- Xây dựng component `StepEditor.tsx` và `StepItem.tsx` quản lý danh sách bước thực hiện công thức.
+- Hỗ trợ xem, thêm, sửa, xóa bước và thay đổi thứ tự bước linh hoạt (Move Up / Move Down).
+- Định dạng số thứ tự bước dạng 2 chữ số (01, 02...) và hiển thị huy hiệu thời gian hẹn giờ (timer badge).
+- Bộ kiểm thử tự động `StepEditor.test.tsx` kiểm chứng toàn diện logic nghiệp vụ trên giao diện.
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Component StepEditor & StepItem | `StepEditor.tsx, StepItem.tsx` | `fcf8531` | Vitest test render danh sách bước | **PASS** |
+| 2 | Form thêm / sửa bước & validation | `StepEditor.tsx` | `fcf8531` | Vitest test kiểm tra form submit | **PASS** |
+| 3 | Sắp xếp thứ tự bước (Move Up/Down) | `StepEditor.tsx` | `fcf8531` | Vitest test đảo vị trí các bước | **PASS** |
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12

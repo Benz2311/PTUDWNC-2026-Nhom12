@@ -1,5 +1,10 @@
 # Giao diện Quản lý các bước nấu ăn (Recipe Step UI)
 
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-step-ui`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+
+
 ## 1. Mục tiêu
 
 Module Giao diện Quản lý các bước thực hiện công thức (`Recipe Step UI`) được xây dựng nhằm giải quyết các bài toán sau trên tầng Frontend của CulinaryBlog:
