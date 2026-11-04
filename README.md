@@ -1,3 +1,48 @@
+# TASK 8: RECIPE STEP MANAGEMENT — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-task8-step`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu:** [docs/README_TASK8_STEP.md](docs/README_TASK8_STEP.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-task8-step`
+- **Quản lý các bước nấu ăn (Recipe Steps):** Thiết kế và hoàn thiện toàn bộ component `StepEditor.tsx` và `StepItem.tsx`, hỗ trợ cả hai chế độ: Direct API mode (thao tác trực tiếp với Backend qua `steps.ts`) và Controlled mode (khi tạo mới công thức).
+- **Sắp xếp thứ tự (Reorder Steps):** Triển khai cơ chế di chuyển bước (Move Up / Move Down) với Optimistic UI cập nhật tức thì và tự động Rollback hoàn tác trạng thái nếu server trả lỗi.
+- **Ràng buộc dữ liệu chuẩn SRS v1.2.0 (Bảng 7.3):** Validation mô tả bắt buộc (tối đa 2000 ký tự), tiêu đề (tối đa 200 ký tự), thời gian hẹn giờ (0 - 1440 phút), đường dẫn ảnh (URL hợp lệ, tối đa 500 ký tự). Hỗ trợ tải tệp ảnh từ máy lên MinIO (`uploadStepImageFile`) có kiểm tra chặn file vượt quá 5MB.
+- **Phân quyền truy cập (RBAC):** Tự động phát hiện vai trò và quyền tác giả (`authorId === currentUser.id`), hiển thị banner cảnh báo và khóa toàn bộ form đối với khách vãng lai (Guest) hoặc người dùng không phải chủ bài viết; cấp quyền đầy đủ cho Admin.
+- **Kiểm thử tự động:** Đạt **21/21 Unit Tests PASSED** với Jest (`npm test -- components/recipe-management/__tests__/StepEditor.test.tsx`) và kịch bản E2E Playwright (`e2e/step-editor.spec.ts`).
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Render StepNumber (01, 02) và nội dung bước | `StepEditor.tsx`, `StepItem.tsx` | `27ac254` | Unit Test #1: `expect(getByText('01')).toBeInTheDocument()` | **PASS** |
+| 2 | Empty State khi chưa có bước nào | `StepEditor.tsx` | `27ac254` | Unit Test #2: kiểm tra text gợi ý | **PASS** |
+| 3 | Validation mô tả (bắt buộc, max 2000 ký tự) | `StepEditor.tsx` | `27ac254` | Unit Test #3: nhập rỗng / >2000 ký tự | **PASS** |
+| 4 | Validation tiêu đề (max 200 ký tự) | `StepEditor.tsx` | `27ac254` | Unit Test #4: chặn submit khi tiêu đề quá dài | **PASS** |
+| 5 | Validation thời gian Timer (0 - 1440 phút) | `StepEditor.tsx` | `27ac254` | Unit Test #5: chặn số âm hoặc > 1440 | **PASS** |
+| 6 | Validation ImageUrl hợp lệ và max 500 ký tự | `StepEditor.tsx` | `27ac254` | Unit Test #6: regex URL và max 500 chars | **PASS** |
+| 7 | Tải ảnh trực tiếp lên MinIO (chặn file >5MB) | `StepEditor.tsx`, `steps.ts` | `27ac254` | Unit Test #18, #19: mock upload và chặn >5MB | **PASS** |
+| 8 | Thêm bước mới (Direct API & Controlled) | `StepEditor.tsx`, `steps.ts` | `27ac254` | Unit Test #7, #13: gọi API POST hoặc trigger onChange | **PASS** |
+| 9 | Chỉnh sửa bước nấu ăn | `StepEditor.tsx`, `steps.ts` | `27ac254` | Unit Test #8: điền form và cập nhật UI | **PASS** |
+| 10 | Xóa bước có Modal hỏi xác nhận | `StepEditor.tsx`, `steps.ts` | `27ac254` | Unit Test #9: mở modal xác nhận trước khi xóa | **PASS** |
+| 11 | Sắp xếp thứ tự (Reorder) với Optimistic Rollback | `StepEditor.tsx`, `steps.ts` | `27ac254` | Unit Test #10, #20: đảo vị trí và tự rollback khi lỗi | **PASS** |
+| 12 | Phân quyền RBAC (Guest / Non-owner / Admin) | `StepEditor.tsx` | `27ac254` | Unit Test #14, #15, #16, #17: kiểm tra forbidden-banner | **PASS** |
+| 13 | Báo lỗi hệ thống và nút Thử lại (Retry) | `StepEditor.tsx` | `27ac254` | Unit Test #11, #21: render error banner và fetch lại | **PASS** |
+
+### 3. Hướng dẫn chạy kiểm thử
+- **Chạy Unit Test:**
+  ```bash
+  cd frontend/culinary-blog-web
+  npm test -- components/recipe-management/__tests__/StepEditor.test.tsx
+  ```
+- **Chạy E2E Test (Playwright):**
+  ```bash
+  cd frontend/culinary-blog-web
+  npx playwright test e2e/step-editor.spec.ts
+  ```
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12
