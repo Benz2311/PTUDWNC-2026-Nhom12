@@ -1,3 +1,25 @@
+# GIAO DIỆN QUẢN LÝ HÌNH ẢNH CÔNG THỨC (IMAGE UI) — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-image-ui`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu:** [docs/README_IMAGE_UI.md](docs/README_IMAGE_UI.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-image-ui`
+- Xây dựng các component giao diện React quản lý hình ảnh công thức: `ImageManager.tsx`, `ImageCard.tsx`.
+- Hỗ trợ tải lên tệp ảnh từ máy tính hoặc dán URL trực tiếp, hiển thị xem trước (preview modal phóng to).
+- Cung cấp thao tác đặt làm ảnh đại diện (`Set as Primary`) và xóa ảnh an toàn kèm modal xác nhận.
+- Bộ kiểm thử tự động `ImageManager.test.tsx` kiểm chứng toàn bộ luồng giao diện người dùng.
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Component ImageManager & ImageCard | `ImageManager.tsx, ImageCard.tsx` | `585a6d8` | Vitest test render bộ sưu tập ảnh | **PASS** |
+| 2 | Validation dung lượng & preview modal | `ImageManager.tsx` | `585a6d8` | Vitest test từ chối file > 5MB | **PASS** |
+| 3 | Thao tác đặt Primary & xóa ảnh | `ImageManager.tsx` | `585a6d8` | Vitest test đổi badge Primary | **PASS** |
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12
