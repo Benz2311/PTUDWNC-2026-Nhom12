@@ -1,3 +1,51 @@
+# TASK 8: RECIPE IMAGE MANAGEMENT — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-task8-image`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu:** [docs/README_TASK8_IMAGE.md](docs/README_TASK8_IMAGE.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-task8-image`
+- **Quản lý bộ sưu tập hình ảnh (Recipe Images):** Xây dựng component `ImageManager.tsx` và `ImageCard.tsx`, hỗ trợ xem danh sách ảnh, xem trước (preview) tệp trước khi tải, hiển thị `AltText`, thứ tự `OrderIndex` và huy hiệu `Ảnh đại diện`.
+- **Tải tệp ảnh trực tiếp lên MinIO:** Hỗ trợ tải tệp ảnh từ máy tính thông qua `FormData` multipart, tự động xác thực kích thước file (tối đa 5MB) và kiểm soát định dạng nghiêm ngặt (chỉ chấp nhận JPEG, PNG, WebP, AVIF).
+- **Cơ chế ảnh đại diện (Primary Image & FR-RCP-008):** Cho phép người dùng linh hoạt thiết lập ảnh đại diện mới qua API `PATCH .../set-primary`. Đặc biệt, khi xóa ảnh đang là Primary, hệ thống tự động phát hiện và chuyển giao quyền Primary cho ảnh có `orderIndex` nhỏ nhất còn lại.
+- **Ràng buộc dữ liệu chuẩn SRS v1.2.0 (Bảng 7.5):** Kiểm tra giới hạn `AltText` không quá 200 ký tự và `ImageUrl` không quá 500 ký tự, hiển thị thông báo lỗi rõ ràng.
+- **Kiểm thử tự động:** Đạt **16/16 Unit Tests PASSED** với Jest (`npm test -- components/recipe-management/__tests__/ImageManager.test.tsx`) và kịch bản E2E Playwright (`e2e/image-manager.spec.ts`).
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Empty State khi chưa có ảnh | `ImageManager.tsx` | `25d649c` | Unit Test #1: kiểm tra text gợi ý | **PASS** |
+| 2 | Render danh sách ảnh & badge Ảnh đại diện | `ImageManager.tsx`, `ImageCard.tsx` | `25d649c` | Unit Test #2: kiểm tra badge Primary & alt text | **PASS** |
+| 3 | Chặn file vượt quá kích thước 5MB | `ImageManager.tsx` | `25d649c` | Unit Test #3: từ chối file >5MB | **PASS** |
+| 4 | Chặn file sai định dạng (chỉ nhận JPG/PNG/WebP/AVIF) | `ImageManager.tsx` | `25d649c` | Unit Test #4: từ chối file không hỗ trợ | **PASS** |
+| 5 | Preview ảnh trước khi upload | `ImageManager.tsx` | `25d649c` | Unit Test #5: kiểm tra URL.createObjectURL | **PASS** |
+| 6 | Thêm ảnh mới trong Direct API mode | `ImageManager.tsx`, `images.ts` | `25d649c` | Unit Test #6: gọi addRecipeImage | **PASS** |
+| 7 | Validation AltText tối đa 200 ký tự | `ImageManager.tsx` | `25d649c` | Unit Test #7: chặn alt text quá dài | **PASS** |
+| 8 | Tùy chỉnh OrderIndex khi thêm ảnh | `ImageManager.tsx` | `25d649c` | Unit Test #8: kiểm tra thứ tự tùy chọn | **PASS** |
+| 9 | Đặt làm ảnh đại diện (Set Primary Image) | `ImageManager.tsx`, `images.ts` | `25d649c` | Unit Test #9: gọi setPrimaryRecipeImage | **PASS** |
+| 10 | Modal xác nhận trước khi xóa ảnh | `ImageManager.tsx` | `25d649c` | Unit Test #10: mở hộp thoại xác nhận | **PASS** |
+| 11 | Xóa ảnh thành công sau xác nhận | `ImageManager.tsx`, `images.ts` | `25d649c` | Unit Test #11: gọi deleteRecipeImage | **PASS** |
+| 12 | Hiển thị Error Banner khi gọi API thất bại | `ImageManager.tsx` | `25d649c` | Unit Test #12: kiểm tra banner đỏ | **PASS** |
+| 13 | Báo lỗi thân thiện khi MinIO gặp sự cố HTTP 503 | `ImageManager.tsx` | `25d649c` | Unit Test #13: bắt lỗi 503 hiển thị thông báo | **PASS** |
+| 14 | Vô hiệu hóa nút và form khi disabled=true | `ImageManager.tsx` | `25d649c` | Unit Test #14: kiểm tra disabled controls | **PASS** |
+| 15 | Validation ImageUrl max 500 ký tự (SRS Bảng 7.5) | `ImageManager.tsx` | `25d649c` | Unit Test #15: chặn URL vượt quá 500 ký tự | **PASS** |
+| 16 | Tự động chuyển giao Primary khi xóa ảnh chính (FR-RCP-008) | `ImageManager.tsx` | `25d649c` | Unit Test #16: tự gán Primary cho ảnh nhỏ nhất | **PASS** |
+
+### 3. Hướng dẫn chạy kiểm thử
+- **Chạy Unit Test:**
+  ```bash
+  cd frontend/culinary-blog-web
+  npm test -- components/recipe-management/__tests__/ImageManager.test.tsx
+  ```
+- **Chạy E2E Test (Playwright):**
+  ```bash
+  cd frontend/culinary-blog-web
+  npx playwright test e2e/image-manager.spec.ts
+  ```
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12
