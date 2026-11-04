@@ -1,3 +1,39 @@
+# TASK 6: RECIPE IMAGE MANAGEMENT (CHUẨN HÓA SRS v1.2.0) — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-task6-image`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu (507 dòng & Traceability Matrix):** [docs/README_TASK6_IMAGE.md](docs/README_TASK6_IMAGE.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-task6-image`
+- **Chuẩn hóa quản lý ảnh món ăn theo SRS v1.2.0:** Xây dựng bộ component hoàn chỉnh gồm `ImageManager.tsx`, `ImageCard.tsx`, `ImagePreview.tsx`, `ImageUploadButton.tsx` và custom hook `useRecipeImages.ts`.
+- **Hỗ trợ tải lên đa phương thức:** Tải tệp từ máy tính qua `multipart/form-data` lên MinIO và nhập liên kết URL có sẵn. Kiểm soát chặt chẽ dung lượng (tối đa 5MB), định dạng ảnh (JPEG, PNG, WebP, AVIF) và giới hạn URL tối đa 500 ký tự (SRS v1.2.0 Bảng 7.5).
+- **Cơ chế ảnh đại diện (Primary Image):** Hỗ trợ đặt ảnh đại diện với API `PATCH .../set-primary`. Khi ảnh đại diện bị xóa, hệ thống tự động chuyển giao quyền Primary cho ảnh nhỏ nhất còn lại (FR-RCP-008).
+- **Kiểm thử tự động & Nghiệm thu:** Đạt 100% tỷ lệ pass trên bộ 16 ca kiểm thử Jest trong `ImageManager.test.tsx`, kiểm tra type an toàn với TypeScript và build Next.js thành công.
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Render danh sách ảnh & badge Ảnh đại diện | `ImageManager.tsx`, `ImageCard.tsx` | `c83ee31` | Jest Test #2: kiểm tra badge Primary & alt text | **PASS** |
+| 2 | Chặn file vượt kích thước 5MB | `ImageManager.tsx`, `image-validator.ts` | `c83ee31` | Jest Test #3: từ chối file >5MB | **PASS** |
+| 3 | Chặn định dạng ảnh không hợp lệ | `image-validator.ts` | `c83ee31` | Jest Test #4: chỉ nhận JPEG, PNG, WebP, AVIF | **PASS** |
+| 4 | Xem trước phóng to ảnh (Preview Modal) | `ImagePreview.tsx` | `c83ee31` | Jest Test #5: kiểm tra URL.createObjectURL | **PASS** |
+| 5 | Thêm ảnh mới trong Direct API mode | `ImageManager.tsx`, `images.ts` | `c83ee31` | Jest Test #6: gọi addRecipeImage | **PASS** |
+| 6 | Validation AltText tối đa 200 ký tự | `ImageManager.tsx` | `c83ee31` | Jest Test #7: chặn alt text quá dài | **PASS** |
+| 7 | Đặt làm ảnh đại diện (PATCH Primary) | `ImageManager.tsx`, `images.ts` | `c83ee31` | Jest Test #9: gọi setPrimaryRecipeImage | **PASS** |
+| 8 | Modal xác nhận trước khi xóa ảnh | `ImageManager.tsx` | `c83ee31` | Jest Test #10: mở hộp thoại xác nhận | **PASS** |
+| 9 | Tự động chuyển giao Primary khi xóa ảnh chính | `ImageManager.tsx` | `c83ee31` | Jest Test #16: reassign Primary cho ảnh kế tiếp | **PASS** |
+| 10 | Validation ImageUrl tối đa 500 ký tự | `ImageManager.tsx` | `c83ee31` | Jest Test #15: tuân thủ SRS v1.2.0 Bảng 7.5 | **PASS** |
+
+### 3. Hướng dẫn chạy kiểm thử
+- **Chạy Unit Test:**
+  ```bash
+  cd frontend/culinary-blog-web
+  npm test -- components/recipe-management/__tests__/ImageManager.test.tsx
+  ```
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12
