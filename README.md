@@ -1,3 +1,25 @@
+# BACKGROUND JOB TẠO ẢNH THU NHỎ (THUMBNAIL PROCESSING) — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-thumbnail-job`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu:** [docs/README_THUMBNAIL_JOB.md](docs/README_THUMBNAIL_JOB.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-thumbnail-job`
+- Xây dựng background worker `ImageResizeJob` sử dụng thư viện đồ họa thuần .NET `SixLabors.ImageSharp`.
+- Tự động tính toán tỷ lệ, nén và resize ảnh về các kích thước tiêu chuẩn phục vụ tối ưu hóa giao diện web.
+- Hỗ trợ đầy đủ các định dạng ảnh hiện đại: JPEG, PNG, WebP và AVIF.
+- Tự động đồng bộ ảnh thumbnail đã xử lý lên MinIO Object Storage.
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Interface & Background Worker | `IImageResizeJob.cs, ImageResizeJob.cs` | `666018c` | Unit Test xử lý ảnh kích thước lớn | **PASS** |
+| 2 | Hỗ trợ đa định dạng (JPG, PNG, WebP, AVIF) | `ImageResizeJob.cs` | `666018c` | Kiểm tra nén và format output | **PASS** |
+| 3 | Lưu trữ thumbnail vào MinIO | `ImageResizeJob.cs, IStorageService.cs` | `666018c` | Kiểm tra tệp thumbnail trên MinIO | **PASS** |
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12

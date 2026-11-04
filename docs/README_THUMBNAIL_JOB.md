@@ -1,5 +1,10 @@
 # Xử lý ảnh nền và tạo ảnh thu nhỏ (Thumbnail Background Job)
 
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-thumbnail-job`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+
+
 ## 1. Mục tiêu
 Branch `feat/vohungmanh-thumbnail-job` giải quyết việc xây dựng phân hệ tác vụ nền xử lý đồ họa (**JOB-002 Image Resize / Thumbnail**) cho nền tảng CulinaryBlog thuộc Task 4:
 - Khi người dùng tải lên hình ảnh món ăn chất lượng cao (dung lượng lớn, kích thước hàng ngàn pixel), việc xử lý giải mã và thay đổi kích thước ngay trong luồng HTTP Request sẽ làm nghẽn tiến trình API, gây độ trễ lớn (High Latency) và làm giảm nghiêm trọng trải nghiệm người dùng.
