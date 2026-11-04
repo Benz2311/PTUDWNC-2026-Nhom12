@@ -118,6 +118,9 @@ export async function uploadRecipeImageFile(
       `/recipes/${recipeId}/images`,
       formData,
       {
+        headers: {
+          'Content-Type': undefined,
+        },
         onUploadProgress,
       }
     );
