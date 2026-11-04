@@ -81,5 +81,37 @@ public static class AdminUsersEndpoints
         .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status403Forbidden)
         .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPatch("/{id:guid}/role", async Task<IResult> (
+            Guid id,
+            [FromBody] CulinaryBlog.Application.DTOs.Auth.UpdateAuthorRoleRequest request,
+            ClaimsPrincipal userPrincipal,
+            IAuthService authService,
+            CancellationToken cancellationToken) =>
+        {
+            if (!string.Equals(request.Role, "Author", StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.BadRequest("Only the Author role can be managed from this endpoint.");
+            }
+
+            var adminUserIdClaim = userPrincipal.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? userPrincipal.FindFirstValue("sub");
+
+            if (string.IsNullOrWhiteSpace(adminUserIdClaim) || !Guid.TryParse(adminUserIdClaim, out var adminUserId))
+            {
+                return Results.Unauthorized();
+            }
+
+            await authService.UpdateAuthorRoleAsync(adminUserId, id, request.Enabled);
+            return Results.NoContent();
+        })
+        .WithName("UpdateAuthorRole")
+        .WithSummary("Admin thay đổi vai trò Author cho người dùng")
+        .Produces(StatusCodes.Status204NoContent)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
+        .ProducesProblem(StatusCodes.Status403Forbidden)
+        .ProducesProblem(StatusCodes.Status404NotFound);
     }
 }
+
