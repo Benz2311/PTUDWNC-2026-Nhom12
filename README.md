@@ -1,16 +1,16 @@
 # Võ Hùng Mạnh - Báo cáo tổng hợp đóng góp cá nhân (Lab 1 - Lab 8)
 
-> **Họ và tên:** Võ Hùng Mạnh
-> **MSSV:** 2312687
-> **Lớp / Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
-> **Vai trò trong nhóm:** Nhóm trưởng / Phụ trách Module RecipeStep, RecipeImage, Full-Text Search & Hạ tầng kỹ thuật
-> **Nhánh cá nhân tổng hợp:** `2312687_VoHungManh`
+> **Họ và tên:** Võ Hùng Mạnh  
+> **MSSV:** 2312687  
+> **Lớp / Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12  
+> **Vai trò trong nhóm:** Nhóm trưởng / Phụ trách Module RecipeStep, RecipeImage, Full-Text Search & Hạ tầng kỹ thuật  
+> **Nhánh cá nhân tổng hợp:** `2312687_VoHungManh`  
 
 ---
 
 ## Bảng tổng hợp tiến độ và các nhánh tính năng chi tiết
 
-Do quy trình làm việc của nhóm áp dụng Feature Branch Workflow, mỗi bài Lab/Task được phát triển và kiểm thử độc lập trên từng nhánh chuyên biệt. Dưới đây là bảng định tuyến mã nguồn và tài liệu tương ứng:
+Do quy trình làm việc của nhóm áp dụng Feature Branch Workflow, mỗi bài Lab/Task được phát triển và kiểm thử độc lập trên từng nhánh chuyên biệt. Dưới đây là bảng định tuyến mã nguồn và tài liệu tương ứng trên từng nhánh:
 
 | Bữa / Task | Nội dung phụ trách | Nhánh Git triển khai | Tài liệu chi tiết | Trạng thái |
 |:---:|---|---|---|:---:|
@@ -19,9 +19,9 @@ Do quy trình làm việc của nhóm áp dụng Feature Branch Workflow, mỗi 
 | **Bữa 3** | Tối ưu truy vấn, PostgreSQL Full-Text Search, Unaccent & Fuzzy | `2312687_VoHungManh`, `main` | Mục [Bữa 3](#bữa-3---thiết-kế-dữ-liệu-và-tối-ưu-truy-vấn) | **Hoàn thành** |
 | **Bữa 4** | API Endpoints Step/Image, MinIO, Health Check, Observability, Thumbnail Job | `feat/vohungmanh-*` (7 nhánh), `main` | Mục [Bữa 4](#bữa-4---hoàn-thiện-api-endpoints-và-hạ-tầng) | **Hoàn thành** |
 | **Bữa 5** | Frontend Foundation, API Contracts TypeScript, Rate Limiting | `feat/vohungmanh-task5-frontend-foundation`, `feat/task5-integration` | Mục [Bữa 5](#bữa-5---chuẩn-hóa-api-contracts-và-frontend-foundation) | **Hoàn thành** |
-| **Bữa 6** | Chuẩn hóa Step, Image, Search bám sát SRS v1.2.0 & E2E Validation | `feat/vohungmanh-task6-step`, `...task6-image`, `...task6-search`, `integration/task6-validation` | [README_TASK6_SEARCH](docs/README_TASK6_SEARCH.md) | **Hoàn thành** |
-| **Bữa 7** | Recipe Search UI toàn diện (filter, sort, debounce, URL sync, 16 ảnh E2E) | `feat/vohungmanh-task7-search`, `integration/task7-validation` | [README_TASK7_SEARCH](docs/README_TASK7_SEARCH.md) | **Hoàn thành** |
-| **Bữa 8** | Hoàn thiện StepEditor, ImageManager, upload MinIO, Vitest & Playwright E2E | `feat/vohungmanh-task8-step`, `feat/vohungmanh-task8-image` | [README_TASK8_STEP](docs/README_TASK8_STEP.md), [README_TASK8_IMAGE](docs/README_TASK8_IMAGE.md) | **Hoàn thành** |
+| **Bữa 6** | Chuẩn hóa Step, Image, Search bám sát SRS v1.2.0 & E2E Validation | `feat/vohungmanh-task6-step`, `...task6-image`, `...task6-search`, `integration/task6-validation` | [README_TASK6_SEARCH](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task6-search/docs/README_TASK6_SEARCH.md) | **Hoàn thành** |
+| **Bữa 7** | Recipe Search UI toàn diện (filter, sort, debounce, URL sync, 16 ảnh E2E) | `feat/vohungmanh-task7-search`, `integration/task7-validation` | [README_TASK7_SEARCH](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task7-search/docs/README_TASK7_SEARCH.md) | **Hoàn thành** |
+| **Bữa 8** | Hoàn thiện StepEditor, ImageManager, upload MinIO, Vitest & Playwright E2E | `feat/vohungmanh-task8-step`, `feat/vohungmanh-task8-image` | [README_TASK8_STEP](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task8-step/docs/README_TASK8_STEP.md), [README_TASK8_IMAGE](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task8-image/docs/README_TASK8_IMAGE.md) | **Hoàn thành** |
 
 ---
 
@@ -152,7 +152,7 @@ Ngoài yêu cầu chính của Bữa 3, đã bổ sung:
 - Thực hiện kiểm thử nghiệm thu 16 kịch bản thực tế, chụp đầy đủ 16 ảnh minh chứng lưu tại `docs/task7-search/screenshots/`.
 - Tham gia nghiệm thu tích hợp toàn bộ hệ thống nhóm và kiểm toán cơ sở dữ liệu Docker PostgreSQL trên nhánh `integration/task7-validation`.
 
-*Chi tiết tài liệu và hình ảnh minh chứng: [README_TASK7_SEARCH.md](docs/README_TASK7_SEARCH.md).*
+*Chi tiết tài liệu và hình ảnh minh chứng: [README_TASK7_SEARCH](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task7-search/docs/README_TASK7_SEARCH.md).*
 
 ---
 
@@ -166,11 +166,11 @@ Ngoài yêu cầu chính của Bữa 3, đã bổ sung:
   - Tải tệp ảnh trực tiếp từ máy lên MinIO (chặn file >5MB).
   - Phân quyền RBAC: Guest và Author không chính chủ bị chặn chỉnh sửa (`forbidden-banner`).
   - Đạt **21/21 Unit Tests PASSED** và kịch bản Playwright E2E (`step-editor.spec.ts`).
-  - *Mã nguồn & tài liệu chi tiết:* Nhánh `feat/vohungmanh-task8-step` / [README_TASK8_STEP.md](docs/README_TASK8_STEP.md).
+  - *Mã nguồn & tài liệu chi tiết:* Nhánh `feat/vohungmanh-task8-step` / [README_TASK8_STEP](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task8-step/docs/README_TASK8_STEP.md).
 
 - **Quản lý hình ảnh (`ImageManager.tsx`):**
   - Tải lên ảnh qua Multipart Form Data lên MinIO, kiểm tra định dạng (JPG, PNG, WebP, AVIF) và dung lượng tối đa 5MB.
   - Đặt ảnh đại diện (`Primary Image`).
   - Cơ chế tự động chuyển giao quyền Primary cho ảnh nhỏ nhất còn lại khi xóa ảnh đại diện (FR-RCP-008).
   - Đạt **16/16 Unit Tests PASSED** và kịch bản Playwright E2E (`image-manager.spec.ts`).
-  - *Mã nguồn & tài liệu chi tiết:* Nhánh `feat/vohungmanh-task8-image` / [README_TASK8_IMAGE.md](docs/README_TASK8_IMAGE.md).
+  - *Mã nguồn & tài liệu chi tiết:* Nhánh `feat/vohungmanh-task8-image` / [README_TASK8_IMAGE](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task8-image/docs/README_TASK8_IMAGE.md).
