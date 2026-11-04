@@ -160,7 +160,12 @@ export async function uploadStepImageFile(
 
     const response = await apiClient.post<ApiResponse<{ url: string }>>(
       `/recipes/${recipeId}/steps/images`,
-      formData
+      formData,
+      {
+        headers: {
+          'Content-Type': undefined,
+        },
+      }
     );
     return unwrapData(response);
   } catch (error) {

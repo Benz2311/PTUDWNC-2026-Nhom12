@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type {
   RecipeStep,
   StepFormValues,
@@ -12,8 +12,11 @@ import {
   updateRecipeStep,
   deleteRecipeStep,
   reorderRecipeSteps,
+  uploadStepImageFile,
   StepApiError,
 } from '@/lib/api/steps';
+import { useAuthStore } from '@/lib/auth-store';
+import { validateImageFile } from '@/lib/image-validator';
 import { StepItem } from './StepItem';
 
 export interface StepEditorProps {
@@ -23,11 +26,15 @@ export interface StepEditorProps {
    */
   recipeId?: string;
   /**
+   * ID tác giả của Recipe dùng để kiểm tra phân quyền sở hữu
+   */
+  authorId?: string;
+  /**
    * Danh sách bước ban đầu (dùng khi render RecipeForm hoặc edit trang)
    */
   initialSteps?: RecipeStep[];
   /**
-   * Callback thông báo cho form cha khi danh sách bước thay đổi (đặc biệt trong Controlled mode)
+   * Callback thông báo cho form cha khi danh sách bước thay đổi
    */
   onStepsChange?: (steps: RecipeStep[]) => void;
   /**
@@ -54,18 +61,27 @@ function isValidUrl(urlString: string): boolean {
 
 export const StepEditor: React.FC<StepEditorProps> = ({
   recipeId,
+  authorId,
   initialSteps = [],
   onStepsChange,
   disabled: externalDisabled = false,
 }) => {
   const isDirectApiMode = Boolean(recipeId && recipeId.trim() !== '');
 
-  const [steps, setSteps] = useState<RecipeStep[]>(() => 
-    // Sắp xếp initial steps theo StepNumber tăng dần
-     [...initialSteps].sort((a, b) => (a.stepNumber ?? 0) - (b.stepNumber ?? 0))
+  // Lấy thông tin người dùng để kiểm tra phân quyền Author/Admin
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = Boolean(user);
+  const checkPermissions = isDirectApiMode && Boolean(authorId);
+  const isOwnerOrAdmin =
+    !checkPermissions ||
+    Boolean(user && (user.roles?.includes('Admin') || user.id === authorId));
+
+  const [steps, setSteps] = useState<RecipeStep[]>(() =>
+    [...initialSteps].sort((a, b) => (a.stepNumber ?? 0) - (b.stepNumber ?? 0))
   );
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Trạng thái form Thêm / Sửa
@@ -74,46 +90,61 @@ export const StepEditor: React.FC<StepEditorProps> = ({
   const [formValues, setFormValues] = useState<StepFormValues>(INITIAL_FORM_VALUES);
   const [formErrors, setFormErrors] = useState<StepValidationError>({});
 
+  // Input file ảnh minh họa cho bước
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Trạng thái modal xác nhận xóa
   const [stepToDelete, setStepToDelete] = useState<RecipeStep | null>(null);
 
   // Tự động load danh sách steps từ backend nếu có recipeId và chưa có initialSteps
-  useEffect(() => {
+  const fetchSteps = useCallback(() => {
+    if (!isDirectApiMode) return;
+
     let cancelled = false;
+    setIsLoading(true);
+    setErrorMessage(null);
 
-    if (isDirectApiMode && initialSteps.length === 0) {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      getRecipeSteps(recipeId!)
-        .then((fetchedSteps) => {
-          if (!cancelled) {
-            const sorted = [...fetchedSteps].sort((a, b) => (a.stepNumber ?? 0) - (b.stepNumber ?? 0));
-            setSteps(sorted);
-            onStepsChange?.(sorted);
-          }
-        })
-        .catch((err) => {
-          if (!cancelled) {
-            setErrorMessage(err instanceof Error ? err.message : 'Không tải được danh sách bước thực hiện.');
-          }
-        })
-        .finally(() => {
-          if (!cancelled) {
-            setIsLoading(false);
-          }
-        });
-    }
+    getRecipeSteps(recipeId!)
+      .then((fetchedSteps) => {
+        if (!cancelled) {
+          const sorted = [...fetchedSteps].sort(
+            (a, b) => (a.stepNumber ?? 0) - (b.stepNumber ?? 0)
+          );
+          setSteps(sorted);
+          onStepsChange?.(sorted);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setErrorMessage(
+            err instanceof Error ? err.message : 'Không tải được danh sách bước thực hiện.'
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [recipeId, isDirectApiMode]);
+  }, [isDirectApiMode, recipeId, onStepsChange]);
 
-  // Cập nhật khi initialSteps từ bên ngoài thay đổi (nếu có)
+  useEffect(() => {
+    if (isDirectApiMode && initialSteps.length === 0) {
+      const cancel = fetchSteps();
+      return cancel;
+    }
+  }, [isDirectApiMode, initialSteps.length, fetchSteps]);
+
+  // Cập nhật khi initialSteps từ bên ngoài thay đổi
   useEffect(() => {
     if (initialSteps.length > 0) {
-      const sorted = [...initialSteps].sort((a, b) => (a.stepNumber ?? 0) - (b.stepNumber ?? 0));
+      const sorted = [...initialSteps].sort(
+        (a, b) => (a.stepNumber ?? 0) - (b.stepNumber ?? 0)
+      );
       setSteps(sorted);
     }
   }, [initialSteps]);
@@ -127,7 +158,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
     [onStepsChange]
   );
 
-  const isActionDisabled = externalDisabled || isLoading;
+  const isActionDisabled = externalDisabled || isLoading || isUploadingImage || !isOwnerOrAdmin;
 
   // Validate form dữ liệu nhập
   const validateForm = (values: StepFormValues): StepValidationError => {
@@ -167,8 +198,57 @@ export const StepEditor: React.FC<StepEditorProps> = ({
     return errors;
   };
 
+  // Xử lý chọn tệp hình ảnh cho bước
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate client-side
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      setFormErrors((prev) => ({
+        ...prev,
+        imageUrl: validation.errorMessage || 'Tệp hình ảnh không hợp lệ.',
+      }));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // Clear error
+    setFormErrors((prev) => ({ ...prev, imageUrl: undefined }));
+
+    if (isDirectApiMode) {
+      // Upload trực tiếp lên server
+      setIsUploadingImage(true);
+      try {
+        const uploadResult = await uploadStepImageFile(recipeId!, file);
+        setFormValues((prev) => ({
+          ...prev,
+          imageUrl: uploadResult.url,
+        }));
+      } catch (err) {
+        setFormErrors((prev) => ({
+          ...prev,
+          imageUrl: err instanceof Error ? err.message : 'Tải ảnh lên máy chủ thất bại.',
+        }));
+      } finally {
+        setIsUploadingImage(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    } else {
+      // Controlled mode (blob url preview)
+      const blobUrl = URL.createObjectURL(file);
+      setFormValues((prev) => ({
+        ...prev,
+        imageUrl: blobUrl,
+      }));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   // Mở form Thêm bước
   const handleOpenAddForm = () => {
+    if (!isOwnerOrAdmin) return;
     setEditingStep(null);
     setFormValues(INITIAL_FORM_VALUES);
     setFormErrors({});
@@ -177,11 +257,15 @@ export const StepEditor: React.FC<StepEditorProps> = ({
 
   // Mở form Sửa bước
   const handleOpenEditForm = (step: RecipeStep) => {
+    if (!isOwnerOrAdmin) return;
     setEditingStep(step);
     setFormValues({
       title: step.title ?? '',
       description: step.description,
-      timerMinutes: step.timerMinutes !== null && step.timerMinutes !== undefined ? String(step.timerMinutes) : '',
+      timerMinutes:
+        step.timerMinutes !== null && step.timerMinutes !== undefined
+          ? String(step.timerMinutes)
+          : '',
       imageUrl: step.imageUrl ?? '',
     });
     setFormErrors({});
@@ -198,6 +282,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
   // Submit form (Thêm hoặc Cập nhật)
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isOwnerOrAdmin) return;
     setErrorMessage(null);
 
     const errors = validateForm(formValues);
@@ -229,14 +314,15 @@ export const StepEditor: React.FC<StepEditorProps> = ({
         } else {
           // Create: Server tự cấp StepNumber = N + 1
           const created = await createRecipeStep(recipeId!, payload);
-          const nextSteps = [...steps, created].sort((a, b) => (a.stepNumber ?? 0) - (b.stepNumber ?? 0));
+          const nextSteps = [...steps, created].sort(
+            (a, b) => (a.stepNumber ?? 0) - (b.stepNumber ?? 0)
+          );
           setSteps(nextSteps);
           onStepsChange?.(nextSteps);
         }
         handleCloseForm();
       } catch (err) {
         if (err instanceof StepApiError && err.errors) {
-          // Hiển thị validation errors từ server nếu có
           const mappedErrors: StepValidationError = {};
           if (err.errors.Title?.[0]) mappedErrors.title = err.errors.Title[0];
           if (err.errors.Description?.[0]) mappedErrors.description = err.errors.Description[0];
@@ -283,12 +369,13 @@ export const StepEditor: React.FC<StepEditorProps> = ({
 
   // Yêu cầu xóa bước
   const handleDeleteRequest = (step: RecipeStep) => {
+    if (!isOwnerOrAdmin) return;
     setStepToDelete(step);
   };
 
   // Xác nhận thực hiện xóa
   const handleConfirmDelete = async () => {
-    if (!stepToDelete) return;
+    if (!stepToDelete || !isOwnerOrAdmin) return;
     setErrorMessage(null);
 
     if (isDirectApiMode) {
@@ -319,8 +406,12 @@ export const StepEditor: React.FC<StepEditorProps> = ({
 
   // Reorder Up / Down
   const handleMoveStep = async (currentIndex: number, direction: 'up' | 'down') => {
+    if (!isOwnerOrAdmin) return;
     const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
     if (targetIndex < 0 || targetIndex >= steps.length) return;
+
+    // Lưu trạng thái trước khi đổi để rollback nếu API lỗi
+    const previousSteps = [...steps];
 
     // Hoán đổi vị trí trong mảng
     const reordered = [...steps];
@@ -339,11 +430,18 @@ export const StepEditor: React.FC<StepEditorProps> = ({
       try {
         const stepIds = normalized.map((s) => s.id);
         const serverResult = await reorderRecipeSteps(recipeId!, stepIds);
-        const sortedServer = [...serverResult].sort((a, b) => (a.stepNumber ?? 0) - (b.stepNumber ?? 0));
+        const sortedServer = [...serverResult].sort(
+          (a, b) => (a.stepNumber ?? 0) - (b.stepNumber ?? 0)
+        );
         setSteps(sortedServer);
         onStepsChange?.(sortedServer);
       } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : 'Không thể sắp xếp lại các bước.');
+        // Rollback state nếu server trả lỗi
+        setSteps(previousSteps);
+        onStepsChange?.(previousSteps);
+        setErrorMessage(
+          err instanceof Error ? err.message : 'Không thể sắp xếp lại các bước.'
+        );
       } finally {
         setIsLoading(false);
       }
@@ -355,6 +453,26 @@ export const StepEditor: React.FC<StepEditorProps> = ({
 
   return (
     <div className="space-y-6" data-testid="step-editor">
+      {/* Read-only Warning Banner if not owner/admin */}
+      {checkPermissions && (!isAuthenticated || !isOwnerOrAdmin) && (
+        <div
+          data-testid="forbidden-banner"
+          className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-sm text-slate-700 flex items-start gap-3 shadow-xs"
+        >
+          <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 shrink-0 mt-0.5">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <strong className="font-semibold block text-slate-900">Chế độ chỉ xem:</strong>
+            <span className="text-xs sm:text-sm">
+              Chỉ tác giả sở hữu công thức này hoặc Quản trị viên mới có quyền thêm, chỉnh sửa hoặc sắp xếp thứ tự các bước thực hiện.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Header section with title & Add button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-emerald-50/90 via-emerald-50/50 to-white border border-emerald-100 shadow-xs">
         <div className="space-y-1">
@@ -376,44 +494,58 @@ export const StepEditor: React.FC<StepEditorProps> = ({
           </p>
         </div>
 
-        <button
-          type="button"
-          data-testid="btn-add-step"
-          disabled={isActionDisabled || isFormOpen}
-          onClick={handleOpenAddForm}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl text-white bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 self-start sm:self-auto"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-          <span>Thêm bước mới</span>
-        </button>
+        {isOwnerOrAdmin && (
+          <button
+            type="button"
+            data-testid="btn-add-step"
+            disabled={isActionDisabled || isFormOpen}
+            onClick={handleOpenAddForm}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl text-white bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 self-start sm:self-auto"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+            <span>Thêm bước mới</span>
+          </button>
+        )}
       </div>
 
-      {/* Global Error Banner */}
+      {/* Global Error Banner with Retry */}
       {errorMessage && (
         <div
           data-testid="step-error-banner"
           role="alert"
           className="flex items-start justify-between gap-3 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm shadow-xs animate-in fade-in"
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-1">
             <svg className="w-5 h-5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span className="font-medium">{errorMessage}</span>
           </div>
-          <button
-            type="button"
-            data-testid="btn-close-error"
-            onClick={() => setErrorMessage(null)}
-            className="text-rose-500 hover:text-rose-800 p-1 rounded-lg hover:bg-rose-100/50 transition-colors"
-            aria-label="Đóng thông báo lỗi"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            {isDirectApiMode && (
+              <button
+                type="button"
+                data-testid="btn-retry-fetch-steps"
+                onClick={fetchSteps}
+                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-100 text-rose-800 hover:bg-rose-200 transition-colors"
+              >
+                Thử lại
+              </button>
+            )}
+            <button
+              type="button"
+              data-testid="btn-close-error"
+              onClick={() => setErrorMessage(null)}
+              className="text-rose-500 hover:text-rose-800 p-1 rounded-lg hover:bg-rose-100/50 transition-colors"
+              aria-label="Đóng thông báo lỗi"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 
@@ -552,11 +684,37 @@ export const StepEditor: React.FC<StepEditorProps> = ({
               )}
             </div>
 
-            {/* Image URL (Optional, max 500) */}
+            {/* Image Upload / URL Section */}
             <div className="space-y-1.5">
-              <label htmlFor="step-input-image" className="block text-xs font-semibold text-gray-800">
-                URL ảnh minh họa <span className="text-gray-400 font-normal">(tùy chọn, tối đa 500 ký tự)</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="step-input-image" className="block text-xs font-semibold text-gray-800">
+                  Ảnh minh họa <span className="text-gray-400 font-normal">(tùy chọn)</span>
+                </label>
+                <button
+                  type="button"
+                  data-testid="btn-upload-step-image"
+                  disabled={isActionDisabled}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  <span>{isUploadingImage ? 'Đang tải...' : 'Tải ảnh từ máy'}</span>
+                </button>
+              </div>
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                data-testid="input-step-file"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                disabled={isActionDisabled}
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
               <input
                 id="step-input-image"
                 data-testid="input-step-image"
@@ -571,6 +729,31 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                 placeholder="https://example.com/step-1.jpg"
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50 transition-all shadow-2xs"
               />
+
+              {formValues.imageUrl && (
+                <div className="flex items-center gap-2 pt-1">
+                  <div className="w-8 h-8 rounded-lg overflow-hidden border border-emerald-200 bg-slate-50 shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={formValues.imageUrl}
+                      alt="Minh họa bước"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="btn-remove-step-image"
+                    onClick={() => setFormValues((prev) => ({ ...prev, imageUrl: '' }))}
+                    className="text-xs text-rose-600 hover:text-rose-800 font-medium hover:underline"
+                  >
+                    Gỡ ảnh
+                  </button>
+                </div>
+              )}
+
               {formErrors.imageUrl && (
                 <p data-testid="error-step-image" className="text-xs text-rose-600 font-medium mt-1 flex items-center gap-1">
                   <span>⚠</span> {formErrors.imageUrl}
@@ -618,7 +801,9 @@ export const StepEditor: React.FC<StepEditorProps> = ({
               Chưa có bước thực hiện nào
             </h4>
             <p className="text-xs sm:text-sm text-gray-600 max-w-sm leading-relaxed">
-              Hãy bấm nút &ldquo;Thêm bước&rdquo; ở trên để bắt đầu soạn thảo các thao tác nấu nướng cụ thể cho món ăn.
+              {isOwnerOrAdmin
+                ? 'Hãy bấm nút "Thêm bước mới" ở trên để bắt đầu soạn thảo các thao tác nấu nướng cụ thể cho món ăn.'
+                : 'Công thức này chưa có bước thực hiện nào được công bố.'}
             </p>
           </div>
         </div>
@@ -631,6 +816,8 @@ export const StepEditor: React.FC<StepEditorProps> = ({
               index={index}
               totalSteps={steps.length}
               disabled={isActionDisabled}
+              canEdit={isOwnerOrAdmin}
+              canDelete={isOwnerOrAdmin}
               onEdit={handleOpenEditForm}
               onDeleteRequest={handleDeleteRequest}
               onMoveUp={(idx) => handleMoveStep(idx, 'up')}
