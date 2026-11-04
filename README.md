@@ -1,3 +1,29 @@
+# TASK 5: FRONTEND FOUNDATION & API CONTRACTS — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-task5-frontend-foundation`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu:** [docs/README_TASK5_FRONTEND_FOUNDATION.md](docs/README_TASK5_FRONTEND_FOUNDATION.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-task5-frontend-foundation`
+- **Xây dựng nền tảng Front-end (Foundation):** Cấu hình biến môi trường `.env.example`, cấu trúc thư mục types/hooks và thiết lập quy ước tích hợp giao tiếp API cho toàn bộ dự án Front-end.
+- **Chuẩn hóa Hợp đồng dữ liệu TypeScript (API Contracts):** Thiết kế hệ thống type an toàn tuyệt đối đồng bộ với Backend ASP.NET Core:
+  - `types/api.ts`: Chuẩn hóa phong bì dữ liệu `ApiResponse<T>`, `ApiError`, `PaginatedResponse<T>`.
+  - `types/step.ts`: Định nghĩa dữ liệu các bước nấu ăn (`RecipeStep`, `CreateRecipeStepRequest`, `UpdateRecipeStepRequest`).
+  - `types/image.ts`: Định nghĩa dữ liệu hình ảnh (`RecipeImage`, `CreateRecipeImageRequest`, `SetPrimaryImageRequest`).
+  - `types/search.ts`: Định nghĩa truy vấn và kết quả tìm kiếm (`RecipeSearchQuery`, `RecipeSearchResult`).
+
+### 2. Bảng đối chiếu mã nguồn & Hợp đồng dữ liệu
+| STT | Loại hợp đồng dữ liệu | File mã nguồn liên quan | Commit HEAD | Kiểm tra Type Safety | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Envelope ApiResponse, Error & Pagination | `types/api.ts` | `88128ec` | Khớp 100% envelope backend | **PASS** |
+| 2 | RecipeStep Models & Requests | `types/step.ts` | `88128ec` | Khớp entity RecipeStep | **PASS** |
+| 3 | RecipeImage Models & Requests | `types/image.ts` | `88128ec` | Khớp entity RecipeImage | **PASS** |
+| 4 | RecipeSearch Models & Facets | `types/search.ts` | `88128ec` | Khớp DTO Search backend | **PASS** |
+| 5 | Environment Configuration | `.env.example` | `88128ec` | Định nghĩa NEXT_PUBLIC_API_URL | **PASS** |
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12
