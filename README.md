@@ -1,3 +1,25 @@
+# QUẢN LÝ HÌNH THỨC CÔNG THỨC (RECIPE IMAGE BACKEND) — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-recipe-image`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu:** [docs/README_RECIPE_IMAGE.md](docs/README_RECIPE_IMAGE.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-recipe-image`
+- Triển khai trọn bộ API Endpoints cho phân hệ hình ảnh công thức: thêm ảnh, xóa ảnh, đặt ảnh đại diện.
+- Xây dựng công cụ thẩm định tệp `ImageValidator` kiểm tra MIME type, magic bytes và dung lượng tối đa 5MB.
+- Xử lý nghiệp vụ đặt ảnh chính (`SetPrimary`) đảm bảo mỗi công thức chỉ có duy nhất 1 ảnh đại diện.
+- Đóng gói MediatR Commands (`AddRecipeImageCommand`, `DeleteRecipeImageCommand`, `SetPrimaryImageCommand`).
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | API Endpoints Recipe Image | `RecipeEndpoints.cs` | `53feb6f` | Swagger / Curl test các HTTP methods | **PASS** |
+| 2 | ImageValidator (Magic bytes, 5MB, format) | `ImageValidator.cs` | `53feb6f` | Unit Test thẩm định file ảnh | **PASS** |
+| 3 | Nghiệp vụ ảnh đại diện Primary | `RecipeImageCommands.cs` | `53feb6f` | Kiểm tra tính duy nhất của IsPrimary | **PASS** |
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12

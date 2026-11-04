@@ -1,5 +1,10 @@
 # Quản lý hình ảnh công thức (Recipe Image)
 
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-recipe-image`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+
+
 ## 1. Mục tiêu
 Branch `feat/vohungmanh-recipe-image` giải quyết việc xây dựng phân hệ quản lý bộ sưu tập hình ảnh cho công thức nấu ăn (`RecipeImage`) thuộc Task 4 trong dự án CulinaryBlog:
 - Cho phép tải lên nhiều hình ảnh minh họa cho một món ăn (ảnh đại diện, ảnh thành phẩm, ảnh cận cảnh các nguyên liệu).
