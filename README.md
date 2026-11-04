@@ -1,3 +1,35 @@
+# TASK 6: RECIPE SEARCH SYSTEM (CHUẨN HÓA SRS v1.2.0) — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-task6-search`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu (672 dòng & Traceability Matrix):** [docs/README_TASK6_SEARCH.md](docs/README_TASK6_SEARCH.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-task6-search`
+- **Chuẩn hóa hệ thống tìm kiếm theo SRS v1.2.0:** Xây dựng module tìm kiếm toàn diện gồm `SearchContainer.tsx`, `SearchBox.tsx`, `SearchResultCard.tsx`, `SearchEmptyState.tsx`, `SearchErrorState.tsx`, `SearchLoadingState.tsx`.
+- **Đồng bộ hóa Server-Side Filter & Sort:** Tích hợp bộ lọc danh mục (`categoryId`), tiêu chí sắp xếp (`Title`, `CreatedAt`, `CookTimeMinutes`), cơ chế debounce 400ms và đồng bộ URL query params (`?q=&category=&sort=`).
+- **PostgreSQL Full-Text Search:** Khai thác `to_tsvector`, GIN Index, hàm `unaccent` hỗ trợ tìm kiếm tiếng Việt không dấu và fuzzy matching (`pg_trgm`).
+- **Kiểm thử tự động & Nghiệm thu thực tế:** Viết bộ test Vitest (`SearchUI.test.tsx`), kiểm thử curl API và kiểm thử trình duyệt thực tế, đối chiếu đầy đủ với Traceability Matrix SRS v1.2.0.
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Ô tìm kiếm với Debounce 400ms | `SearchBox.tsx` | `abe4848` | Vitest: debounce không gửi request dồn dập | **PASS** |
+| 2 | Tìm kiếm toàn văn unaccent tiếng Việt | Backend `RecipeEndpoints.cs`, FTS | `abe4848` | Curl: tìm `pho bo` trả về `Phở bò Hà Nội` | **PASS** |
+| 3 | Lọc theo danh mục phía Server | `SearchContainer.tsx` | `abe4848` | Vitest: trigger chọn category cập nhật query | **PASS** |
+| 4 | Sắp xếp theo CookTime / Title / Date | `SearchContainer.tsx` | `abe4848` | Vitest: chọn sort gọi API đúng param | **PASS** |
+| 5 | Xử lý các trạng thái Loading, Empty, Error | `SearchLoadingState.tsx`, `SearchEmptyState.tsx` | `abe4848` | Vitest: render đúng UI tương ứng trạng thái | **PASS** |
+| 6 | Thẻ hiển thị công thức tìm kiếm | `SearchResultCard.tsx` | `abe4848` | Vitest: render hình ảnh, tác giả, thời gian | **PASS** |
+
+### 3. Hướng dẫn chạy kiểm thử
+- **Chạy Unit Test giao diện tìm kiếm:**
+  ```bash
+  cd frontend/culinary-blog-web
+  npm test -- components/search/__tests__/SearchUI.test.tsx
+  ```
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12
