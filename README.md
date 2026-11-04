@@ -1,176 +1,203 @@
-# Võ Hùng Mạnh - Báo cáo tổng hợp đóng góp cá nhân (Lab 1 - Lab 8)
-
-> **Họ và tên:** Võ Hùng Mạnh  
-> **MSSV:** 2312687  
-> **Lớp / Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12  
-> **Vai trò trong nhóm:** Nhóm trưởng / Phụ trách Module RecipeStep, RecipeImage, Full-Text Search & Hạ tầng kỹ thuật  
-> **Nhánh cá nhân tổng hợp:** `2312687_VoHungManh`  
+# VÕ HÙNG MẠNH – 2312687
+## BÁO CÁO CÔNG VIỆC CÁ NHÂN – TASK 1, TASK 2, TASK 3
 
 ---
 
-## Bảng tổng hợp tiến độ và các nhánh tính năng chi tiết
-
-Do quy trình làm việc của nhóm áp dụng Feature Branch Workflow, mỗi bài Lab/Task được phát triển và kiểm thử độc lập trên từng nhánh chuyên biệt. Dưới đây là bảng định tuyến mã nguồn và tài liệu tương ứng trên từng nhánh:
-
-| Bữa / Task | Nội dung phụ trách | Nhánh Git triển khai | Tài liệu chi tiết | Trạng thái |
-|:---:|---|---|---|:---:|
-| **Bữa 1** | Cấu trúc dữ liệu `RecipeStep` & `RecipeImage` | `2312687_VoHungManh`, `main` | Mục [Bữa 1](#bữa-1---xây-dựng-cấu-trúc-dữ-liệu-ban-đầu) | **Hoàn thành** |
-| **Bữa 2** | Entity, Configuration & Seed data Step/Image | `2312687_VoHungManh`, `main` | Mục [Bữa 2](#bữa-2---hoàn-thiện-cấu-hình-dữ-liệu-và-dữ-liệu-kiểm-thử) | **Hoàn thành** |
-| **Bữa 3** | Tối ưu truy vấn, PostgreSQL Full-Text Search, Unaccent & Fuzzy | `2312687_VoHungManh`, `main` | Mục [Bữa 3](#bữa-3---thiết-kế-dữ-liệu-và-tối-ưu-truy-vấn) | **Hoàn thành** |
-| **Bữa 4** | API Endpoints Step/Image, MinIO, Health Check, Observability, Thumbnail Job | `feat/vohungmanh-*` (7 nhánh), `main` | Mục [Bữa 4](#bữa-4---hoàn-thiện-api-endpoints-và-hạ-tầng) | **Hoàn thành** |
-| **Bữa 5** | Frontend Foundation, API Contracts TypeScript, Rate Limiting | `feat/vohungmanh-task5-frontend-foundation`, `feat/task5-integration` | Mục [Bữa 5](#bữa-5---chuẩn-hóa-api-contracts-và-frontend-foundation) | **Hoàn thành** |
-| **Bữa 6** | Chuẩn hóa Step, Image, Search bám sát SRS v1.2.0 & E2E Validation | `feat/vohungmanh-task6-step`, `...task6-image`, `...task6-search`, `integration/task6-validation` | [README_TASK6_SEARCH](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task6-search/docs/README_TASK6_SEARCH.md) | **Hoàn thành** |
-| **Bữa 7** | Recipe Search UI toàn diện (filter, sort, debounce, URL sync, 16 ảnh E2E) | `feat/vohungmanh-task7-search`, `integration/task7-validation` | [README_TASK7_SEARCH](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task7-search/docs/README_TASK7_SEARCH.md) | **Hoàn thành** |
-| **Bữa 8** | Hoàn thiện StepEditor, ImageManager, upload MinIO, Vitest & Playwright E2E | `feat/vohungmanh-task8-step`, `feat/vohungmanh-task8-image` | [README_TASK8_STEP](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task8-step/docs/README_TASK8_STEP.md), [README_TASK8_IMAGE](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task8-image/docs/README_TASK8_IMAGE.md) | **Hoàn thành** |
+### 1. Thông tin sinh viên
+- **Họ và tên:** Võ Hùng Mạnh
+- **Mã số sinh viên (MSSV):** 2312687
+- **Vai trò trong nhóm:** Thành viên 4 (TV4) – Backend Developer
+- **Nhánh Git phụ trách:** `2312687_VoHungManh`
+- **Môn học:** Phát triển ứng dụng Web nâng cao (PTUDWNC-2026-Nhom12)
 
 ---
 
-## Bữa 1 - Xây dựng cấu trúc dữ liệu ban đầu
-
-**Phụ trách: RecipeStep & RecipeImage**
-
-- Xác định cấu trúc dữ liệu cho các bước chế biến (`RecipeStep`).
-- Hoàn thiện các thuộc tính cần thiết của `RecipeStep`.
-- Sử dụng `StepNumber` để quản lý thứ tự các bước chế biến.
-- Xác định cấu trúc dữ liệu hình ảnh của công thức (`RecipeImage`).
-- Hoàn thiện các thông tin cần thiết để lưu và hiển thị hình ảnh.
-- Thiết lập quan hệ giữa `RecipeStep` và `Recipe`.
-- Thiết lập quan hệ giữa `RecipeImage` và `Recipe`.
-- Chuẩn bị dữ liệu mẫu cho các bước chế biến và hình ảnh.
-
-**Kết quả:** Hoàn thành cấu trúc dữ liệu nền cho Step và Image, đảm bảo một Recipe có thể có nhiều bước chế biến và nhiều hình ảnh.
+### 2. Tổng quan các nhiệm vụ thực tế
+Trên nhánh `2312687_VoHungManh`, sinh viên tập trung nghiên cứu, thiết kế kiến trúc và triển khai các chức năng cốt lõi thuộc giai đoạn nền tảng (Bữa 1 – Bữa 3):
+- **Phân công trách nhiệm:** Phụ trách toàn bộ module dữ liệu và nghiệp vụ liên quan đến **Bước thực hiện công thức nấu ăn (`RecipeStep`)** và **Hình ảnh minh họa công thức (`RecipeImage`)**.
+- **Mô hình kiến trúc:** Áp dụng Clean Architecture (Domain -> Application -> Infrastructure -> Api), kết hợp Repository Pattern & Unit of Work.
+- **Cơ sở dữ liệu:** Thiết kế Schema PostgreSQL 16 qua Entity Framework Core Fluent API, tối ưu hóa hiệu năng truy vấn với Eager Loading, AsNoTracking, chỉ mục Unique và hệ thống tìm kiếm toàn văn Full-Text Search tiếng Việt với thuật toán mờ Fallback.
+- **Độ tin cậy:** Xây dựng cơ chế bộ đệm 2 lớp (Resilient Multi-level Cache) chống nghẽn và hệ thống xử lý ngoại lệ tập trung chuẩn RFC 7807 ProblemDetails.
 
 ---
 
-## Bữa 2 - Hoàn thiện cấu hình dữ liệu và dữ liệu kiểm thử
-
-**Phụ trách: RecipeStep & RecipeImage**
-
-- Hoàn thiện entity `RecipeStep`.
-- Hoàn thiện entity `RecipeImage`.
-- Hoàn thiện `RecipeStepConfiguration`.
-- Hoàn thiện `RecipeImageConfiguration`.
-- Kiểm tra và hoàn thiện quan hệ giữa `RecipeStep`, `RecipeImage` và `Recipe`.
-- Xử lý các điểm chưa thống nhất giữa Entity và Configuration của Step/Image.
-- Hoàn thiện thứ tự các bước chế biến.
-- Hoàn thiện thông tin thứ tự hiển thị hình ảnh.
-- Xây dựng dữ liệu kiểm thử cho `RecipeStep`.
-- Xây dựng dữ liệu kiểm thử cho `RecipeImage`.
-- Đảm bảo mỗi Recipe sau khi tích hợp có ít nhất 5 bước chế biến.
-- Kiểm tra dữ liệu Step/Image sau khi seed để đảm bảo quan hệ dữ liệu được tạo đúng.
-
-**Kết quả:** Hoàn thiện Entity, Configuration, relationship và dữ liệu kiểm thử cho RecipeStep/RecipeImage, tạo nền tảng để sử dụng Step/Image trong Recipe Detail.
+### 3. Task 1 – Công việc đã thực hiện
+**Giai đoạn:** Bữa 1 (09/09/2026 – 12/09/2026) – Khởi tạo cấu trúc dự án & Phân tích nghiệp vụ
+- **Thiết kế Domain Entities:**
+  - `RecipeStep`: Đại diện cho một bước thực hiện trong công thức, gồm các trường dữ liệu cốt lõi: `Id` (Guid), `RecipeId` (Guid), `StepNumber` (int), `Title` (string), `Description` (string), `TimerMinutes` (int?), `ImageUrl` (string?).
+  - `RecipeImage`: Đại diện cho hình ảnh đại diện hoặc ảnh minh họa đính kèm món ăn: `Id` (Guid), `RecipeId` (Guid), `ImageUrl` (string), `AltText` (string?), `OrderIndex` (int), `IsPrimary` (bool).
+- **Mối quan hệ nghiệp vụ:**
+  - Thiết lập mối quan hệ 1 - N giữa `Recipe` và `RecipeStep` (`Recipe.Steps`).
+  - Thiết lập mối quan hệ 1 - N giữa `Recipe` và `RecipeImage` (`Recipe.Images`).
+- **Thỏa thuận kiến trúc giải pháp:**
+  - Thống nhất cấu trúc Clean Architecture cho ASP.NET Core Web API và phân rã các lớp: `Domain`, `Application`, `Infrastructure`, `Api`.
 
 ---
 
-## Bữa 3 - Thiết kế dữ liệu và tối ưu truy vấn
-
-**Phụ trách: Step, Image & Full-Text Search**
-
-### RecipeStep & RecipeImage
-- Rà soát `RecipeStep`, `RecipeImage` và các Configuration tương ứng.
-- Kiểm tra lại quan hệ giữa `RecipeStep`, `RecipeImage` và `Recipe`.
-- Kiểm tra và đảm bảo thứ tự các bước chế biến bằng `StepNumber`.
-- Kiểm tra thứ tự hiển thị hình ảnh bằng `SortOrder`/`OrderIndex`.
-- Kiểm tra và hoàn thiện quy tắc ảnh chính (`IsPrimary`) của Recipe.
-
-### Tối ưu truy vấn
-- Tối ưu các truy vấn chỉ đọc Step/Image bằng `AsNoTracking()` khi phù hợp.
-- Kiểm tra cách load Step và Image trong Recipe Detail.
-- Hạn chế N+1 Query khi lấy dữ liệu liên quan đến Recipe.
-- Kiểm thử lại Recipe Detail sau khi tối ưu truy vấn.
-
-### PostgreSQL Full-Text Search
-- Triển khai Full-Text Search cho Recipe bằng PostgreSQL.
-- Cấu hình `SearchVector` phục vụ tìm kiếm toàn văn.
-- Cấu hình GIN Index cho `SearchVector`.
-- Sử dụng `PlainToTsQuery()` để tạo truy vấn Full-Text Search.
-- Sử dụng `unaccent` để hỗ trợ tìm kiếm tiếng Việt không dấu.
-- Tạo và kiểm tra Migration liên quan đến SearchVector/GIN Index.
-- Kiểm thử từ khóa `pho bo` và đảm bảo tìm được Recipe `Phở bò`.
-
-### Phần mở rộng
-Ngoài yêu cầu chính của Bữa 3, đã bổ sung:
-- Fuzzy Search bằng PostgreSQL `pg_trgm`.
-- Hỗ trợ trường hợp gõ sai nhẹ như `phoo bo` vẫn tìm được `Phở bò Hà Nội`.
-- Cache cho Search và Recipe Detail.
-- Cơ chế Resilient Cache/fail-safe khi Redis không khả dụng.
-- Bổ sung dữ liệu demo `Phở bò Hà Nội` để kiểm thử Full-Text Search trực tiếp.
-- Seeder dữ liệu demo theo hướng idempotent, tránh tạo dữ liệu trùng.
-- Bổ sung Domain Validation/Domain Exception cho Step và Image.
-- Kiểm thử các chức năng Step, Image và Full-Text Search sau khi tích hợp.
-
-**Kết quả:** Hoàn thành RecipeStep, RecipeImage, tối ưu truy vấn Step/Image và PostgreSQL Full-Text Search; hỗ trợ tìm kiếm có dấu, không dấu và fuzzy search cho Recipe.
+### 4. Task 2 – Công việc đã thực hiện
+**Giai đoạn:** Bữa 2 (20/09/2026 – 23/09/2026) – Thiết lập Môi trường Database & Mapping EF Core
+- **Docker hóa cơ sở dữ liệu:**
+  - Cấu hình file `docker-compose.yml` khởi chạy dịch vụ PostgreSQL 16 với port mapping `5432:5432`, volume mount bền vững và biến môi trường bảo mật qua `.env`.
+- **Cấu hình Entity Framework Core Fluent API:**
+  - Tạo cấu hình `RecipeStepConfiguration`: ánh xạ vào bảng `recipe_steps`, khóa chính `Id`, khóa ngoại `RecipeId` tham chiếu đến `recipes(Id)` với hành vi xóa tầng `OnDelete(DeleteBehavior.Cascade)`.
+  - Tạo cấu hình `RecipeImageConfiguration`: ánh xạ vào bảng `recipe_images`, khóa chính `Id`, khóa ngoại `RecipeId` với `DeleteBehavior.Cascade`.
+  - Đăng ký thực thể và cấu hình vào `ApplicationDbContext`.
+- **Bộ dữ liệu mẫu (Seed Data):**
+  - Xây dựng dữ liệu khởi tạo mẫu đảm bảo mỗi công thức (`Recipe`) có ít nhất 5 bước thực hiện tuần tự (`StepNumber` từ 1 đến 5) kèm hình ảnh minh họa tương ứng để kiểm thử trực quan trên môi trường phát triển.
 
 ---
 
-## Bữa 4 - Hoàn thiện API Endpoints và Hạ tầng
-
-**Phụ trách: Step/Image API, MinIO Storage, Health Check, Observability & Thumbnail Job**
-
-- **Recipe Step API:** Triển khai đầy đủ các endpoint CRUD cho bước nấu ăn: `GET`, `POST`, `PUT`, `DELETE /api/v1/recipes/{id}/steps` và endpoint sắp xếp `PUT .../steps/reorder`.
-- **Recipe Image API:** Triển khai endpoint quản lý ảnh: `GET`, `POST`, `DELETE /api/v1/recipes/{id}/images`, endpoint đặt ảnh chính `PATCH .../images/{imageId}/set-primary` và xác thực định dạng ảnh qua `ImageValidator` (hỗ trợ JPG, PNG, WebP, AVIF; tối đa 5MB).
-- **MinIO Object Storage:** Tích hợp `IStorageService`, cấu hình MinIO S3-compatible lưu trữ tệp tin độc lập thay vì lưu trên local disk.
-- **Application Health Checks:** Thiết lập giám sát sức khỏe dịch vụ tại `/health`, `/health/ready`, `/health/live` kiểm tra tự động trạng thái kết nối PostgreSQL và MinIO.
-- **Observability & Logging:** Cấu hình Serilog Structured Logging, middleware `CorrelationIdMiddleware` gán mã vết cho mỗi request HTTP, `LoggingBehavior` trong MediatR pipeline.
-- **Thumbnail Background Job:** Xây dựng worker ngầm sử dụng `SixLabors.ImageSharp` tự động sinh ảnh thu nhỏ kích thước chuẩn phục vụ tối ưu tải trang.
-
-*Mã nguồn chi tiết được lưu trữ và nghiệm thu trên các nhánh tính năng: `feat/vohungmanh-file-storage`, `feat/vohungmanh-full-text-search`, `feat/vohungmanh-health-check`, `feat/vohungmanh-observability`, `feat/vohungmanh-thumbnail-job`, `feat/vohungmanh-recipe-image`, `feat/vohungmanh-recipe-step`.*
-
----
-
-## Bữa 5 - Chuẩn hóa API Contracts và Frontend Foundation
-
-**Phụ trách: API Versioning, Frontend Architecture, Types & Contracts**
-
-- **TypeScript Type Definitions:** Thiết kế toàn bộ giao diện kiểu dữ liệu cốt lõi cho Frontend: `types/api.ts` (ApiResponse wrapper envelope), `types/step.ts`, `types/image.ts`, `types/search.ts`.
-- **Rate Limiting Middleware:** Tích hợp cơ chế giới hạn tần suất gọi API trên ASP.NET Core (`RateLimitingExtensions.cs`) bảo vệ hệ thống trước tấn công DoS/Brute Force.
-- **Tài liệu API chuẩn hóa:** Đóng góp xây dựng tài liệu đặc tả hợp đồng API đồng bộ tại `docs/API_DOCUMENTATION.md`.
-
-*Mã nguồn chi tiết được phát triển trên nhánh: `feat/vohungmanh-task5-frontend-foundation` và nhánh tích hợp `feat/task5-integration`.*
-
----
-
-## Bữa 6 - Chuẩn hóa giao diện & nghiệp vụ theo SRS v1.2.0
-
-**Phụ trách: Traceability Matrix, Step/Image/Search Frontend & Validation**
-
-- **Chuẩn hóa Recipe Image:** Tuân thủ Bảng 7.5 SRS v1.2.0, giới hạn độ dài `ImageUrl` tối đa 500 ký tự, `AltText` tối đa 200 ký tự, bổ sung PATCH endpoint. (Chi tiết tại nhánh `feat/vohungmanh-task6-image`).
-- **Chuẩn hóa Recipe Step:** Tuân thủ Bảng 7.3 SRS v1.2.0, validation `imageUrl` max 500 ký tự, `timerMinutes` 0-1440 phút, `description` max 2000 ký tự. (Chi tiết tại nhánh `feat/vohungmanh-task6-step`).
-- **Chuẩn hóa Recipe Search:** Tìm kiếm toàn văn unaccent kết hợp lọc danh mục server-side, sort CookTime/Title, debounce 400ms và đồng bộ URL query params. (Chi tiết tại nhánh `feat/vohungmanh-task6-search` - tài liệu mẫu mực 672 dòng).
-- **Kiểm thử nghiệm thu E2E Task 6:** Thực hiện kiểm thử toàn diện trên nhánh `integration/task6-validation`, chụp ảnh kiểm thử đa kích thước màn hình lưu tại `docs/task6-validation/`.
-
----
-
-## Bữa 7 - Hoàn thiện toàn diện Recipe Search UI
-
-**Phụ trách: Nâng cấp trải nghiệm tìm kiếm, Lọc đa tiêu chí & Khôi phục trạng thái**
-
-- Bổ sung bộ lọc danh mục (`category`), độ khó (`difficulty`: Easy/Medium/Hard), sắp xếp thời gian nấu (`cookTimeAsc`/`cookTimeDesc`).
-- Đồng bộ hóa hai chiều giữa form tìm kiếm và URL browser; hỗ trợ tải lại trang giữ nguyên trạng thái (URL state preservation) và điều hướng Back/Forward trên trình duyệt.
-- Xử lý các trạng thái giao diện: Loading Skeleton, Error State, Empty State thân thiện.
-- Thực hiện kiểm thử nghiệm thu 16 kịch bản thực tế, chụp đầy đủ 16 ảnh minh chứng lưu tại `docs/task7-search/screenshots/`.
-- Tham gia nghiệm thu tích hợp toàn bộ hệ thống nhóm và kiểm toán cơ sở dữ liệu Docker PostgreSQL trên nhánh `integration/task7-validation`.
-
-*Chi tiết tài liệu và hình ảnh minh chứng: [README_TASK7_SEARCH](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task7-search/docs/README_TASK7_SEARCH.md).*
+### 5. Task 3 – Công việc đã thực hiện
+**Giai đoạn:** Bữa 3 (29/09/2026 – 30/09/2026) – Tối ưu Truy vấn, Nghiệp vụ Domain, Full-Text Search & Cache
+- **Domain Entity Validation & Business Rules:**
+  - Đóng gói logic nghiệp vụ trực tiếp trong Entity (`RecipeStep.cs`, `RecipeImage.cs`): kiểm tra độ dài tiêu đề (tối đa 200 ký tự), mô tả (tối đa 4000 ký tự), thời lượng hẹn giờ không âm, định dạng URL ảnh hợp lệ.
+  - Quản lý trạng thái ảnh đại diện (`IsPrimary`): đảm bảo trong một công thức chỉ có duy nhất một ảnh chính; khi kích hoạt ảnh mới làm ảnh chính thì tự động hạ cờ các ảnh còn lại.
+- **Tối ưu hóa Database & Chỉ mục:**
+  - Thêm Unique Composite Index `(RecipeId, StepNumber)` trong bảng `recipe_steps` ngăn chặn triệt để tình trạng trùng số thứ tự bước.
+  - Thêm Index `(RecipeId, OrderIndex)` trong bảng `recipe_images` hỗ trợ sắp xếp thứ tự hiển thị nhanh chóng.
+- **Chống N+1 Query và Tối ưu truy vấn đọc:**
+  - Cấu hình truy vấn `RecipeDetailQuery` sử dụng `.AsNoTracking()` cho các thao tác đọc dữ liệu.
+  - Áp dụng Eager Loading kết hợp sắp xếp:
+    ```csharp
+    .Include(r => r.Steps.OrderBy(s => s.StepNumber))
+    .Include(r => r.Images.OrderBy(i => i.OrderIndex))
+    ```
+    loại bỏ hoàn toàn vấn đề truy vấn N+1 khi tải chi tiết món ăn kèm đầy đủ các bước và hình ảnh.
+- **PostgreSQL Full-Text Search (FTS) & Fuzzy Search:**
+  - Tích hợp tính năng tìm kiếm tiếng Việt toàn văn trên PostgreSQL:
+    - Bổ sung cấu hình từ điển `to_tsvector('vietnamese', ...)` và tạo chỉ mục GIN trên `SearchVector`.
+    - Sử dụng extension `unaccent` để hỗ trợ tìm kiếm tiếng Việt không dấu (`pho bo` tìm ra `Phở bò`).
+    - Xây dựng thuật toán Fallback tìm kiếm mờ (Fuzzy Search) sử dụng `pg_trgm` (`similarity()`) khi người dùng gõ sai chính tả nhẹ (ví dụ: `phoo bo`).
+- **Resilient Multi-Level Caching (`ResilientCacheService`):**
+  - Hiện thực bộ nhớ đệm kết hợp In-Memory Cache (L1) và Distributed Cache / Redis (L2).
+  - Tích hợp cơ chế fail-safe: khi cache gặp sự cố kết nối, hệ thống ghi log cảnh báo và truy xuất thẳng xuống database mà không làm gián đoạn trải nghiệm người dùng.
+- **Kiến trúc Repository & Unit of Work:**
+  - Định nghĩa và hiện thực `IRecipeRepository`, `RecipeRepository`, `IUnitOfWork`, `UnitOfWork` nhằm tách biệt tầng truy cập dữ liệu và quản lý giao dịch an toàn.
+- **Xử lý ngoại lệ chuẩn hóa (RFC 7807):**
+  - Xây dựng các lớp Domain Exception chuyên biệt: `RecipeStepException`, `RecipeImageException`, `InvalidStepNumberException`, `PrimaryImageConflictException`.
+  - Triển khai middleware `GlobalExceptionHandler` bắt mọi ngoại lệ và định dạng response theo chuẩn RFC 7807 `ProblemDetails`.
+- **API Endpoints Tích hợp:**
+  - Bổ sung và hoàn thiện các endpoint trong `RecipeEndpoints.cs`:
+    - `GET /api/v1/recipes/{id}`: Trả về chi tiết công thức kèm các bước nấu và danh sách ảnh.
+    - `GET /api/v1/recipes/search`: Endpoint tìm kiếm kết hợp Full-Text Search, Unaccent và Fuzzy matching.
+    - Các API quản lý bước nấu và hình ảnh.
 
 ---
 
-## Bữa 8 - Hoàn thiện StepEditor, ImageManager và kiểm thử Playwright E2E
+### 6. Các file mã nguồn và vai trò
 
-**Phụ trách: Hoàn thiện UI Step & Image, Tải ảnh MinIO, Kiểm thử tự động**
+| Đường dẫn file | Vai trò và chức năng chính |
+| :--- | :--- |
+| `backend/src/CulinaryBlog.Domain/Entities/RecipeStep.cs` | Domain Entity đại diện cho bước thực hiện, chứa validation logic và factory methods. |
+| `backend/src/CulinaryBlog.Domain/Entities/RecipeImage.cs` | Domain Entity quản lý hình ảnh công thức và nghiệp vụ duy nhất của ảnh chính (`IsPrimary`). |
+| `backend/src/CulinaryBlog.Domain/Exceptions/` | Định nghĩa hệ thống domain exceptions (`RecipeStepException`, `PrimaryImageConflictException`, v.v.). |
+| `backend/src/CulinaryBlog.Infrastructure/Data/Configurations/RecipeStepConfiguration.cs` | EF Core Fluent API cho `RecipeStep`, cấu hình bảng `recipe_steps`, Unique Index `(RecipeId, StepNumber)`. |
+| `backend/src/CulinaryBlog.Infrastructure/Data/Configurations/RecipeImageConfiguration.cs` | EF Core Fluent API cho `RecipeImage`, cấu hình bảng `recipe_images`, Index `(RecipeId, OrderIndex)`. |
+| `backend/src/CulinaryBlog.Infrastructure/Data/ApplicationDbContext.cs` | Đăng ký `DbSet<RecipeStep>`, `DbSet<RecipeImage>`, khởi tạo extensions PostgreSQL (`unaccent`, `pg_trgm`). |
+| `backend/src/CulinaryBlog.Infrastructure/Repositories/RecipeRepository.cs` | Hiện thực repository truy vấn công thức, eager loading Steps & Images, thực hiện Full-Text Search. |
+| `backend/src/CulinaryBlog.Infrastructure/Repositories/UnitOfWork.cs` | Quản lý transaction commit tập trung qua giao diện `IUnitOfWork`. |
+| `backend/src/CulinaryBlog.Infrastructure/Services/ResilientCacheService.cs` | Dịch vụ bộ đệm 2 lớp chịu lỗi (L1 In-Memory / L2 Distributed) bảo vệ DB trước tải đọc lớn. |
+| `backend/src/CulinaryBlog.Api/Endpoints/Recipes/RecipeEndpoints.cs` | Định nghĩa các Minimal API endpoints lấy chi tiết công thức, tìm kiếm FTS và quản lý Step/Image. |
+| `backend/src/CulinaryBlog.Api/Middleware/GlobalExceptionHandler.cs` | Middleware xử lý ngoại lệ toàn cục chuẩn hóa theo RFC 7807 `ProblemDetails`. |
+| `backend/src/CulinaryBlog.Infrastructure/Data/Migrations/20260928080623_AddStepImageAndFullTextSearch.cs` | EF Core Migration tạo bảng `recipe_steps`, `recipe_images` và chỉ mục tìm kiếm GIN. |
+| `backend/tests/CulinaryBlog.IntegrationTests/Program.cs` | Bộ kiểm thử tích hợp tự động cho Full-Text Search, Unaccent, Fuzzy Search, Caching và Problem Details. |
 
-- **Quản lý bước nấu ăn (`StepEditor.tsx`):**
-  - Hỗ trợ xem, thêm, sửa, xóa (kèm Modal xác nhận).
-  - Sắp xếp thứ tự (Move Up/Down) với Optimistic UI và cơ chế tự động Rollback khi API lỗi.
-  - Tải tệp ảnh trực tiếp từ máy lên MinIO (chặn file >5MB).
-  - Phân quyền RBAC: Guest và Author không chính chủ bị chặn chỉnh sửa (`forbidden-banner`).
-  - Đạt **21/21 Unit Tests PASSED** và kịch bản Playwright E2E (`step-editor.spec.ts`).
-  - *Mã nguồn & tài liệu chi tiết:* Nhánh `feat/vohungmanh-task8-step` / [README_TASK8_STEP](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task8-step/docs/README_TASK8_STEP.md).
+---
 
-- **Quản lý hình ảnh (`ImageManager.tsx`):**
-  - Tải lên ảnh qua Multipart Form Data lên MinIO, kiểm tra định dạng (JPG, PNG, WebP, AVIF) và dung lượng tối đa 5MB.
-  - Đặt ảnh đại diện (`Primary Image`).
-  - Cơ chế tự động chuyển giao quyền Primary cho ảnh nhỏ nhất còn lại khi xóa ảnh đại diện (FR-RCP-008).
-  - Đạt **16/16 Unit Tests PASSED** và kịch bản Playwright E2E (`image-manager.spec.ts`).
-  - *Mã nguồn & tài liệu chi tiết:* Nhánh `feat/vohungmanh-task8-image` / [README_TASK8_IMAGE](https://github.com/Benz2311/PTUDWNC-2026-Nhom12/blob/feat/vohungmanh-task8-image/docs/README_TASK8_IMAGE.md).
+### 7. Hướng dẫn chạy chương trình
+
+#### Yêu cầu môi trường
+- .NET SDK 10.0
+- Docker Desktop (cho PostgreSQL 16)
+- Node.js 20+ (nếu chạy Frontend)
+
+#### Bước 1: Khởi động Cơ sở dữ liệu PostgreSQL
+Tại thư mục gốc dự án:
+```bash
+docker compose up -d postgres
+```
+
+#### Bước 2: Áp dụng Migration cơ sở dữ liệu
+```bash
+cd backend/src/CulinaryBlog.Api
+dotnet ef database update
+```
+
+#### Bước 3: Khởi chạy Backend Web API
+```bash
+cd backend/src/CulinaryBlog.Api
+dotnet run
+```
+API lắng nghe tại `http://localhost:5000` (Swagger UI: `http://localhost:5000/swagger` hoặc OpenAPI definition).
+
+---
+
+### 8. Hướng dẫn kiểm thử
+
+#### 8.1. Chạy bộ Integration Tests tự động
+Dự án có sẵn bộ kiểm thử tích hợp tự động kiểm tra toàn bộ tính năng Task 3:
+```bash
+cd backend/tests/CulinaryBlog.IntegrationTests
+dotnet run
+```
+Hoặc dùng lệnh test chuẩn:
+```bash
+dotnet test backend/tests/CulinaryBlog.IntegrationTests/CulinaryBlog.IntegrationTests.csproj
+```
+Kết quả mong đợi: Toàn bộ kịch bản kiểm thử (FTS, Unaccent, Fuzzy, Cache, RFC 7807) đều trả về `Passed!`.
+
+#### 8.2. Kiểm thử thủ công qua API
+1. **Lấy chi tiết công thức (bao gồm các bước và danh sách ảnh):**
+   ```bash
+   curl -X GET "http://localhost:5000/api/v1/recipes/{recipe-id}" -H "Accept: application/json"
+   ```
+2. **Tìm kiếm Full-Text Search có dấu:**
+   ```bash
+   curl -X GET "http://localhost:5000/api/v1/recipes/search?q=Ph%E1%BB%9F%20b%C3%B2"
+   ```
+3. **Tìm kiếm không dấu (unaccent):**
+   ```bash
+   curl -X GET "http://localhost:5000/api/v1/recipes/search?q=pho%20bo"
+   ```
+4. **Tìm kiếm mờ khi sai lỗi chính tả nhẹ (Fuzzy Similarity):**
+   ```bash
+   curl -X GET "http://localhost:5000/api/v1/recipes/search?q=phoo%20bo"
+   ```
+
+---
+
+### 9. Kết quả thực tế và bằng chứng
+
+- **Bằng chứng Git Commit:**
+  - `41867b9`, `0fd8014`, `2e95b4e`: Thiết kế thực thể `RecipeStep` và `RecipeImage` (Task 1).
+  - `05b7f6f`, `a985c3d`, `8ae00d7`, `be592f9`: Docker Postgres, cấu hình EF Core Fluent API, Seed Data mẫu (Task 2).
+  - `76f766a`, `ede382e`, `5ff6188`, `fd1524b`, `10a90d1`, `bd9b82b`: Validation, Eager loading chống N+1, PostgreSQL FTS, Resilient Cache, API Endpoints, ProblemDetails (Task 3).
+- **Bằng chứng thực thi kiểm thử:**
+  - Lệnh `dotnet test backend/tests/CulinaryBlog.IntegrationTests/CulinaryBlog.IntegrationTests.csproj` biên dịch và thực thi kiểm chứng thành công:
+    ```text
+    Test run for CulinaryBlog.IntegrationTests.dll (.NETCoreApp,Version=v10.0)
+    Passed!  - Failed: 0, Passed: 1, Skipped: 0, Total: 1, Duration: 5 s
+    ```
+
+---
+
+### 10. Hạn chế và tồn đọng
+
+- **Trạng thái tại mốc Bữa 3:** Nhánh `2312687_VoHungManh` phản ánh đúng khối lượng công việc kết thúc tại ngày 30/09/2026 (Task 1, 2 và 3).
+- **Giao diện người dùng:** Phần UI hiển thị động các bước nấu dạng carousel và upload trực quan ảnh trên Next.js được tách sang phát triển chuyên biệt ở các giai đoạn Task 6, Task 7 và Task 8.
+- **Tách nhánh tính năng:** Từ Task 4 đến Task 8, sinh viên chuyển sang làm việc trên các nhánh tính năng độc lập theo chuẩn Git Feature Branching (`feat/vohungmanh-*`) để phục vụ review và merge độc lập.
+
+---
+
+### 11. Liên kết đến các nhánh Task tiếp theo
+
+Sau khi hoàn thành nền tảng Task 1–3 trên nhánh này, các công việc phát triển chuyên sâu tiếp theo được thực hiện độc lập trên các nhánh sau:
+
+- **Task 6 (Quản lý trạng thái và UI Frontend):**
+  - [`feat/vohungmanh-task6-step-management`](https://github.com/vohungmanh/PTUDWNC-2026-Nhom12/tree/feat/vohungmanh-task6-step-management): Quản lý bước nấu ăn.
+  - [`feat/vohungmanh-task6-image-management`](https://github.com/vohungmanh/PTUDWNC-2026-Nhom12/tree/feat/vohungmanh-task6-image-management): Quản lý upload và thư viện ảnh.
+- **Task 7 (Tìm kiếm nâng cao & Tối ưu hóa UI/UX):**
+  - [`feat/vohungmanh-task7-search`](https://github.com/vohungmanh/PTUDWNC-2026-Nhom12/tree/feat/vohungmanh-task7-search): Bộ lọc nâng cao và giao diện tìm kiếm tức thì.
+- **Task 8 (Tối ưu hóa, Kiểm thử toàn diện & Hoàn thiện):**
+  - [`feat/vohungmanh-task8-step`](https://github.com/vohungmanh/PTUDWNC-2026-Nhom12/tree/feat/vohungmanh-task8-step): Hoàn thiện giao diện step-by-step cooking mode, timer và test coverage.
+  - [`feat/vohungmanh-task8-image`](https://github.com/vohungmanh/PTUDWNC-2026-Nhom12/tree/feat/vohungmanh-task8-image): Tối ưu nén ảnh, lazy loading và Responsive Image Gallery.
