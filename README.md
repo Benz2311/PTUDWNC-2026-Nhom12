@@ -1,3 +1,25 @@
+# GIÁM SÁT SỨC KHỎE ỨNG DỤNG (APPLICATION HEALTH CHECKS) — VÕ HÙNG MẠNH (2312687)
+
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-health-check`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+> **Tài liệu kỹ thuật chuyên sâu:** [docs/README_HEALTH_CHECK.md](docs/README_HEALTH_CHECK.md)
+
+### 1. Tóm tắt đóng góp cá nhân trên nhánh `feat/vohungmanh-health-check`
+- Thiết lập ASP.NET Core Health Checks giám sát trạng thái thời gian thực của PostgreSQL và MinIO.
+- Triển khai `PostgresHealthCheck` kiểm tra khả năng kết nối và thực thi query trên cơ sở dữ liệu.
+- Triển khai `MinioHealthCheck` kiểm tra tính sẵn sàng của bucket lưu trữ đối tượng MinIO.
+- Tùy biến `HealthCheckResponseWriter` định dạng kết quả JSON chuẩn hóa cho các probes `/health`, `/health/ready`, `/health/live`.
+
+### 2. Bảng đối chiếu mã nguồn & Bằng chứng kiểm thử
+| STT | Chức năng thực tế | File mã nguồn liên quan | Commit HEAD | Kiểm thử & Kết quả | Trạng thái |
+|:---:|---|---|:---:|---|:---:|
+| 1 | Health Check PostgreSQL | `PostgresHealthCheck.cs` | `b47ab19` | Gọi /health/ready khi DB Up/Down | **PASS** |
+| 2 | Health Check MinIO Storage | `MinioHealthCheck.cs` | `b47ab19` | Gọi /health/ready kiểm tra bucket | **PASS** |
+| 3 | Custom JSON Response Writer | `HealthCheckResponseWriter.cs` | `b47ab19` | Kiểm tra cấu trúc JSON trả về | **PASS** |
+
+---
+
 # Phát triển ứng dụng Web nâng cao
 
 ## Nhóm 12

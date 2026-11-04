@@ -1,5 +1,10 @@
 # Giám sát sức khỏe ứng dụng (Application Health Checks)
 
+> **Sinh viên thực hiện:** Võ Hùng Mạnh — MSSV: 2312687
+> **Nhánh Git:** `feat/vohungmanh-health-check`
+> **Học phần:** Phát triển ứng dụng Web nâng cao (PTUDWNC) — Nhóm 12
+
+
 ## 1. Mục tiêu
 Branch `feat/vohungmanh-health-check` giải quyết việc xây dựng hệ thống kiểm tra và giám sát sức khỏe dịch vụ (**Application Health Checks**) chuẩn công nghiệp cho nền tảng CulinaryBlog thuộc Task 4:
 - Khi vận hành trên môi trường Container (Docker Compose, Kubernetes) hoặc đứng sau bộ cân bằng tải (Load Balancer như Nginx, Traefik), hệ thống cần các điểm cuối chuyên dụng để biết chính xác khi nào tiến trình bị treo, khi nào hạ tầng gặp sự cố và khi nào cần điều hướng hoặc ngắt lưu lượng mạng.
