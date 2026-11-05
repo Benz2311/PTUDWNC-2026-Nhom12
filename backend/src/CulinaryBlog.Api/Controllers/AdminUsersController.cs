@@ -79,4 +79,30 @@ public class AdminUsersController : ControllerBase
         await _authService.UpdateUserStatusAsync(adminUserId, id, request.IsActive);
         return NoContent();
     }
+    [HttpPatch("{id:guid}/role")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateAuthorRole(
+        Guid id,
+        [FromBody] UpdateAuthorRoleRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(request.Role, "Author", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest("Only the Author role can be managed from this endpoint.");
+        }
+
+        var adminUserIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub");
+        if (!Guid.TryParse(adminUserIdClaim, out var adminUserId))
+        {
+            return Unauthorized();
+        }
+
+        await _authService.UpdateAuthorRoleAsync(adminUserId, id, request.Enabled);
+        return NoContent();
+    }
 }
+

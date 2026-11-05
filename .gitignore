@@ -1,4 +1,4 @@
-﻿# Environment variables
+# Environment variables
 .env
 
 # Build
@@ -33,3 +33,7 @@ test-results/
 /*_RESULT.md
 /*_CHECK.md
 /BAO_CAO_*.md
+
+# Local database backups
+backup/
+*.sql

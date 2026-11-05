@@ -1,28 +1,45 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import type { RecipeImage, ImageFormValues, ImageValidationError } from '@/types/image';
 import {
   getRecipeImages,
   addRecipeImage,
+  uploadRecipeImageFile,
+  updateRecipeImage,
   setPrimaryRecipeImage,
   deleteRecipeImage,
-  uploadImageFile,
   ImageApiError,
 } from '@/lib/api/images';
+import { useAuthStore } from '@/lib/auth-store';
 import { ImageCard } from './ImageCard';
 import { ImagePreview } from './ImagePreview';
 
-export interface ImageManagerProps {
+export type RecipeImageDraft = {
+  id?: string;
+  url: string;
+  altText: string;
+  isPrimary?: boolean;
+  orderIndex?: number;
+};
+
+export interface FullImageManagerProps {
   /**
    * Nếu có recipeId: Chế độ Existing Recipe (gọi REST API thật).
    * Nếu không có recipeId: Chế độ New Recipe (quản lý state cục bộ hoặc yêu cầu lưu Recipe trước).
    */
   recipeId?: string;
+  authorId?: string;
   initialImages?: RecipeImage[];
   onImagesChange?: (images: RecipeImage[]) => void;
   disabled?: boolean;
 }
+
+export type ImageManagerProps = FullImageManagerProps & {
+  images?: RecipeImageDraft[];
+  onFilesChange?: (files: File[]) => void;
+};
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -36,17 +53,132 @@ function isValidHttpUrl(urlString: string): boolean {
   }
 }
 
-export const ImageManager: React.FC<ImageManagerProps> = ({
+const DraftImageManager: React.FC<{
+  images?: RecipeImageDraft[];
+  onImagesChange?: (images: RecipeImageDraft[]) => void;
+  onFilesChange?: (files: File[]) => void;
+}> = ({ images = [], onImagesChange, onFilesChange }) => {
+  const [previews, setPreviews] = useState<{ name: string; url: string }[]>([]);
+
+  useEffect(() => {
+    return () => {
+      previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    };
+  }, [previews]);
+
+  const selectFiles = (fileList: FileList | null) => {
+    previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    const files = Array.from(fileList ?? []);
+    onFilesChange?.(files);
+    setPreviews(files.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })));
+  };
+
+  const updateAltText = (index: number, altText: string) => {
+    onImagesChange?.(
+      images.map((image, imageIndex) =>
+        imageIndex === index ? { ...image, altText } : image
+      )
+    );
+  };
+
+  const moveImage = (index: number, offset: -1 | 1) => {
+    const target = index + offset;
+    if (target < 0 || target >= images.length) return;
+    const reordered = [...images];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    onImagesChange?.(reordered);
+  };
+
+  return (
+    <div>
+      <label className="upload-dropzone">
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/avif"
+          multiple
+          onChange={(event) => selectFiles(event.target.files)}
+        />
+        <strong>Chọn ảnh món ăn</strong>
+        <span>JPG, PNG, WebP hoặc AVIF · Tối đa 5 MB/ảnh</span>
+      </label>
+      {images.length > 0 && (
+        <div className="upload-preview-grid">
+          {images.map((image, index) => (
+            <div className="upload-preview" key={`${image.url}-${index}`}>
+              <Image src={image.url} alt={image.altText} width={320} height={320} unoptimized />
+              <label className="field">
+                <span>Mô tả ảnh {index + 1}</span>
+                <input
+                  maxLength={300}
+                  value={image.altText}
+                  onChange={(event) => updateAltText(index, event.target.value)}
+                />
+              </label>
+              <div className="ingredient-row-actions">
+                <button
+                  type="button"
+                  aria-label="Chuyển ảnh lên"
+                  disabled={index === 0}
+                  onClick={() => moveImage(index, -1)}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  aria-label="Chuyển ảnh xuống"
+                  disabled={index === images.length - 1}
+                  onClick={() => moveImage(index, 1)}
+                >
+                  ↓
+                </button>
+              </div>
+            </div>
+          ))}
+          {previews.map((preview) => (
+            <div className="upload-preview" key={preview.url}>
+              <Image src={preview.url} alt={preview.name} width={320} height={320} unoptimized />
+              <span>{preview.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {images.length === 0 && previews.length > 0 && (
+        <div className="upload-preview-grid">
+          {previews.map((preview) => (
+            <div className="upload-preview" key={preview.url}>
+              <Image src={preview.url} alt={preview.name} width={320} height={320} unoptimized />
+              <span>{preview.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const FullImageManager: React.FC<FullImageManagerProps> = ({
   recipeId,
+  authorId,
   initialImages = [],
   onImagesChange,
   disabled: externalDisabled = false,
 }) => {
   const isDirectApiMode = Boolean(recipeId && recipeId.trim() !== '');
 
-  const [images, setImages] = useState<RecipeImage[]>(() => [...initialImages].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)));
+  // Lấy thông tin người dùng từ auth store để kiểm tra phân quyền (Author-Owner hoặc Admin)
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = Boolean(user);
+  const checkPermissions = isDirectApiMode && Boolean(authorId);
+  const isOwnerOrAdmin =
+    !checkPermissions ||
+    Boolean(user && (user.roles?.includes('Admin') || user.id === authorId));
+
+  const [images, setImages] = useState<RecipeImage[]>(() =>
+    [...initialImages].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+  );
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Tab phương thức thêm ảnh: upload file hoặc nhập URL
@@ -72,62 +204,76 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
   const [previewImage, setPreviewImage] = useState<RecipeImage | null>(null);
 
   // Tự động load ảnh từ backend khi có recipeId
-  useEffect(() => {
+  const fetchImages = useCallback(() => {
+    if (!isDirectApiMode) return;
+
     let cancelled = false;
+    setIsLoading(true);
+    setErrorMessage(null);
 
-    if (isDirectApiMode && initialImages.length === 0) {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      getRecipeImages(recipeId!)
-        .then((fetchedImages) => {
-          if (!cancelled) {
-            setImages(fetchedImages);
-            onImagesChange?.(fetchedImages);
-          }
-        })
-        .catch((err) => {
-          if (!cancelled) {
-            setErrorMessage(err instanceof Error ? err.message : 'Không tải được danh sách hình ảnh.');
-          }
-        })
-        .finally(() => {
-          if (!cancelled) {
-            setIsLoading(false);
-          }
-        });
-    }
+    getRecipeImages(recipeId!)
+      .then((fetchedImages) => {
+        if (!cancelled) {
+          setImages(fetchedImages);
+          onImagesChange?.(fetchedImages);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setErrorMessage(
+            err instanceof Error ? err.message : 'Không tải được danh sách hình ảnh.'
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [recipeId, isDirectApiMode]);
+  }, [isDirectApiMode, recipeId, onImagesChange]);
+
+  useEffect(() => {
+    if (isDirectApiMode && initialImages.length === 0) {
+      const cancel = fetchImages();
+      return cancel;
+    }
+  }, [isDirectApiMode, initialImages.length, fetchImages]);
 
   // Cập nhật khi initialImages từ bên ngoài thay đổi
   useEffect(() => {
     if (initialImages.length > 0) {
-      const sorted = [...initialImages].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+      const sorted = [...initialImages].sort(
+        (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
+      );
       setImages(sorted);
     }
   }, [initialImages]);
 
   // Clean up object URL khi preview thay đổi hoặc unmount
-  useEffect(() => () => {
+  useEffect(() => {
+    return () => {
       if (previewUrl && previewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(previewUrl);
       }
-    }, [previewUrl]);
+    };
+  }, [previewUrl]);
 
   const updateLocalImages = useCallback(
     (newImages: RecipeImage[]) => {
-      const sorted = [...newImages].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+      const sorted = [...newImages].sort(
+        (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
+      );
       setImages(sorted);
       onImagesChange?.(sorted);
     },
     [onImagesChange]
   );
 
-  const isActionDisabled = externalDisabled || isLoading;
+  const isActionDisabled = externalDisabled || isLoading || !isOwnerOrAdmin;
 
   // Validate file chọn từ máy
   const validateFile = (file: File): string | null => {
@@ -174,6 +320,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
       URL.revokeObjectURL(previewUrl);
     }
     setPreviewUrl(null);
+    setUploadProgress(0);
     setFormValues({
       imageUrl: '',
       altText: '',
@@ -202,7 +349,8 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
       if (!trimmedUrl) {
         errors.imageUrl = 'Đường dẫn ảnh (URL) là bắt buộc.';
       } else if (!isValidHttpUrl(trimmedUrl)) {
-        errors.imageUrl = 'Đường dẫn ảnh không hợp lệ. Phải bắt đầu bằng http:// hoặc https://';
+        errors.imageUrl =
+          'Đường dẫn ảnh không hợp lệ. Phải bắt đầu bằng http:// hoặc https://';
       } else if (trimmedUrl.length > 500) {
         errors.imageUrl = 'Đường dẫn ảnh không được vượt quá 500 ký tự.';
       }
@@ -232,10 +380,14 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
 
     if (!isDirectApiMode) {
       // Chế độ New Recipe: chưa có recipeId
-      const targetUrl = uploadMode === 'file' ? (previewUrl || '') : formValues.imageUrl.trim();
-      const nextOrder = formValues.orderIndex !== ''
-        ? Number(formValues.orderIndex)
-        : images.length > 0 ? Math.max(...images.map((img) => img.orderIndex ?? 0)) + 1 : 0;
+      const targetUrl =
+        uploadMode === 'file' ? previewUrl || '' : formValues.imageUrl.trim();
+      const nextOrder =
+        formValues.orderIndex !== ''
+          ? Number(formValues.orderIndex)
+          : images.length > 0
+          ? Math.max(...images.map((img) => img.orderIndex ?? 0)) + 1
+          : 0;
 
       const shouldBePrimary = images.length === 0 ? true : formValues.isPrimary;
 
@@ -263,34 +415,42 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
 
     // Direct API mode (có recipeId)
     setIsLoading(true);
+    setUploadProgress(10);
     try {
-      let finalUrl = formValues.imageUrl.trim();
+      let added: RecipeImage;
 
-      // Nếu người dùng tải file, upload lên MinIO / Storage trước
       if (uploadMode === 'file' && selectedFile) {
-        try {
-          const uploadResult = await uploadImageFile(selectedFile);
-          finalUrl = uploadResult.url;
-        } catch (uploadErr: any) {
-          // Nếu MinIO 503 hoặc dịch vụ storage lỗi HTTP 503, ném lỗi cho catch ngoài hiển thị banner
-          if (uploadErr?.status === 503 || uploadErr instanceof ImageApiError) {
-            throw uploadErr;
+        // Tải file trực tiếp lên endpoint multipart của Recipe
+        added = await uploadRecipeImageFile(
+          recipeId!,
+          selectedFile,
+          formValues.altText.trim() || undefined,
+          images.length === 0 ? true : formValues.isPrimary,
+          (progressEvent) => {
+            if (progressEvent.total) {
+              const percent = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              setUploadProgress(percent);
+            }
           }
-          // Fallback giả định previewUrl nếu backend môi trường dev
-          finalUrl = previewUrl || `https://storage.culinaryblog.local/${selectedFile.name}`;
-        }
+        );
+      } else {
+        // Nhập URL có sẵn
+        const nextOrder =
+          formValues.orderIndex !== ''
+            ? Number(formValues.orderIndex)
+            : images.length > 0
+            ? Math.max(...images.map((img) => img.orderIndex ?? 0)) + 1
+            : 0;
+
+        added = await addRecipeImage(recipeId!, {
+          originalUrl: formValues.imageUrl.trim(),
+          altText: formValues.altText.trim() || null,
+          isPrimary: images.length === 0 ? true : formValues.isPrimary,
+          orderIndex: nextOrder,
+        });
       }
-
-      const nextOrder = formValues.orderIndex !== ''
-        ? Number(formValues.orderIndex)
-        : images.length > 0 ? Math.max(...images.map((img) => img.orderIndex ?? 0)) + 1 : 0;
-
-      const added = await addRecipeImage(recipeId!, {
-        originalUrl: finalUrl,
-        altText: formValues.altText.trim() || null,
-        isPrimary: images.length === 0 ? true : formValues.isPrimary,
-        orderIndex: nextOrder,
-      });
 
       // Nếu backend trả về ảnh mới là Primary, cập nhật cờ các ảnh khác
       let nextImages: RecipeImage[];
@@ -301,7 +461,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         nextImages = [...images, added];
       }
 
-      const sorted = nextImages.sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+      const sorted = nextImages.sort(
+        (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
+      );
       setImages(sorted);
       onImagesChange?.(sorted);
       resetForm();
@@ -313,9 +475,12 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         if (err.errors.OrderIndex?.[0]) mapped.orderIndex = err.errors.OrderIndex[0];
         setFormErrors(mapped);
       }
-      setErrorMessage(err instanceof Error ? err.message : 'Thêm hình ảnh không thành công.');
+      setErrorMessage(
+        err instanceof Error ? err.message : 'Thêm hình ảnh không thành công.'
+      );
     } finally {
       setIsLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -335,7 +500,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         setImages(nextImages);
         onImagesChange?.(nextImages);
       } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : 'Không thể đặt ảnh làm ảnh đại diện.');
+        setErrorMessage(
+          err instanceof Error ? err.message : 'Không thể đặt ảnh làm ảnh đại diện.'
+        );
       } finally {
         setIsLoading(false);
       }
@@ -346,6 +513,51 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         isPrimary: img.id === imageId,
       }));
       updateLocalImages(nextImages);
+    }
+  };
+
+  // Sắp xếp thứ tự ảnh (Reorder: Move Up / Move Down)
+  const handleMoveImage = async (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= images.length) return;
+
+    setErrorMessage(null);
+    const currentImg = images[index];
+    const targetImg = images[targetIndex];
+
+    const currentOrder = currentImg.orderIndex ?? index;
+    const targetOrder = targetImg.orderIndex ?? targetIndex;
+
+    // Hoán đổi thứ tự trong mảng
+    const newImages = [...images];
+    newImages[index] = { ...targetImg, orderIndex: currentOrder };
+    newImages[targetIndex] = { ...currentImg, orderIndex: targetOrder };
+
+    const sorted = newImages.sort(
+      (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
+    );
+    setImages(sorted);
+    onImagesChange?.(sorted);
+
+    // Nếu ở chế độ Direct API: Cập nhật thứ tự lên backend qua PATCH
+    if (isDirectApiMode) {
+      try {
+        await updateRecipeImage(recipeId!, currentImg.id, {
+          orderIndex: targetOrder,
+        });
+        await updateRecipeImage(recipeId!, targetImg.id, {
+          orderIndex: currentOrder,
+        });
+      } catch (err) {
+        // Rollback lại thứ tự nếu API thất bại
+        setImages(images);
+        onImagesChange?.(images);
+        setErrorMessage(
+          err instanceof Error
+            ? err.message
+            : 'Không thể cập nhật thứ tự hình ảnh.'
+        );
+      }
     }
   };
 
@@ -369,7 +581,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         let remaining = images.filter((img) => img.id !== imageToDelete.id);
 
         if (wasPrimary && remaining.length > 0) {
-          const sortedRemaining = [...remaining].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+          const sortedRemaining = [...remaining].sort(
+            (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
+          );
           sortedRemaining[0].isPrimary = true;
           remaining = sortedRemaining;
         }
@@ -378,7 +592,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         onImagesChange?.(remaining);
         setImageToDelete(null);
       } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : 'Không thể xóa hình ảnh.');
+        setErrorMessage(
+          err instanceof Error ? err.message : 'Không thể xóa hình ảnh.'
+        );
       } finally {
         setIsLoading(false);
       }
@@ -387,7 +603,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
       const wasPrimary = imageToDelete.isPrimary;
       let remaining = images.filter((img) => img.id !== imageToDelete.id);
       if (wasPrimary && remaining.length > 0) {
-        const sortedRemaining = [...remaining].sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+        const sortedRemaining = [...remaining].sort(
+          (a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
+        );
         sortedRemaining[0].isPrimary = true;
         remaining = sortedRemaining;
       }
@@ -430,6 +648,45 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         )}
       </div>
 
+      {/* Authorization Banners */}
+      {checkPermissions && !isAuthenticated && (
+        <div
+          data-testid="auth-required-banner"
+          className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-800 flex items-start gap-3 shadow-xs"
+        >
+          <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 shrink-0 mt-0.5">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <strong className="font-semibold block text-amber-900">Yêu cầu đăng nhập:</strong>
+            <span className="text-xs sm:text-sm">
+              Bạn cần đăng nhập với tư cách tác giả sở hữu hoặc Quản trị viên để tải lên và quản lý hình ảnh công thức.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {checkPermissions && isAuthenticated && !isOwnerOrAdmin && (
+        <div
+          data-testid="forbidden-banner"
+          className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-sm text-slate-700 flex items-start gap-3 shadow-xs"
+        >
+          <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 shrink-0 mt-0.5">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <strong className="font-semibold block text-slate-900">Chế độ chỉ xem:</strong>
+            <span className="text-xs sm:text-sm">
+              Chỉ tác giả sở hữu công thức này hoặc Quản trị viên mới có quyền tải lên, thay đổi ảnh chính hoặc xóa hình ảnh.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Error banner */}
       {errorMessage && (
         <div
@@ -438,25 +695,53 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         >
           <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0 mt-0.5">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10" strokeWidth="2" />
-              <line x1="12" y1="8" x2="12" y2="12" strokeWidth="2" strokeLinecap="round" />
-              <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="12" cy="12" r="10" strokeWidth={2} />
+              <line x1="12" y1="8" x2="12" y2="12" strokeWidth={2} strokeLinecap="round" />
+              <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth={2} strokeLinecap="round" />
             </svg>
           </div>
           <div className="flex-1">
             <strong className="font-semibold block text-rose-900">Đã xảy ra lỗi:</strong>
             <span className="text-xs sm:text-sm">{errorMessage}</span>
           </div>
-          <button
-            type="button"
-            onClick={() => setErrorMessage(null)}
-            className="text-rose-500 hover:text-rose-800 p-1 rounded-lg hover:bg-rose-100/60 transition-colors"
-            aria-label="Đóng thông báo"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1.5">
+            {isDirectApiMode && (
+              <button
+                type="button"
+                data-testid="btn-retry-fetch"
+                onClick={fetchImages}
+                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-100 text-rose-800 hover:bg-rose-200 transition-colors"
+              >
+                Thử lại
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setErrorMessage(null)}
+              className="text-rose-500 hover:text-rose-800 p-1 rounded-lg hover:bg-rose-100/60 transition-colors"
+              aria-label="Đóng thông báo"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Progress Bar */}
+      {uploadProgress > 0 && uploadProgress < 100 && (
+        <div data-testid="upload-progress-bar" className="space-y-1.5 p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+          <div className="flex justify-between text-xs font-semibold text-emerald-800">
+            <span>Đang tải ảnh lên máy chủ...</span>
+            <span>{uploadProgress}%</span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-emerald-200 overflow-hidden">
+            <div
+              className="h-full bg-emerald-600 transition-all duration-200 ease-out"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
         </div>
       )}
 
@@ -510,11 +795,17 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
           {uploadMode === 'file' ? (
             <div className="space-y-2">
               <div
-                onClick={() => fileInputRef.current?.click()}
-                className={`relative flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-200 ${
-                  formErrors.file
-                    ? 'border-rose-300 bg-rose-50/40'
-                    : 'border-emerald-300 bg-emerald-50/20 hover:border-emerald-600 hover:bg-emerald-50/50'
+                onClick={() => {
+                  if (!isActionDisabled) {
+                    fileInputRef.current?.click();
+                  }
+                }}
+                className={`relative flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-2xl transition-all duration-200 ${
+                  isActionDisabled
+                    ? 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-60'
+                    : formErrors.file
+                    ? 'border-rose-300 bg-rose-50/40 cursor-pointer'
+                    : 'border-emerald-300 bg-emerald-50/20 hover:border-emerald-600 hover:bg-emerald-50/50 cursor-pointer'
                 }`}
               >
                 <input
@@ -566,9 +857,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
               {formErrors.file && (
                 <p data-testid="error-file" className="text-xs text-rose-600 font-medium flex items-center gap-1">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10" strokeWidth="2" />
-                    <line x1="12" y1="8" x2="12" y2="12" strokeWidth="2" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2" />
+                    <circle cx="12" cy="12" r="10" strokeWidth={2} />
+                    <line x1="12" y1="8" x2="12" y2="12" strokeWidth={2} />
+                    <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth={2} />
                   </svg>
                   {formErrors.file}
                 </p>
@@ -601,9 +892,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
               {formErrors.imageUrl && (
                 <p data-testid="error-image-url" className="text-xs text-rose-600 font-medium flex items-center gap-1">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10" strokeWidth="2" />
-                    <line x1="12" y1="8" x2="12" y2="12" strokeWidth="2" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth="2" />
+                    <circle cx="12" cy="12" r="10" strokeWidth={2} />
+                    <line x1="12" y1="8" x2="12" y2="12" strokeWidth={2} />
+                    <line x1="12" y1="16" x2="12.01" y2="16" strokeWidth={2} />
                   </svg>
                   {formErrors.imageUrl}
                 </p>
@@ -753,6 +1044,10 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
               onSetPrimary={handleSetPrimary}
               onDeleteRequest={handleDeleteRequest}
               onPreview={(img) => setPreviewImage(img)}
+              onMoveUp={() => handleMoveImage(idx, 'up')}
+              onMoveDown={() => handleMoveImage(idx, 'down')}
+              canMoveUp={idx > 0 && !isActionDisabled}
+              canMoveDown={idx < images.length - 1 && !isActionDisabled}
             />
           ))}
         </div>
@@ -820,3 +1115,18 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
     </div>
   );
 };
+
+export const ImageManager: React.FC<ImageManagerProps> = (props) => {
+  if (props.onFilesChange) {
+    return (
+      <DraftImageManager
+        images={props.images}
+        onImagesChange={props.onImagesChange as any}
+        onFilesChange={props.onFilesChange}
+      />
+    );
+  }
+  return <FullImageManager {...props} />;
+};
+
+export default ImageManager;

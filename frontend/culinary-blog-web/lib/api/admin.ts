@@ -4,6 +4,7 @@ import type {
   AdminUserQuery,
   PagedUsersResponse,
   UpdateUserStatusRequest,
+  UpdateAuthorRoleRequest,
 } from "@/types/admin";
 import type { ApiResponse, PaginationMeta } from "@/types/api";
 
@@ -32,6 +33,13 @@ export const adminApi = {
     await apiClient.patch(
       `/admin/users/${id}/status`,
       { isActive } satisfies UpdateUserStatusRequest
+    );
+  },
+
+  async updateAuthorRole(id: string, enabled: boolean): Promise<void> {
+    await apiClient.patch(
+      `/admin/users/${id}/role`,
+      { role: "Author", enabled } satisfies UpdateAuthorRoleRequest
     );
   },
 };

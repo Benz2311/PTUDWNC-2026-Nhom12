@@ -8,6 +8,14 @@ import type {
 } from "@/types/category";
 import type { ApiResponse } from "@/types/api";
 
+export class CategoryConflictError extends Error {
+  status = 409;
+  constructor(message: string) {
+    super(message);
+    this.name = "CategoryConflictError";
+  }
+}
+
 export async function getCategories(): Promise<Category[]> {
   try {
     const response = await apiClient.get<ApiResponse<Category[]>>("/categories");
@@ -40,19 +48,46 @@ export async function getCategoryBySlug(
 export async function createCategory(
   data: CreateCategoryRequest
 ): Promise<Category> {
-  const response = await apiClient.post<ApiResponse<Category>>("/categories", data);
-  return unwrapData(response);
+  try {
+    const response = await apiClient.post<ApiResponse<Category>>("/categories", data);
+    return unwrapData(response);
+  } catch (err: any) {
+    if (err?.status === 409 || err?.response?.status === 409) {
+      throw new CategoryConflictError(
+        err?.message || "Tên danh mục đã tồn tại trong hệ thống."
+      );
+    }
+    throw err;
+  }
 }
 
 export async function updateCategory(
   id: string,
   data: UpdateCategoryRequest
 ): Promise<void> {
-  await apiClient.put(`/categories/${id}`, data);
+  try {
+    await apiClient.put(`/categories/${id}`, data);
+  } catch (err: any) {
+    if (err?.status === 409 || err?.response?.status === 409) {
+      throw new CategoryConflictError(
+        err?.message || "Tên danh mục đã tồn tại trong hệ thống."
+      );
+    }
+    throw err;
+  }
 }
 
 export async function deleteCategory(id: string): Promise<void> {
-  await apiClient.delete(`/categories/${id}`);
+  try {
+    await apiClient.delete(`/categories/${id}`);
+  } catch (err: any) {
+    if (err?.status === 409 || err?.response?.status === 409) {
+      throw new CategoryConflictError(
+        "Không thể xóa danh mục vì vẫn còn công thức liên kết."
+      );
+    }
+    throw err;
+  }
 }
 
 export async function getCategoryStatistics(): Promise<CategoryStatistics> {

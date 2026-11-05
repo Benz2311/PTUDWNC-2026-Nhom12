@@ -458,6 +458,44 @@ public class AuthService : IAuthService
         await _unitOfWork.SaveChangesAsync();
         return true;
     }
+    public async Task<bool> UpdateAuthorRoleAsync(Guid adminUserId, Guid targetUserId, bool enabled)
+    {
+        var adminUser = await _userRepository.GetByIdAsync(adminUserId);
+        if (adminUser is null || !adminUser.Roles.Contains("Admin"))
+        {
+            throw new ForbiddenException("Only administrators can change author roles.");
+        }
+
+        var targetUser = await _userRepository.GetByIdAsync(targetUserId)
+            ?? throw new NotFoundException("User not found.");
+        var roles = (targetUser.Roles ?? []).ToList();
+        var hasAuthorRole = roles.Contains("Author", StringComparer.OrdinalIgnoreCase);
+
+        if (enabled && !hasAuthorRole)
+        {
+            roles.Add("Author");
+        }
+        else if (!enabled && hasAuthorRole)
+        {
+            roles.RemoveAll(role => role.Equals("Author", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!roles.Any(role => !role.Equals("Author", StringComparison.OrdinalIgnoreCase)))
+        {
+            roles.Add("User");
+        }
+
+        if (hasAuthorRole == enabled)
+        {
+            return false;
+        }
+
+        targetUser.Roles = roles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        await _userRepository.UpdateAsync(targetUser);
+        await _unitOfWork.SaveChangesAsync();
+        return true;
+    }
+
 
     private async Task SendWelcomeEmailAsync(ApplicationUser user)
     {

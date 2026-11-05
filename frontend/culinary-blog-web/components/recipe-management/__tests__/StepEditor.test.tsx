@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { StepEditor } from '../StepEditor';
 import type { RecipeStep } from '@/types/step';
 import * as stepsApi from '@/lib/api/steps';
+import { useAuthStore } from '@/lib/auth-store';
 
 // Mock toàn bộ module @/lib/api/steps
 jest.mock('@/lib/api/steps', () => {
@@ -15,6 +16,7 @@ jest.mock('@/lib/api/steps', () => {
     updateRecipeStep: jest.fn(),
     deleteRecipeStep: jest.fn(),
     reorderRecipeSteps: jest.fn(),
+    uploadStepImageFile: jest.fn(),
   };
 });
 
@@ -45,6 +47,14 @@ describe('StepEditor Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (stepsApi.getRecipeSteps as jest.Mock).mockResolvedValue([]);
+    useAuthStore.setState({
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      roles: [],
+      isAuthenticated: false,
+      isLoading: false,
+    });
   });
 
   // 1. Render đúng StepNumber
@@ -387,5 +397,174 @@ describe('StepEditor Component', () => {
         }),
       ])
     );
+  });
+
+  // 14. RBAC: Guest (không đăng nhập) xem Recipe -> hiển thị forbidden banner, ẩn nút thêm/sửa/xóa
+  it('14. RBAC: Guest xem Recipe có authorId -> hiển thị forbidden-banner và không cho phép chỉnh sửa', () => {
+    render(<StepEditor recipeId="recipe-100" authorId="user-author-99" initialSteps={mockSteps} />);
+
+    expect(screen.getByTestId('forbidden-banner')).toBeInTheDocument();
+    expect(screen.getByText(/Chế độ chỉ xem/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('btn-add-step')).not.toBeInTheDocument();
+    expect(screen.getByTestId('btn-edit-step-0')).toBeDisabled();
+    expect(screen.getByTestId('btn-delete-step-0')).toBeDisabled();
+    expect(screen.getByTestId('btn-move-down-0')).toBeDisabled();
+  });
+
+  // 15. RBAC: Author khác không sở hữu -> hiển thị forbidden banner
+  it('15. RBAC: Author không sở hữu Recipe -> hiển thị forbidden-banner và không cho phép chỉnh sửa', () => {
+    useAuthStore.setState({
+      user: {
+        id: 'user-author-other',
+        email: 'other@example.com',
+        fullName: 'Other Author',
+        roles: ['Author'],
+      } as any,
+      isAuthenticated: true,
+      roles: ['Author'],
+    });
+
+    render(<StepEditor recipeId="recipe-100" authorId="user-author-99" initialSteps={mockSteps} />);
+
+    expect(screen.getByTestId('forbidden-banner')).toBeInTheDocument();
+    expect(screen.queryByTestId('btn-add-step')).not.toBeInTheDocument();
+    expect(screen.getByTestId('btn-edit-step-0')).toBeDisabled();
+    expect(screen.getByTestId('btn-delete-step-0')).toBeDisabled();
+  });
+
+  // 16. RBAC: Author sở hữu Recipe -> đầy đủ quyền thao tác
+  it('16. RBAC: Author sở hữu Recipe -> đầy đủ quyền Thêm, Sửa, Xóa, không có forbidden banner', () => {
+    useAuthStore.setState({
+      user: {
+        id: 'user-author-99',
+        email: 'author99@example.com',
+        fullName: 'Owner Author',
+        roles: ['Author'],
+      } as any,
+      isAuthenticated: true,
+      roles: ['Author'],
+    });
+
+    render(<StepEditor recipeId="recipe-100" authorId="user-author-99" initialSteps={mockSteps} />);
+
+    expect(screen.queryByTestId('forbidden-banner')).not.toBeInTheDocument();
+    expect(screen.getByTestId('btn-add-step')).toBeInTheDocument();
+    expect(screen.getByTestId('btn-edit-step-0')).toBeInTheDocument();
+    expect(screen.getByTestId('btn-delete-step-0')).toBeInTheDocument();
+  });
+
+  // 17. RBAC: Admin -> toàn quyền chỉnh sửa bất kể authorId
+  it('17. RBAC: Admin -> toàn quyền chỉnh sửa bất kể authorId', () => {
+    useAuthStore.setState({
+      user: {
+        id: 'user-admin-1',
+        email: 'admin@example.com',
+        fullName: 'System Admin',
+        roles: ['Admin'],
+      } as any,
+      isAuthenticated: true,
+      roles: ['Admin'],
+    });
+
+    render(<StepEditor recipeId="recipe-100" authorId="user-author-99" initialSteps={mockSteps} />);
+
+    expect(screen.queryByTestId('forbidden-banner')).not.toBeInTheDocument();
+    expect(screen.getByTestId('btn-add-step')).toBeInTheDocument();
+  });
+
+  // 18. Upload Step Image: Tải ảnh hợp lệ qua uploadStepImageFile
+  it('18. Upload Step Image: Tải ảnh máy tính qua uploadStepImageFile thành công', async () => {
+    const user = userEvent.setup();
+    (stepsApi.uploadStepImageFile as jest.Mock).mockResolvedValueOnce({
+      url: 'https://minio.culinaryblog.local/culinaryblog/step-img-123.jpg',
+    });
+
+    render(<StepEditor recipeId="recipe-100" initialSteps={[]} />);
+
+    await user.click(screen.getByTestId('btn-add-step'));
+    const fileInput = screen.getByTestId('input-step-file');
+    const validFile = new File(['fake-image-binary'], 'step-photo.jpg', { type: 'image/jpeg' });
+
+    await user.upload(fileInput, validFile);
+
+    await waitFor(() => {
+      expect(stepsApi.uploadStepImageFile).toHaveBeenCalledWith('recipe-100', validFile);
+      expect(screen.getByTestId('input-step-image')).toHaveValue(
+        'https://minio.culinaryblog.local/culinaryblog/step-img-123.jpg'
+      );
+    });
+  });
+
+  // 19. Upload Step Image: Báo lỗi khi chọn file quá 5MB
+  it('19. Upload Step Image: Báo lỗi khi chọn file quá 5MB và không gọi API upload', async () => {
+    const user = userEvent.setup();
+    render(<StepEditor recipeId="recipe-100" initialSteps={[]} />);
+
+    await user.click(screen.getByTestId('btn-add-step'));
+    const fileInput = screen.getByTestId('input-step-file');
+
+    // Tạo file giả kích thước 6MB
+    const bigFile = new File([new ArrayBuffer(6 * 1024 * 1024)], 'big-image.jpg', {
+      type: 'image/jpeg',
+    });
+
+    await user.upload(fileInput, bigFile);
+
+    expect(screen.getByTestId('error-step-image')).toHaveTextContent(
+      /vượt quá giới hạn tối đa cho phép là 5 MB/i
+    );
+    expect(stepsApi.uploadStepImageFile).not.toHaveBeenCalled();
+  });
+
+  // 20. Reorder Rollback: Tự động hoàn tác danh sách khi API reorder thất bại
+  it('20. Reorder Rollback: Tự động hoàn tác khi reorderRecipeSteps thất bại', async () => {
+    const user = userEvent.setup();
+    (stepsApi.reorderRecipeSteps as jest.Mock).mockRejectedValueOnce(
+      new Error('Lỗi sắp xếp từ máy chủ.')
+    );
+
+    render(<StepEditor recipeId="recipe-100" initialSteps={mockSteps} />);
+
+    // Nhấn Move Down bước 1
+    const moveDownBtn = screen.getByTestId('btn-move-down-0');
+    await user.click(moveDownBtn);
+
+    // Chờ thông báo lỗi hiển thị
+    await waitFor(() => {
+      expect(screen.getByTestId('step-error-banner')).toHaveTextContent(
+        'Lỗi sắp xếp từ máy chủ.'
+      );
+    });
+
+    // Danh sách vẫn được giữ nguyên thứ tự ban đầu sau khi rollback
+    const stepTitles = screen.getAllByRole('heading', { level: 4 });
+    expect(stepTitles[0]).toHaveTextContent('Sơ chế nguyên liệu');
+    expect(stepTitles[1]).toHaveTextContent('Xào thịt bò');
+  });
+
+  // 21. Retry fetch steps khi getRecipeSteps gặp lỗi
+  it('21. Retry fetch steps: Hiển thị nút Thử lại khi tải danh sách ban đầu thất bại', async () => {
+    const user = userEvent.setup();
+    (stepsApi.getRecipeSteps as jest.Mock).mockRejectedValueOnce(
+      new Error('Không thể tải danh sách bước.')
+    );
+
+    render(<StepEditor recipeId="recipe-100" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('step-error-banner')).toBeInTheDocument();
+      expect(screen.getByTestId('btn-retry-fetch-steps')).toBeInTheDocument();
+    });
+
+    // Mock thành công cho lần gọi thứ hai
+    (stepsApi.getRecipeSteps as jest.Mock).mockResolvedValueOnce(mockSteps);
+
+    // Nhấn nút Thử lại
+    await user.click(screen.getByTestId('btn-retry-fetch-steps'));
+
+    await waitFor(() => {
+      expect(stepsApi.getRecipeSteps).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Sơ chế nguyên liệu')).toBeInTheDocument();
+    });
   });
 });

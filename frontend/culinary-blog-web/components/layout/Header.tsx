@@ -12,6 +12,8 @@ import {
   LayoutDashboard,
   ShieldAlert,
   ChevronDown,
+  Layers,
+  Users,
 } from "lucide-react";
 import { getStoredToken, removeStoredToken, setStoredToken } from "@/lib/api/client";
 import { Button } from "@/components/ui/Button";
@@ -249,13 +251,23 @@ export function Header() {
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/dashboard/categories")}>
                     <LayoutDashboard className="h-4 w-4 text-gray-600" />
-                    <span>Quản lý danh mục</span>
+                    <span>Thống kê danh mục</span>
                   </DropdownMenuItem>
                   {user.role === "Admin" && (
-                    <DropdownMenuItem onClick={() => router.push("/admin/recipes/trash")}>
-                      <ShieldAlert className="h-4 w-4 text-purple-600" />
-                      <span>Thùng rác công thức</span>
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem onClick={() => router.push("/admin/categories")}>
+                        <Layers className="h-4 w-4 text-emerald-700" />
+                        <span>Quản lý danh mục (Admin)</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push("/admin/users")}>
+                        <Users className="h-4 w-4 text-purple-600" />
+                        <span>Quản lý người dùng</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push("/admin/recipes/trash")}>
+                        <ShieldAlert className="h-4 w-4 text-purple-600" />
+                        <span>Thùng rác công thức</span>
+                      </DropdownMenuItem>
+                    </>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600 hover:bg-red-50 hover:text-red-700">
@@ -347,6 +359,38 @@ export function Header() {
               );
             })}
           </nav>
+
+          {user.role === "Admin" && (
+            <div className="pt-2 border-t border-gray-100 space-y-1">
+              <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-3 py-1">
+                Quản trị hệ thống
+              </div>
+              <Link
+                href="/admin/categories"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
+                  pathname.startsWith("/admin/categories")
+                    ? "bg-emerald-700 text-white font-semibold"
+                    : "text-gray-700 hover:bg-emerald-50"
+                }`}
+              >
+                <Layers className="h-4 w-4" />
+                <span>Quản lý danh mục</span>
+              </Link>
+              <Link
+                href="/admin/users"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
+                  pathname.startsWith("/admin/users")
+                    ? "bg-emerald-700 text-white font-semibold"
+                    : "text-gray-700 hover:bg-emerald-50"
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                <span>Quản lý người dùng</span>
+              </Link>
+            </div>
+          )}
 
           {user.role === "Guest" && (
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
