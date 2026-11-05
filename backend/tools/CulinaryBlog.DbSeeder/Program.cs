@@ -1,4 +1,4 @@
-using CulinaryBlog.Domain.Entities;
+﻿using CulinaryBlog.Domain.Entities;
 using CulinaryBlog.Infrastructure.Persistence;
 using CulinaryBlog.Infrastructure.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +24,11 @@ try
     }
 
     Console.WriteLine("Kết nối PostgreSQL thành công.");
+    Console.WriteLine();
+
+    Console.WriteLine("Đang kiểm tra và áp dụng EF Core Migrations nếu database trống...");
+    await db.Database.MigrateAsync();
+    Console.WriteLine("Cấu trúc bảng PostgreSQL đã sẵn sàng.");
     Console.WriteLine();
 
     // =========================================================
@@ -272,6 +277,13 @@ try
     {
         Console.WriteLine("Recipe 'Phở bò Hà Nội' đã tồn tại, bỏ qua tạo mới (Idempotent).");
     }
+
+    // =========================================================
+    // 1C. SEED 30 MÓN ĂN THỰC TẾ VIỆT NAM NẾU CHƯA TỒN TẠI (IDEMPOTENT)
+    // =========================================================
+    Console.WriteLine("Đang kiểm tra và seed 30 món ăn thực tế Việt Nam...");
+    await RecipeSeedData.SeedRealVietnameseRecipesAsync(db);
+    Console.WriteLine("Hoàn tất kiểm tra 30 món ăn thực tế Việt Nam.");
 
     // =========================================================
     // 2. LẤY DANH SÁCH RECIPE
