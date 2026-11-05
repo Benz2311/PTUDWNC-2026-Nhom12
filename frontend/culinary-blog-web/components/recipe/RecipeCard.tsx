@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { RecipeListItem, RecipeSummary } from '@/types/recipe';
 import DifficultyBadge from './DifficultyBadge';
 import RecipeStatusBadge from './RecipeStatusBadge';
+import FollowAuthorButton from '@/components/social/FollowAuthorButton';
 
 const fallbackImages = [
   '/sample-images/food-01.svg',
@@ -39,6 +40,7 @@ export default function RecipeCard({ recipe, className = '', showStatus = false,
   const prepTime = recipe.prepTimeMinutes ?? recipe.prepTime ?? 0;
   const cookTime = recipe.cookTimeMinutes ?? recipe.cookTime ?? 0;
   const totalMinutes = prepTime + cookTime;
+  const authorId = recipe.authorId ?? recipe.author?.id;
 
   return (
     <article
@@ -106,9 +108,10 @@ export default function RecipeCard({ recipe, className = '', showStatus = false,
         </div>
       </Link>
 
-      {actions && (
+      {(actions || authorId) && (
         <div className="p-3 border-t border-gray-100 bg-gray-50 card-actions recipe-card-actions">
           {actions}
+          {authorId && <FollowAuthorButton authorId={authorId} compact />}
         </div>
       )}
     </article>

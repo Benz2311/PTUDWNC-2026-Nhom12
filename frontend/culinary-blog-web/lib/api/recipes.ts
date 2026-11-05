@@ -5,6 +5,8 @@ import {
   type RecipeFilterParams,
   type RecipeListItem,
   type RecipeTrashItem,
+  type RecipeRatingSummary,
+  type RecipeComment,
   DIFFICULTY_MAP,
 } from "@/types/recipe";
 import type { ApiResponse, PaginationMeta } from "@/types/api";
@@ -120,4 +122,91 @@ export async function restoreRecipe(id: string): Promise<{ id: string; status: s
 
 export async function purgeRecipe(id: string): Promise<void> {
   await apiDelete(`/admin/recipes/${id}/purge`);
+}
+
+export async function toggleRecipeFavorite(
+  recipeId: string
+): Promise<{ recipeId: string; isFavorite: boolean }> {
+  const response = await apiPost<ApiResponse<{ recipeId: string; isFavorite: boolean }>>(
+    `/recipes/${recipeId}/favorite`,
+    {}
+  );
+  return unwrapData(response);
+}
+
+export async function getRecipeFavoriteStatus(
+  recipeId: string
+): Promise<{ recipeId: string; isFavorite: boolean }> {
+  const response = await apiGet<ApiResponse<{ recipeId: string; isFavorite: boolean }>>(
+    `/recipes/${recipeId}/favorite`
+  );
+  return unwrapData(response);
+}
+
+export async function getRecipeRatings(recipeId: string): Promise<RecipeRatingSummary> {
+  const response = await apiGet<ApiResponse<RecipeRatingSummary>>(
+    `/recipes/${recipeId}/ratings`
+  );
+  return unwrapData(response);
+}
+
+export async function upsertRecipeRating(
+  recipeId: string,
+  score: number
+): Promise<RecipeRatingSummary> {
+  const response = await apiPut<ApiResponse<RecipeRatingSummary>>(
+    `/recipes/${recipeId}/ratings/me`,
+    { score }
+  );
+  return unwrapData(response);
+}
+
+export async function deleteRecipeRating(recipeId: string): Promise<RecipeRatingSummary> {
+  const response = await apiDelete<ApiResponse<RecipeRatingSummary>>(
+    `/recipes/${recipeId}/ratings/me`
+  );
+  return unwrapData(response);
+}
+
+export async function getRecipeComments(
+  recipeId: string,
+  page = 1,
+  pageSize = 20
+): Promise<PagedResult<RecipeComment>> {
+  const response = await apiGet<ApiResponse<RecipeComment[], PaginationMeta>>(
+    `/recipes/${recipeId}/comments`,
+    { params: { page, pageSize } }
+  );
+  return unwrapPaged<RecipeComment>(response);
+}
+
+export async function addRecipeComment(
+  recipeId: string,
+  content: string,
+  parentCommentId?: string
+): Promise<{ id: string; content: string; createdAt: string }> {
+  const response = await apiPost<ApiResponse<{ id: string; content: string; createdAt: string }>>(
+    `/recipes/${recipeId}/comments`,
+    { content, parentCommentId: parentCommentId ?? null }
+  );
+  return unwrapData(response);
+}
+
+export async function updateRecipeComment(
+  recipeId: string,
+  commentId: string,
+  content: string
+): Promise<{ id: string; content: string; updatedAt?: string }> {
+  const response = await apiPut<ApiResponse<{ id: string; content: string; updatedAt?: string }>>(
+    `/recipes/${recipeId}/comments/${commentId}`,
+    { content }
+  );
+  return unwrapData(response);
+}
+
+export async function deleteRecipeComment(
+  recipeId: string,
+  commentId: string
+): Promise<void> {
+  await apiDelete(`/recipes/${recipeId}/comments/${commentId}`);
 }

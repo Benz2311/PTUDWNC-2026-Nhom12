@@ -6,6 +6,13 @@ import DifficultyBadge from './DifficultyBadge';
 import RecipeStatusBadge from './RecipeStatusBadge';
 import RecipeTimeInfo from './RecipeTimeInfo';
 import RecipeSteps from '@/components/recipe-management/RecipeSteps';
+import RecipeInteractionPanel from './RecipeInteractionPanel';
+import {
+  formatNutritionValue,
+  formatScaledQuantity,
+  scaleRecipeIngredients,
+} from '@/lib/recipe-scaling';
+import { downloadApiFile } from '@/lib/api';
 
 const nutritionLabels = [
   ['calories', 'Calories', 'kcal'],
@@ -31,14 +38,52 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
   const images = [...recipe.images].sort((left, right) =>
     Number(right.isPrimary) - Number(left.isPrimary) || (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
   const [activeImage, setActiveImage] = useState(0);
+  const [targetServings, setTargetServings] = useState(recipe.servings);
   const selectedImage = images[activeImage] ?? images[0];
 
-  const sortedIngredients = [...recipe.ingredients].sort(
+  const sortedIngredients = scaleRecipeIngredients([...recipe.ingredients].sort(
     (left, right) => (left.orderIndex ?? left.sortOrder ?? 0) - (right.orderIndex ?? right.sortOrder ?? 0),
-  );
+  ), recipe.servings, targetServings);
 
   const publishedDate = formatPublishedDate(recipe.publishedAt);
   const hasNutrition = recipe.nutrition != null && nutritionLabels.some(([key]) => recipe.nutrition?.[key] != null);
+  const nutritionPerServing = recipe.nutrition;
+
+  function printRecipe() {
+    window.print();
+  }
+
+  function exportRecipe() {
+    const lines = [
+      recipe.title,
+      `Khẩu phần: ${targetServings}`,
+      '',
+      'Nguyên liệu:',
+      ...sortedIngredients.map((ingredient) =>
+        `- ${ingredient.name}: ${formatScaledQuantity(ingredient.quantity)} ${ingredient.unit ?? ''}`.trim()),
+      '',
+      'Cách làm:',
+      recipe.steps
+        .slice()
+        .sort((left, right) => left.stepNumber - right.stepNumber)
+        .map((step) => `${step.stepNumber}. ${step.title}: ${step.description}`)
+        .join('\n'),
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${recipe.slug}-recipe.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportPdf() {
+    await downloadApiFile(
+      `/api/v1/recipes/${encodeURIComponent(recipe.slug)}/export/pdf`,
+      `${recipe.slug}.pdf`,
+    );
+  }
 
   return (
     <article className="recipe-detail recipe-detail-view" aria-label={`Chi tiết công thức: ${recipe.title}`}>
@@ -85,6 +130,22 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
           cookTimeMinutes={recipe.cookTimeMinutes}
           servings={recipe.servings}
         />
+        <div className="recipe-detail-actions" data-print-hide>
+          <label>
+            Khẩu phần
+            <input
+              type="number"
+              min={1}
+              max={1000}
+              value={targetServings}
+              onChange={(event) => setTargetServings(Math.max(1, Math.min(1000, Number(event.target.value) || 1)))}
+              style={{ width: 80, marginLeft: 8 }}
+            />
+          </label>
+          <button className="outline-button" type="button" onClick={printRecipe}>In công thức</button>
+          <button className="outline-button" type="button" onClick={exportRecipe}>Tải TXT</button>
+          <button className="outline-button" type="button" onClick={() => void exportPdf()}>Tải PDF</button>
+        </div>
       </header>
 
       <section className="recipe-detail-gallery" aria-label="Thư viện ảnh công thức">
@@ -145,7 +206,7 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
             <div className="section-heading">
               <div>
                 <h2>Nguyên liệu</h2>
-                <p>Khẩu phần {recipe.servings} người · Chuẩn bị theo thứ tự</p>
+                <p>Khẩu phần {targetServings} người · Chuẩn bị theo thứ tự</p>
               </div>
             </div>
             {sortedIngredients.length === 0 ? (
@@ -164,7 +225,7 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
                       ) : null}
                     </div>
                     <strong className="ingredient-quantity">
-                      {ingredient.quantity != null ? ingredient.quantity : '—'} {ingredient.unit ?? ''}
+                      {formatScaledQuantity(ingredient.quantity)} {ingredient.unit ?? ''}
                     </strong>
                   </li>
                 ))}
@@ -185,8 +246,8 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
                 <div key={key} className="nutrition-item">
                   <dt>{label}</dt>
                   <dd>
-                    {recipe.nutrition?.[key] != null ? recipe.nutrition[key] : '—'}
-                    {recipe.nutrition?.[key] != null ? <span className="nutrition-unit">{unit}</span> : null}
+                    {formatNutritionValue(nutritionPerServing?.[key])}
+                    {nutritionPerServing?.[key] != null ? <span className="nutrition-unit">{unit}</span> : null}
                   </dd>
                 </div>
               ))}
@@ -198,6 +259,8 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
           )}
         </aside>
       </div>
+
+      <RecipeInteractionPanel recipeId={recipe.id} />
 
       <footer className="recipe-detail-footer">
         <a className="outline-button detail-back" href="/recipes">

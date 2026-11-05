@@ -28,13 +28,29 @@ public sealed class MailKitEmailService : IEmailService
         mime.To.Add(MailboxAddress.Parse(message.To));
         mime.Subject = message.Subject;
 
-        var builder = new BodyBuilder
+        var htmlPart = new TextPart("html")
         {
-            HtmlBody = message.HtmlBody,
-            TextBody = message.PlainTextBody
+            Text = message.HtmlBody
         };
+        htmlPart.ContentType.Charset = "utf-8";
 
-        mime.Body = builder.ToMessageBody();
+        if (message.PlainTextBody is null)
+        {
+            mime.Body = htmlPart;
+        }
+        else
+        {
+            var plainTextPart = new TextPart("plain")
+            {
+                Text = message.PlainTextBody
+            };
+            plainTextPart.ContentType.Charset = "utf-8";
+
+            var alternative = new Multipart("alternative");
+            alternative.Add(plainTextPart);
+            alternative.Add(htmlPart);
+            mime.Body = alternative;
+        }
 
         using var client = new SmtpClient();
 

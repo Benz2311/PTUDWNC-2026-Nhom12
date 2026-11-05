@@ -12,37 +12,61 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.FullName)
-            .HasColumnName("DisplayName")
-            .HasMaxLength(100)
-            .IsRequired();
-
-        builder.Ignore(x => x.DisplayName);
+        builder.Property(x => x.Id)
+            .ValueGeneratedOnAdd();
 
         builder.Property(x => x.UserName)
+            .IsRequired()
             .HasMaxLength(256);
-
-        builder.Property(x => x.Email)
-            .HasMaxLength(256);
-
-        builder.Property(x => x.EmailConfirmed)
-            .IsRequired();
-
-        builder.Property(x => x.Roles)
-            .HasColumnType("text[]")
-            .IsRequired();
-
-        builder.Property(x => x.AvatarUrl)
-            .HasMaxLength(500);
-
-        builder.Property(x => x.PasswordHash)
-            .HasColumnType("text");
 
         builder.HasIndex(x => x.UserName)
             .IsUnique();
 
+        builder.Property(x => x.Email)
+            .IsRequired()
+            .HasMaxLength(256);
+
         builder.HasIndex(x => x.Email)
             .IsUnique();
+
+        builder.Property(x => x.PasswordHash)
+            .HasColumnType("text");
+
+        builder.Property(x => x.FullName)
+            .HasColumnName("DisplayName")
+            .IsRequired()
+            .HasMaxLength(100);
+
+        builder.Ignore(x => x.DisplayName);
+
+        builder.Property(x => x.AvatarUrl)
+            .HasMaxLength(500);
+
+        builder.Property(x => x.Bio)
+            .HasMaxLength(1000);
+
+        builder.Property(x => x.EmailConfirmed)
+            .IsRequired()
+            .ValueGeneratedNever();
+
+        builder.Property(x => x.IsActive)
+            .IsRequired()
+            .HasDefaultValue(true)
+            .ValueGeneratedNever();
+
+        builder.HasIndex(x => x.IsActive);
+
+        builder.Property(x => x.CreatedAt)
+            .IsRequired();
+
+        // FullName maps to the DisplayName database column; DisplayName is a compatibility alias.
+
+        // Roles được lưu trữ dưới dạng mảng PostgreSQL (text[]) thay vì qua bảng
+        // IdentityRole, phù hợp với thiết kế role in-memory -> JWT tại AuthService.
+        builder.Property(x => x.Roles)
+            .HasColumnName("Roles")
+            .HasColumnType("text[]")
+            .IsRequired();
 
         builder.HasMany(x => x.RefreshTokens)
             .WithOne(x => x.User)

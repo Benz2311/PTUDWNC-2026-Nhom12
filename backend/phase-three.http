@@ -1,0 +1,29 @@
+@baseUrl = http://localhost:5000/api/v1
+@token = replace-with-access-token
+@recipeId = 00000000-0000-0000-0000-000000000000
+
+### Smart search: FTS, nutrition, ingredients and sorting
+GET {{baseUrl}}/search/recipes?q=pho%20bo&minCalories=200&maxCalories=800&includeIngredients=thit%20bo&sortBy=relevance&page=1&pageSize=20
+
+### Search suggestions
+GET {{baseUrl}}/search/suggestions?q=pho
+
+### List recipe revisions
+GET {{baseUrl}}/recipes/{{recipeId}}/revisions
+Authorization: Bearer {{token}}
+
+### Compare revisions
+GET {{baseUrl}}/recipes/{{recipeId}}/revisions/compare?v1=1&v2=2
+Authorization: Bearer {{token}}
+
+### Roll back a recipe revision
+POST {{baseUrl}}/recipes/{{recipeId}}/revisions/2/rollback
+Authorization: Bearer {{token}}
+
+### Moderator pending queue
+GET {{baseUrl}}/admin/moderation/pending
+Authorization: Bearer {{token}}
+
+### Approve a recipe
+POST {{baseUrl}}/admin/moderation/recipes/{{recipeId}}/approve
+Authorization: Bearer {{token}}

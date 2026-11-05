@@ -1,14 +1,18 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using CulinaryBlog.Application.DTOs.Auth;
 using CulinaryBlog.Application.Interfaces;
 using CulinaryBlog.Application.Repositories;
 using CulinaryBlog.Application.Services;
 using CulinaryBlog.Domain.Entities;
+using CulinaryBlog.Domain.Exceptions;
+using Google.Apis.Auth;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CulinaryBlog.Infrastructure.Services;
@@ -18,38 +22,75 @@ public class AuthService : IAuthService
     private readonly IUserRepository _userRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IConfiguration _configuration;
+    private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
+    private readonly IEmailService _emailService;
+    private readonly JwtSettings _jwtSettings;
+    private readonly GoogleAuthSettings _googleAuthSettings;
+    private readonly ILogger<AuthService> _logger;
+    private readonly IHostEnvironment _environment;
+    private readonly string _frontendBaseUrl;
 
     public AuthService(
         IUserRepository userRepository,
         IRefreshTokenRepository refreshTokenRepository,
         IUnitOfWork unitOfWork,
+        IJwtTokenGenerator jwtTokenGenerator,
+        IPasswordHasher<ApplicationUser> passwordHasher,
+        IEmailService emailService,
         IConfiguration configuration,
-        IPasswordHasher<ApplicationUser> passwordHasher)
+        ILogger<AuthService> logger,
+        IHostEnvironment environment)
     {
         _userRepository = userRepository;
         _refreshTokenRepository = refreshTokenRepository;
         _unitOfWork = unitOfWork;
-        _configuration = configuration;
+        _jwtTokenGenerator = jwtTokenGenerator;
         _passwordHasher = passwordHasher;
+        _emailService = emailService;
+        _jwtSettings = configuration
+            .GetSection(JwtSettings.Section)
+            .Get<JwtSettings>() ?? throw new InvalidOperationException("Jwt settings not configured.");
+
+        _googleAuthSettings = configuration
+            .GetSection(GoogleAuthSettings.Section)
+            .Get<GoogleAuthSettings>() ?? new GoogleAuthSettings();
+
+        _logger = logger;
+        _environment = environment;
+        _frontendBaseUrl = (configuration["Frontend:BaseUrl"] ?? "http://localhost:3000").TrimEnd('/');
     }
 
     public async Task<AuthResponse> RegisterAsync(
         RegisterRequest request,
         string? ipAddress = null)
     {
+        if (string.IsNullOrWhiteSpace(request.UserName))
+        {
+            throw new BadRequestException("Username is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            throw new BadRequestException("Email is required.");
+        }
+
+        ValidatePassword(request.Password);
         var userName = request.UserName.Trim();
         var email = request.Email.Trim().ToLowerInvariant();
 
+        _logger.LogInformation("Registering new user: {UserName} ({Email})", userName, email);
+
         if (await _userRepository.ExistsByUserNameAsync(userName))
         {
-            throw new InvalidOperationException("Username already exists.");
+            _logger.LogWarning("Registration failed: Username '{UserName}' already exists", userName);
+            throw new ConflictException($"Username '{userName}' already exists.");
         }
 
         if (await _userRepository.ExistsByEmailAsync(email))
         {
-            throw new InvalidOperationException("Email already exists.");
+            _logger.LogWarning("Registration failed: Email '{Email}' already exists", email);
+            throw new ConflictException($"Email '{email}' already exists.");
         }
 
         var user = new ApplicationUser
@@ -62,15 +103,19 @@ public class AuthService : IAuthService
                 : request.DisplayName.Trim(),
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
-            Roles = ["Author"]
+            Roles = ["Author"],
+            EmailConfirmed = false
         };
 
-        user.PasswordHash = _passwordHasher.HashPassword(
-            user,
-            request.Password);
+        user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
 
         await _userRepository.AddAsync(user);
         await _unitOfWork.SaveChangesAsync();
+
+        _logger.LogInformation("User registered successfully: {UserId}", user.Id);
+
+        var confirmationToken = _jwtTokenGenerator.GenerateEmailConfirmationToken(user, TimeSpan.FromHours(24));
+        await SendConfirmationEmailAsync(user, confirmationToken);
 
         return await CreateAuthResponseAsync(user, ipAddress);
     }
@@ -81,26 +126,109 @@ public class AuthService : IAuthService
     {
         var login = request.UserNameOrEmail.Trim();
 
+        _logger.LogInformation("Login attempt for: {Login}", login);
+
         var user = await _userRepository.GetByEmailOrUserNameAsync(login);
 
         if (user is null)
         {
-            throw new UnauthorizedAccessException("Invalid username/email or password.");
+            _logger.LogWarning("Login failed: User not found for {Login}", login);
+            throw new UnauthorizedAuthException("Invalid username/email or password.");
         }
+
+        _logger.LogDebug("User found: {UserId}, IsActive: {IsActive}, EmailConfirmed: {EmailConfirmed}",
+            user.Id, user.IsActive, user.EmailConfirmed);
 
         if (!user.IsActive)
         {
-            throw new UnauthorizedAccessException("Account is inactive.");
+            _logger.LogWarning("Login failed: Account inactive for user {UserId}", user.Id);
+            throw new UnauthorizedAuthException("Account is inactive.");
         }
 
-        var verifyResult = _passwordHasher.VerifyHashedPassword(
-            user,
-            user.PasswordHash,
-            request.Password);
+        // Skip email confirmation check in Development environment for testing
+        if (!string.Equals(_environment.EnvironmentName, Environments.Development, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(_environment.EnvironmentName, "Testing", StringComparison.OrdinalIgnoreCase)
+            && !user.EmailConfirmed)
+        {
+            _logger.LogWarning("Login failed: Email not confirmed for user {UserId}", user.Id);
+            throw new UnauthorizedAuthException("Email not confirmed. Please check your email to confirm your account.");
+        }
+
+        if (string.IsNullOrWhiteSpace(user.PasswordHash))
+        {
+            _logger.LogWarning("Login failed: User {UserId} has no password set (possibly Google-only account)", user.Id);
+            throw new UnauthorizedAuthException("This account uses social login. Please use Google to sign in.");
+        }
+
+        var verifyResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
 
         if (verifyResult == PasswordVerificationResult.Failed)
         {
-            throw new UnauthorizedAccessException("Invalid username/email or password.");
+            _logger.LogWarning("Login failed: Invalid password for user {UserId}", user.Id);
+            throw new UnauthorizedAuthException("Invalid username/email or password.");
+        }
+
+        if (verifyResult == PasswordVerificationResult.SuccessRehashNeeded)
+        {
+            _logger.LogInformation("Rehashing password for user {UserId}", user.Id);
+            user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
+            await _userRepository.UpdateAsync(user);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        _logger.LogInformation("Login successful for user {UserId}", user.Id);
+
+        return await CreateAuthResponseAsync(user, ipAddress);
+    }
+
+    public async Task<AuthResponse> GoogleLoginAsync(
+        GoogleLoginRequest request,
+        string? ipAddress = null)
+    {
+        var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, new GoogleJsonWebSignature.ValidationSettings
+        {
+            Audience = new[] { _googleAuthSettings.ClientId }
+        });
+
+        if (payload == null)
+        {
+            throw new UnauthorizedAuthException("Invalid Google token.");
+        }
+
+        var email = payload.Email.ToLowerInvariant();
+        var user = await _userRepository.GetByEmailAsync(email);
+
+        if (user is null)
+        {
+            // Create new user from Google account
+            var generatedUserName = email.Split('@')[0] + "_" + Guid.NewGuid().ToString("N")[..8];
+            user = new ApplicationUser
+            {
+                Id = Guid.NewGuid(),
+                UserName = generatedUserName,
+                Email = email,
+                DisplayName = payload.Name ?? email.Split('@')[0],
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                Roles = ["Author"],
+                EmailConfirmed = payload.EmailVerified
+            };
+
+            // Generate a random password since Google users don't use password login
+            var randomPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+            user.PasswordHash = _passwordHasher.HashPassword(user, randomPassword);
+
+            await _userRepository.AddAsync(user);
+            await _unitOfWork.SaveChangesAsync();
+
+            if (user.EmailConfirmed)
+            {
+                await SendWelcomeEmailAsync(user);
+            }
+        }
+        else if (!user.IsActive)
+        {
+            throw new UnauthorizedAuthException("Account is inactive.");
         }
 
         return await CreateAuthResponseAsync(user, ipAddress);
@@ -110,32 +238,31 @@ public class AuthService : IAuthService
         RefreshRequest request,
         string? ipAddress = null)
     {
-        var tokenHash = HashToken(request.RefreshToken);
+        var tokenHash = _jwtTokenGenerator.HashToken(request.RefreshToken);
 
         var storedToken = await _refreshTokenRepository.GetByTokenHashWithUserAsync(tokenHash);
 
         if (storedToken is null)
         {
-            throw new UnauthorizedAccessException("Invalid refresh token.");
+            throw new UnauthorizedAuthException("Invalid refresh token.");
         }
 
         if (storedToken.RevokedAt.HasValue)
         {
-            throw new UnauthorizedAccessException("Refresh token has been revoked.");
+            // Token reuse detection - revoke all tokens in the family
+            await _refreshTokenRepository.RevokeAllForUserAsync(storedToken.UserId);
+            await _unitOfWork.SaveChangesAsync();
+            throw new UnauthorizedAuthException("Refresh token has been revoked due to reuse detection.");
         }
 
         if (storedToken.ExpiresAt <= DateTime.UtcNow)
         {
-            throw new UnauthorizedAccessException("Refresh token has expired.");
+            throw new UnauthorizedAuthException("Refresh token has expired.");
         }
 
         var response = await CreateAuthResponseAsync(storedToken.User, ipAddress);
 
-        await _refreshTokenRepository.RevokeAsync(
-            tokenHash,
-            DateTimeOffset.UtcNow,
-            HashToken(response.RefreshToken));
-
+        await _refreshTokenRepository.RevokeAsync(tokenHash, DateTimeOffset.UtcNow, _jwtTokenGenerator.HashToken(response.RefreshToken));
         await _unitOfWork.SaveChangesAsync();
 
         return response;
@@ -143,8 +270,7 @@ public class AuthService : IAuthService
 
     public async Task LogoutAsync(string refreshToken)
     {
-        var tokenHash = HashToken(refreshToken);
-
+        var tokenHash = _jwtTokenGenerator.HashToken(refreshToken);
         await _refreshTokenRepository.RevokeAsync(tokenHash, DateTimeOffset.UtcNow);
         await _unitOfWork.SaveChangesAsync();
     }
@@ -165,25 +291,329 @@ public class AuthService : IAuthService
             Email = profile.Email,
             DisplayName = profile.DisplayName,
             AvatarUrl = profile.AvatarUrl,
-            Bio = profile.Bio
+            Bio = profile.Bio,
+            EmailConfirmed = profile.EmailConfirmed,
+            Roles = profile.Roles,
+            IsActive = profile.IsActive,
+            CreatedAt = profile.CreatedAt
         };
     }
 
-    private async Task<AuthResponse> CreateAuthResponseAsync(
-        ApplicationUser user,
-        string? ipAddress)
+    public async Task ConfirmEmailAsync(ConfirmEmailRequest request)
     {
-        var accessToken = GenerateAccessToken(user);
-        var rawRefreshToken = GenerateRefreshToken();
-        var hashedRefreshToken = HashToken(rawRefreshToken);
+        if (!_jwtTokenGenerator.ValidateEmailConfirmationToken(request.Token, out var userId))
+        {
+            throw new BadRequestException("Invalid or expired confirmation token.");
+        }
 
-        var refreshTokenDays = _configuration.GetValue<int>("Jwt:RefreshTokenDays", 7);
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user is null)
+        {
+            throw new NotFoundException("User not found.");
+        }
+
+        if (user.EmailConfirmed)
+        {
+            return; // Already confirmed, idempotent
+        }
+
+        user.EmailConfirmed = true;
+        await _userRepository.UpdateAsync(user);
+        await _unitOfWork.SaveChangesAsync();
+
+        // Send welcome email if not sent before
+        await SendWelcomeEmailAsync(user);
+    }
+
+    public async Task ResendConfirmationEmailAsync(ResendConfirmationEmailRequest request)
+    {
+        var email = request.Email.Trim().ToLowerInvariant();
+        var user = await _userRepository.GetByEmailAsync(email);
+
+        // Always return success to prevent user enumeration
+        if (user is null || user.EmailConfirmed)
+        {
+            return;
+        }
+
+        if (!user.IsActive)
+        {
+            return; // Don't send to inactive accounts
+        }
+
+        var token = _jwtTokenGenerator.GenerateEmailConfirmationToken(user, TimeSpan.FromHours(24));
+        await SendConfirmationEmailAsync(user, token);
+    }
+
+    public async Task<UserResponse> UpdateProfileAsync(string userId, UpdateProfileRequest request)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user is null)
+        {
+            throw new NotFoundException("User not found.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.DisplayName))
+        {
+            user.DisplayName = request.DisplayName.Trim();
+        }
+
+        if (request.AvatarUrl != null)
+        {
+            user.AvatarUrl = request.AvatarUrl.Trim();
+        }
+
+        if (request.Bio != null)
+        {
+            user.Bio = request.Bio.Trim();
+        }
+
+        await _userRepository.UpdateAsync(user);
+        await _unitOfWork.SaveChangesAsync();
+
+        return ToUserResponse(user);
+    }
+
+    public async Task ChangePasswordAsync(string userId, ChangePasswordRequest request)
+    {
+        ValidatePassword(request.NewPassword);
+        var user = await _userRepository.GetByIdAsync(userId)
+            ?? throw new NotFoundException("User not found.");
+
+        if (string.IsNullOrWhiteSpace(user.PasswordHash) ||
+            _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.CurrentPassword)
+                == PasswordVerificationResult.Failed)
+        {
+            throw new UnauthorizedAuthException("Current password is incorrect.");
+        }
+
+        user.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
+        await _userRepository.UpdateAsync(user);
+        await _refreshTokenRepository.RevokeAllForUserAsync(user.Id);
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task ForgotPasswordAsync(ForgotPasswordRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return;
+        }
+
+        var user = await _userRepository.GetByEmailAsync(request.Email.Trim().ToLowerInvariant());
+        if (user is null || !user.IsActive)
+        {
+            return;
+        }
+
+        var token = _jwtTokenGenerator.GeneratePasswordResetToken(user, TimeSpan.FromHours(1));
+        var resetUrl = $"{_frontendBaseUrl}/reset-password?token={Uri.EscapeDataString(token)}";
+        try
+        {
+            await _emailService.SendAsync(new EmailMessage(
+                user.Email,
+                "Đặt lại mật khẩu CulinaryBlog",
+                $"<p>Chào {user.DisplayName},</p><p><a href='{resetUrl}'>Đặt lại mật khẩu</a></p><p>Liên kết hết hạn sau 1 giờ.</p>",
+                $"Chào {user.DisplayName},\n\nĐặt lại mật khẩu tại: {resetUrl}\n\nLiên kết hết hạn sau 1 giờ."));
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Could not send password reset email for user {UserId}", user.Id);
+        }
+    }
+
+    public async Task ResetPasswordAsync(ResetPasswordRequest request)
+    {
+        ValidatePassword(request.NewPassword);
+        if (!_jwtTokenGenerator.ValidatePasswordResetToken(request.Token, out var userId))
+        {
+            throw new BadRequestException("Invalid or expired password reset token.");
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId)
+            ?? throw new NotFoundException("User not found.");
+
+        user.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
+        await _userRepository.UpdateAsync(user);
+        await _refreshTokenRepository.RevokeAllForUserAsync(user.Id);
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task<bool> UpdateUserStatusAsync(
+        Guid adminUserId,
+        Guid targetUserId,
+        bool isActive,
+        CancellationToken cancellationToken = default)
+    {
+        // Prevent admin from deactivating themselves
+        if (adminUserId == targetUserId)
+        {
+            throw new BadRequestException("Cannot change your own account status.");
+        }
+
+        var targetUser = await _userRepository.GetByIdAsync(targetUserId, cancellationToken);
+        if (targetUser is null)
+        {
+            throw new NotFoundException("User not found.");
+        }
+
+        var adminUser = await _userRepository.GetByIdAsync(adminUserId, cancellationToken);
+        if (adminUser is null || !(adminUser.Roles ?? []).Contains("Admin", StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ForbiddenException("Only administrators can change user status.");
+        }
+
+        if (targetUser.IsActive == isActive)
+        {
+            return false; // No change
+        }
+
+        targetUser.IsActive = isActive;
+        await _userRepository.UpdateAsync(targetUser, cancellationToken);
+
+        // If deactivating, revoke all refresh tokens
+        if (!isActive)
+        {
+            await _refreshTokenRepository.RevokeAllForUserAsync(targetUserId, cancellationToken);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task UpdateUserRolesAsync(
+        Guid adminUserId,
+        Guid targetUserId,
+        string[] roles,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedRoles = (roles ?? [])
+            .Where(role => !string.IsNullOrWhiteSpace(role))
+            .Select(role => role.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(role => role.Equals("Admin", StringComparison.OrdinalIgnoreCase) ? "Admin" :
+                role.Equals("Author", StringComparison.OrdinalIgnoreCase) ? "Author" : role)
+            .ToArray();
+
+        if (normalizedRoles.Length == 0 ||
+            normalizedRoles.Any(role => role is not ("Admin" or "Author")))
+        {
+            throw new BadRequestException("At least one valid role (Admin or Author) is required.");
+        }
+
+        var adminUser = await _userRepository.GetByIdAsync(adminUserId, cancellationToken);
+        if (adminUser is null || !(adminUser.Roles ?? []).Contains("Admin", StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ForbiddenException("Only administrators can change user roles.");
+        }
+
+        var targetUser = await _userRepository.GetByIdAsync(targetUserId, cancellationToken)
+            ?? throw new NotFoundException("User not found.");
+
+        if (normalizedRoles.Contains("Admin", StringComparer.Ordinal) &&
+            !IsEligibleAdminEmail(targetUser.Email))
+        {
+            throw new BadRequestException("Admin role can only be assigned to an account using a numeric student ID email at dlu.edu.vn.");
+        }
+
+        if (adminUserId == targetUserId && !normalizedRoles.Contains("Admin", StringComparer.Ordinal))
+        {
+            throw new BadRequestException("You cannot remove your own administrator role.");
+        }
+
+        if ((targetUser.Roles ?? []).SequenceEqual(normalizedRoles, StringComparer.Ordinal))
+        {
+            return;
+        }
+
+        targetUser.Roles = normalizedRoles;
+        await _userRepository.UpdateAsync(targetUser, cancellationToken);
+        await _refreshTokenRepository.RevokeAllForUserAsync(targetUserId, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    private static bool IsEligibleAdminEmail(string? email) =>
+        !string.IsNullOrWhiteSpace(email) &&
+        Regex.IsMatch(email, @"^[0-9]+@dlu\.edu\.vn$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private async Task SendWelcomeEmailAsync(ApplicationUser user)
+    {
+        try
+        {
+            var subject = "Chào mừng bạn đến với CulinaryBlog!";
+            var htmlBody = $@"
+                <h1>Chào {user.DisplayName},</h1>
+                <p>Cảm ơn bạn đã đăng ký tài khoản tại CulinaryBlog.</p>
+                <p>Chúc bạn có những trải nghiệm nấu ăn tuyệt vời!</p>
+                <hr>
+                <p><small>Đây là email tự động, vui lòng không trả lời.</small></p>";
+
+            await _emailService.SendAsync(new EmailMessage(user.Email, subject, htmlBody));
+        }
+
+        catch
+        {
+            // Log error but don't fail registration
+        }
+    }
+
+    private static void ValidatePassword(string password)
+    {
+        if (string.IsNullOrWhiteSpace(password)
+            || password.Length < 8
+            || !password.Any(char.IsUpper)
+            || !password.Any(char.IsLower)
+            || !password.Any(char.IsDigit)
+            || !password.Any(char.IsPunctuation))
+        {
+            throw new BadRequestException(
+                "Password must be at least 8 characters and contain uppercase, lowercase, digit, and special character.");
+        }
+    }
+
+    private async Task SendConfirmationEmailAsync(ApplicationUser user, string token)
+    {
+        try
+        {
+            var confirmUrl = $"{_frontendBaseUrl}/confirm-email?token={Uri.EscapeDataString(token)}";
+
+            var subject = "Xác thực email tài khoản CulinaryBlog";
+            var htmlBody = $@"
+                <meta charset='utf-8'>
+                <h1>Xác thực email</h1>
+                <p>Chào {user.DisplayName},</p>
+                <p>Vui lòng nhấp vào liên kết bên dưới để xác thực email của bạn:</p>
+                <p><a href='{confirmUrl}'>Xác thực email</a></p>
+                <p>Nếu liên kết không mở được, hãy sao chép địa chỉ sau vào trình duyệt:<br><a href='{confirmUrl}'>{confirmUrl}</a></p>
+                <p>Liên kết này sẽ hết hạn sau 24 giờ.</p>
+                <hr>
+                <p><small>Đây là email tự động, vui lòng không trả lời.</small></p>";
+
+            await _emailService.SendAsync(new EmailMessage(
+                user.Email,
+                subject,
+                htmlBody,
+                $"Chào {user.DisplayName},\n\nXác thực email bằng cách mở liên kết này:\n{confirmUrl}\n\nLiên kết hết hạn sau 24 giờ."));
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Could not send confirmation email for user {UserId}", user.Id);
+        }
+    }
+
+    private async Task<AuthResponse> CreateAuthResponseAsync(ApplicationUser user, string? ipAddress)
+    {
+        var accessTokenExpiry = TimeSpan.FromMinutes(_jwtSettings.AccessTokenMinutes);
+        var accessToken = _jwtTokenGenerator.GenerateAccessToken(user, user.Roles ?? [], accessTokenExpiry);
+        var rawRefreshToken = _jwtTokenGenerator.GenerateRefreshToken();
+        var hashedRefreshToken = _jwtTokenGenerator.HashToken(rawRefreshToken);
+
         var refreshTokenEntity = new RefreshToken
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
             TokenHash = hashedRefreshToken,
-            ExpiresAt = DateTime.UtcNow.AddDays(refreshTokenDays),
+            ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenDays),
             CreatedAt = DateTime.UtcNow,
             CreatedByIp = ipAddress
         };
@@ -191,11 +621,7 @@ public class AuthService : IAuthService
         await _refreshTokenRepository.AddAsync(refreshTokenEntity);
         await _unitOfWork.SaveChangesAsync();
 
-        var accessTokenMinutes = _configuration.GetValue<int>(
-            "Jwt:AccessTokenMinutes",
-            _configuration.GetValue<int>("Jwt:ExpiryMinutes", 60));
-
-        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(accessTokenMinutes);
+        var expiresAt = DateTimeOffset.UtcNow.Add(accessTokenExpiry);
 
         return new AuthResponse
         {
@@ -204,64 +630,6 @@ public class AuthService : IAuthService
             ExpiresAt = expiresAt,
             User = ToUserResponse(user)
         };
-    }
-
-    private string GenerateAccessToken(ApplicationUser user)
-    {
-        var key = _configuration["Jwt:Key"]
-            ?? _configuration["Jwt:SecretKey"]
-            ?? throw new InvalidOperationException("JWT key is missing.");
-
-        var issuer = _configuration["Jwt:Issuer"];
-        var audience = _configuration["Jwt:Audience"];
-
-        var claims = new List<Claim>
-        {
-            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(JwtRegisteredClaimNames.UniqueName, user.UserName),
-            new(JwtRegisteredClaimNames.Email, user.Email),
-            new("displayName", user.DisplayName)
-        };
-
-        if (user.Roles != null && user.Roles.Length > 0)
-        {
-            foreach (var role in user.Roles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, role));
-                claims.Add(new Claim("role", role));
-            }
-        }
-
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
-        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-
-        var accessTokenMinutes = _configuration.GetValue<int>(
-            "Jwt:AccessTokenMinutes",
-            _configuration.GetValue<int>("Jwt:ExpiryMinutes", 60));
-
-        var expires = DateTime.UtcNow.AddMinutes(accessTokenMinutes);
-
-        var token = new JwtSecurityToken(
-            issuer: issuer,
-            audience: audience,
-            claims: claims,
-            expires: expires,
-            signingCredentials: credentials);
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    private static string GenerateRefreshToken()
-    {
-        var bytes = RandomNumberGenerator.GetBytes(64);
-        return Convert.ToBase64String(bytes);
-    }
-
-    private static string HashToken(string token)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     private static UserResponse ToUserResponse(ApplicationUser user)
@@ -273,7 +641,18 @@ public class AuthService : IAuthService
             Email = user.Email,
             DisplayName = user.DisplayName,
             AvatarUrl = user.AvatarUrl,
-            Bio = user.Bio
+            Bio = user.Bio,
+            EmailConfirmed = user.EmailConfirmed,
+            Roles = user.Roles ?? [],
+            IsActive = user.IsActive,
+            CreatedAt = user.CreatedAt
         };
     }
+}
+
+public sealed class GoogleAuthSettings
+{
+    public const string Section = "GoogleAuth";
+    public string ClientId { get; init; } = string.Empty;
+    public string ClientSecret { get; init; } = string.Empty;
 }

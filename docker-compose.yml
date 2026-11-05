@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -18,6 +18,14 @@ services:
     restart: unless-stopped
     ports:
       - "6380:6379"
+
+  mailpit:
+    image: axllent/mailpit:v1.22.3
+    container_name: culinaryblog-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
 
   minio:
     image: quay.io/minio/minio:latest
@@ -35,24 +43,35 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: ../infrastructure/docker/backend/Dockerfile
+      context: .
+      dockerfile: infrastructure/docker/backend/Dockerfile
     container_name: culinaryblog-backend
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ApiDocumentation__Enabled: ${API_DOCUMENTATION_ENABLED:-false}
+      ApiDocumentation__Enabled: ${API_DOCUMENTATION_ENABLED:-true}
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       Jwt__Key: ${JWT_KEY:?Set JWT_KEY in .env}
+      Jwt__SecretKey: ${JWT_KEY:?Set JWT_KEY in .env}
       Jwt__Issuer: ${JWT_ISSUER:-CulinaryBlog}
       Jwt__Audience: ${JWT_AUDIENCE:-CulinaryBlogClient}
-      Redis__ConnectionString: redis:6379
+      AI__Gemini__ApiKey: ${AI__Gemini__ApiKey:-}
+      AI__Gemini__Model: ${AI__Gemini__Model:-gemini-2.5-flash}
+      ConnectionStrings__Redis: redis:6379
+      Email__Host: ${SMTP_HOST:-mailpit}
+      Email__Port: ${SMTP_PORT:-1025}
+      Email__UseSsl: ${SMTP_USE_SSL:-false}
+      Email__UserName: ${SMTP_USERNAME:-}
+      Email__Password: ${SMTP_PASSWORD:-}
+      Email__SenderEmail: ${SMTP_SENDER_EMAIL:-noreply@culinaryblog.local}
+      Email__SenderName: ${SMTP_SENDER_NAME:-CulinaryBlog}
       Minio__Endpoint: http://minio:9000
       Minio__PublicEndpoint: http://localhost:9000
       Minio__AccessKey: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in .env}
       Minio__SecretKey: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in .env}
       Minio__BucketName: ${MINIO_BUCKET_NAME:-culinary-blog}
       Cors__Origins: ${FRONTEND_ORIGIN:-http://localhost:3000}
+      Frontend__BaseUrl: ${FRONTEND_ORIGIN:-http://localhost:3000}
       Seed__DemoPassword: ${DEMO_PASSWORD:?Set DEMO_PASSWORD in .env}
     volumes:
       - ./backend/uploads:/app/wwwroot/uploads
@@ -61,6 +80,7 @@ services:
     depends_on:
       - postgres
       - redis
+      - mailpit
       - minio
 
   frontend:

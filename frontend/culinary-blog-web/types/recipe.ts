@@ -2,7 +2,7 @@ import type { PagedResult } from "./api";
 
 import { z } from "zod";
 
-export const recipeStatusSchema = z.enum(["Draft", "Published", "Archived"]);
+export const recipeStatusSchema = z.enum(["Draft", "Published", "Archived", "PendingApproval", "Approved", "Rejected"]);
 export type RecipeStatus = z.infer<typeof recipeStatusSchema>;
 
 export const difficultyLevelSchema = z.enum(["Easy", "Medium", "Hard", "Expert"]);
@@ -144,6 +144,32 @@ export interface RecipeDetail {
 }
 
 export type Recipe = RecipeDetail;
+
+export interface RecipeRatingSummary {
+  recipeId: string;
+  averageRating: number;
+  ratingCount: number;
+  myScore: number | null;
+}
+
+export interface RecipeCommentReply {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt?: string | null;
+  author: string;
+  userId: string;
+}
+
+export interface RecipeComment {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt?: string | null;
+  author: string;
+  userId: string;
+  replies: RecipeCommentReply[];
+}
 
 export interface RecipeFilterParams {
   page?: number;

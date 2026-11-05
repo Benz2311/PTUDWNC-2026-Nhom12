@@ -109,7 +109,10 @@ public AuthServiceTests()
         result.User.UserName.Should().Be("chef_john");
         result.User.Email.Should().Be("john@example.com");
 
-        _userRepoMock.Verify(x => x.AddAsync(It.Is<ApplicationUser>(u => u.UserName == "chef_john" && u.PasswordHash == "hashed_pwd"), default), Times.Once);
+        _userRepoMock.Verify(x => x.AddAsync(It.Is<ApplicationUser>(u =>
+            u.UserName == "chef_john" &&
+            u.PasswordHash == "hashed_pwd" &&
+            !u.EmailConfirmed), default), Times.Once);
         _emailServiceMock.Verify(x => x.SendAsync(
             It.Is<EmailMessage>(message =>
                 message.To == "john@example.com" &&
@@ -417,7 +420,7 @@ public AuthServiceTests()
         var adminId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
         var admin = new ApplicationUser { Id = adminId, Roles = ["Admin"] };
-        var target = new ApplicationUser { Id = targetId, Roles = ["Author"] };
+        var target = new ApplicationUser { Id = targetId, Email = "98765432@DLU.EDU.VN", Roles = ["Author"] };
         _userRepoMock.Setup(x => x.GetByIdAsync(adminId, default)).ReturnsAsync(admin);
         _userRepoMock.Setup(x => x.GetByIdAsync(targetId, default)).ReturnsAsync(target);
 
@@ -427,6 +430,25 @@ public AuthServiceTests()
         _userRepoMock.Verify(x => x.UpdateAsync(target, default), Times.Once);
         _tokenRepoMock.Verify(x => x.RevokeAllForUserAsync(targetId, default), Times.Once);
         _uowMock.Verify(x => x.SaveChangesAsync(default), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateUserRolesAsync_RejectsAdminRoleForNonDluStudentEmail()
+    {
+        var adminId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        var admin = new ApplicationUser { Id = adminId, Roles = ["Admin"] };
+        var target = new ApplicationUser { Id = targetId, Email = "student@example.com", Roles = ["Author"] };
+        _userRepoMock.Setup(x => x.GetByIdAsync(adminId, default)).ReturnsAsync(admin);
+        _userRepoMock.Setup(x => x.GetByIdAsync(targetId, default)).ReturnsAsync(target);
+
+        var act = () => _sut.UpdateUserRolesAsync(adminId, targetId, ["Author", "Admin"]);
+
+        await act.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("*numeric student ID email at dlu.edu.vn*");
+        _userRepoMock.Verify(x => x.UpdateAsync(It.IsAny<ApplicationUser>(), default), Times.Never);
+        _tokenRepoMock.Verify(x => x.RevokeAllForUserAsync(It.IsAny<Guid>(), default), Times.Never);
+        _uowMock.Verify(x => x.SaveChangesAsync(default), Times.Never);
     }
 
     [Fact]

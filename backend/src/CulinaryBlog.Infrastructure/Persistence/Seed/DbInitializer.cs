@@ -1,7 +1,9 @@
 using CulinaryBlog.Domain.Entities;
 using CulinaryBlog.Domain.Enums;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -17,6 +19,7 @@ public static class DbInitializer
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<ApplicationUser>>();
+        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
 
         logger?.LogInformation("Starting database initialization...");
 
@@ -32,7 +35,7 @@ public static class DbInitializer
         }
 
         // Seed Admin User
-        await SeedAdminUserAsync(context, passwordHasher, logger, cancellationToken);
+        await SeedAdminUserAsync(context, passwordHasher, configuration, logger, cancellationToken);
 
         // Seed Categories
         await SeedCategoriesAsync(context, logger, cancellationToken);
@@ -43,14 +46,31 @@ public static class DbInitializer
     private static async Task SeedAdminUserAsync(
         ApplicationDbContext context,
         IPasswordHasher<ApplicationUser> passwordHasher,
+        IConfiguration configuration,
         ILogger? logger,
         CancellationToken cancellationToken)
     {
-        const string adminEmail = "admin@culinaryblog.com";
-        const string adminUserName = "admin";
-        const string adminPassword = "Admin@123";
+        var adminEmail = configuration["Seed:AdminEmail"];
+        var adminPassword = configuration["Seed:AdminPassword"];
+        if (string.IsNullOrWhiteSpace(adminEmail) || string.IsNullOrWhiteSpace(adminPassword))
+        {
+            logger?.LogInformation("Admin seed skipped because Seed:AdminEmail and Seed:AdminPassword are not configured.");
+            return;
+        }
 
-        var existingAdmin = await context.Users.FirstOrDefaultAsync(u => u.Email == adminEmail, cancellationToken);
+        if (!Regex.IsMatch(adminEmail, @"^[0-9]+@dlu\.edu\.vn$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+        {
+            throw new InvalidOperationException("Seed:AdminEmail must use the format <student-id>@dlu.edu.vn.");
+        }
+
+        if (adminPassword.Length < 12)
+        {
+            throw new InvalidOperationException("Seed:AdminPassword must contain at least 12 characters.");
+        }
+
+        var existingAdmin = await context.Users.FirstOrDefaultAsync(
+            user => user.Email.ToLower() == adminEmail.ToLower(),
+            cancellationToken);
         if (existingAdmin is not null)
         {
             logger?.LogInformation("Admin user already exists: {Email}", adminEmail);
@@ -60,7 +80,7 @@ public static class DbInitializer
         var admin = new ApplicationUser
         {
             Id = Guid.NewGuid(),
-            UserName = adminUserName,
+            UserName = adminEmail[..adminEmail.IndexOf('@')],
             Email = adminEmail,
             DisplayName = "Administrator",
             EmailConfirmed = true,

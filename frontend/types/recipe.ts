@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const recipeStatusSchema = z.enum(['Draft', 'Published', 'Archived']);
+export const recipeStatusSchema = z.enum(['Draft', 'Published', 'Archived', 'PendingApproval', 'Approved', 'Rejected']);
 export type RecipeStatus = z.infer<typeof recipeStatusSchema>;
 
 export const difficultyLevelSchema = z.enum(['Easy', 'Medium', 'Hard', 'Expert']);
@@ -171,6 +171,31 @@ export const recipeTrashPageSchema = z.object({
 });
 export type RecipeTrashItem = z.infer<typeof recipeTrashItemSchema>;
 export type RecipeTrashPage = z.infer<typeof recipeTrashPageSchema>;
+
+export interface RecipeRatingSummary {
+  averageRating: number;
+  ratingCount: number;
+  myScore: number | null;
+}
+
+export interface RecipeCommentReply {
+  id: string;
+  content: string;
+  authorName: string;
+  createdAt: string;
+  updatedAt: string;
+  canManage: boolean;
+}
+
+export interface RecipeComment {
+  id: string;
+  content: string;
+  authorName: string;
+  createdAt: string;
+  updatedAt: string;
+  canManage: boolean;
+  replies: RecipeCommentReply[];
+}
 
 export const recipeDraftRequestSchema = z.object({
   categoryId: z.string().uuid(),

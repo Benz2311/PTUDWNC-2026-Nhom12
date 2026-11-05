@@ -95,7 +95,7 @@ public class ImageResizeJobTests : IDisposable
     }
 
     [Fact]
-    public async Task ProcessAsync_WithValidJpegImage_ResizesMediumAndThumbnailAndUpdatesDatabase()
+    public async Task ProcessAsync_WithValidJpegImage_ConvertsToWatermarkedWebpAndUpdatesDatabase()
     {
         // Arrange: Tạo ảnh JPEG 1200x900 thật
         var recipeId = Guid.NewGuid();
@@ -121,24 +121,24 @@ public class ImageResizeJobTests : IDisposable
             .Setup(x => x.DownloadAsync("culinaryblog", rawKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MemoryStream(jpegBytes));
 
-        var expectedMediumUrl = $"http://localhost:9000/culinaryblog/recipes/{recipeId}/images/{imageId}_medium.jpg";
-        var expectedThumbUrl = $"http://localhost:9000/culinaryblog/recipes/{recipeId}/images/{imageId}_thumb.jpg";
+        var expectedMediumUrl = $"http://localhost:9000/culinaryblog/recipes/{recipeId}/images/{imageId}_medium.webp";
+        var expectedThumbUrl = $"http://localhost:9000/culinaryblog/recipes/{recipeId}/images/{imageId}_thumb.webp";
 
         _storageServiceMock
             .Setup(x => x.UploadAsync(
                 "culinaryblog",
-                $"recipes/{recipeId}/images/{imageId}_medium.jpg",
+                $"recipes/{recipeId}/images/{imageId}_medium.webp",
                 It.IsAny<Stream>(),
-                "image/jpeg",
+                "image/webp",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(expectedMediumUrl);
 
         _storageServiceMock
             .Setup(x => x.UploadAsync(
                 "culinaryblog",
-                $"recipes/{recipeId}/images/{imageId}_thumb.jpg",
+                $"recipes/{recipeId}/images/{imageId}_thumb.webp",
                 It.IsAny<Stream>(),
-                "image/jpeg",
+                "image/webp",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(expectedThumbUrl);
 
@@ -155,21 +155,21 @@ public class ImageResizeJobTests : IDisposable
 
         _storageServiceMock.Verify(x => x.UploadAsync(
             "culinaryblog",
-            $"recipes/{recipeId}/images/{imageId}_medium.jpg",
+            $"recipes/{recipeId}/images/{imageId}_medium.webp",
             It.IsAny<Stream>(),
-            "image/jpeg",
+            "image/webp",
             It.IsAny<CancellationToken>()), Times.Once);
 
         _storageServiceMock.Verify(x => x.UploadAsync(
             "culinaryblog",
-            $"recipes/{recipeId}/images/{imageId}_thumb.jpg",
+            $"recipes/{recipeId}/images/{imageId}_thumb.webp",
             It.IsAny<Stream>(),
-            "image/jpeg",
+            "image/webp",
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task ProcessAsync_WithValidPngImage_PreservesPngFormatAndResizesCorrectly()
+    public async Task ProcessAsync_WithValidPngImage_ConvertsToWatermarkedWebp()
     {
         // Arrange: Tạo ảnh PNG 1000x500 thật
         var recipeId = Guid.NewGuid();
@@ -198,20 +198,20 @@ public class ImageResizeJobTests : IDisposable
         _storageServiceMock
             .Setup(x => x.UploadAsync(
                 "culinaryblog",
-                $"recipes/{recipeId}/images/{imageId}_medium.png",
+                $"recipes/{recipeId}/images/{imageId}_medium.webp",
                 It.IsAny<Stream>(),
-                "image/png",
+                "image/webp",
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync($"http://localhost:9000/culinaryblog/recipes/{recipeId}/images/{imageId}_medium.png");
+            .ReturnsAsync($"http://localhost:9000/culinaryblog/recipes/{recipeId}/images/{imageId}_medium.webp");
 
         _storageServiceMock
             .Setup(x => x.UploadAsync(
                 "culinaryblog",
-                $"recipes/{recipeId}/images/{imageId}_thumb.png",
+                $"recipes/{recipeId}/images/{imageId}_thumb.webp",
                 It.IsAny<Stream>(),
-                "image/png",
+                "image/webp",
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync($"http://localhost:9000/culinaryblog/recipes/{recipeId}/images/{imageId}_thumb.png");
+            .ReturnsAsync($"http://localhost:9000/culinaryblog/recipes/{recipeId}/images/{imageId}_thumb.webp");
 
         // Act
         await _job.ProcessAsync(imageId);
@@ -219,8 +219,8 @@ public class ImageResizeJobTests : IDisposable
         // Assert
         var updatedImage = await _dbContext.RecipeImages.FindAsync(imageId);
         updatedImage.Should().NotBeNull();
-        updatedImage!.MediumUrl.Should().EndWith("_medium.png");
-        updatedImage.ThumbnailUrl.Should().EndWith("_thumb.png");
+        updatedImage!.MediumUrl.Should().EndWith("_medium.webp");
+        updatedImage.ThumbnailUrl.Should().EndWith("_thumb.webp");
     }
 
     [Fact]

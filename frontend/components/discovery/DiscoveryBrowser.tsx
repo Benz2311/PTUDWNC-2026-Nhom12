@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import { getRecipes, searchRecipes } from '@/lib/api/recipes';
+import { getRecipes } from '@/lib/api/recipes';
+import { getRecipeSearchSuggestions, smartSearchRecipes, type SmartSearchFilters } from '@/lib/api/search';
 import type { RecipeSummary } from '@/types/recipe';
 import RecipeList from '@/components/recipes/RecipeList';
 
@@ -21,6 +22,21 @@ export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserP
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [searchFilters, setSearchFilters] = useState<Partial<SmartSearchFilters>>({});
+
+  useEffect(() => {
+    if (mode !== 'search' || query.trim().length < 2 || query.trim() === submittedQuery.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void getRecipeSearchSuggestions(query)
+        .then(setSuggestions)
+        .catch(() => setSuggestions([]));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [mode, query, submittedQuery]);
 
   useEffect(() => {
     apiFetch<unknown>('/api/v1/categories', {}, false)
@@ -50,9 +66,18 @@ export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserP
       .catch((reason: Error) => setError(reason.message));
 
     if (mode === 'search') {
-      const initialQuery = new URLSearchParams(window.location.search).get('q') ?? '';
+      const params = new URLSearchParams(window.location.search);
+      const initialQuery = params.get('q') ?? '';
       setQuery(initialQuery);
       setSubmittedQuery(initialQuery);
+      setCategoryId(params.get('categoryId') ?? '');
+      const filterKeys: Array<keyof SmartSearchFilters> = [
+        'difficulty', 'maxCookTime', 'minCalories', 'maxCalories', 'minProtein', 'maxProtein',
+        'minCarb', 'maxCarb', 'minFat', 'maxFat', 'minRating', 'includeIngredients', 'excludeIngredients', 'sortBy',
+      ];
+      setSearchFilters(Object.fromEntries(
+        filterKeys.flatMap((key) => params.has(key) ? [[key, params.get(key) ?? '']] : []),
+      ) as Partial<SmartSearchFilters>);
     }
   }, [mode]);
 
@@ -70,7 +95,13 @@ export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserP
     setError('');
     const filters = { page, pageSize: 12, categoryId: categoryId || undefined };
     const request = mode === 'search'
-      ? searchRecipes(submittedQuery, filters, false)
+      ? smartSearchRecipes({
+          ...searchFilters,
+          q: submittedQuery,
+          page,
+          pageSize: 12,
+          categoryId: categoryId || undefined,
+        })
       : getRecipes(filters, false);
     request.then((result) => {
       if (cancelled) return;
@@ -85,7 +116,7 @@ export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserP
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [categoryId, mode, page, submittedQuery]);
+  }, [categoryId, mode, page, searchFilters, submittedQuery]);
 
   const currentCategory = useMemo(() => categories.find((category) => category.id === categoryId), [categories, categoryId]);
   const totalPages = Math.max(1, Math.ceil(totalCount / 12));
@@ -99,7 +130,28 @@ export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserP
     }
     setPage(1);
     setSubmittedQuery(value);
-    if (mode === 'search') router.replace(`/search?q=${encodeURIComponent(value)}`);
+    if (mode === 'search') syncSearchUrl(value, categoryId, searchFilters);
+  }
+
+  function syncSearchUrl(
+    q: string,
+    category: string,
+    filters: Partial<SmartSearchFilters>,
+  ) {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (category) params.set('categoryId', category);
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, String(value));
+    });
+    router.replace(`/search${params.size ? `?${params.toString()}` : ''}`);
+  }
+
+  function updateSearchFilter(key: keyof SmartSearchFilters, value: string) {
+    const next = { ...searchFilters, [key]: value || undefined };
+    setSearchFilters(next);
+    setPage(1);
+    syncSearchUrl(query.trim(), categoryId, next);
   }
 
   return (
@@ -108,26 +160,73 @@ export default function DiscoveryBrowser({ mode = 'explore' }: DiscoveryBrowserP
         <h2>Bộ lọc</h2>
         {mode === 'search' && (
           <form className="discovery-search-form" onSubmit={submit}>
-            <label className="field"><span>Từ khóa</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tên món, nguyên liệu..." /></label>
+            <label className="field" style={{ position: 'relative' }}>
+              <span>Từ khóa</span>
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tên món, nguyên liệu..." role="combobox" aria-autocomplete="list" />
+              {suggestions.length > 0 ? (
+                <ul role="listbox" style={{ background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 8, listStyle: 'none', margin: 0, padding: 6, position: 'absolute', top: '100%', width: '100%', zIndex: 2 }}>
+                  {suggestions.map((suggestion) => (
+                    <li key={suggestion}>
+                      <button type="button" style={{ background: 'transparent', border: 0, padding: '7px 4px', textAlign: 'left', width: '100%' }} onClick={() => { setQuery(suggestion); setSubmittedQuery(suggestion); setSuggestions([]); router.replace(`/search?q=${encodeURIComponent(suggestion)}`); }}>
+                        {suggestion}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </label>
             <button className="primary-button" type="submit">Tìm công thức</button>
           </form>
         )}
         <fieldset>
           <legend>Danh mục</legend>
-          <label><input type="radio" name="category" checked={!categoryId} onChange={() => { setCategoryId(''); setPage(1); }} /> Tất cả danh mục</label>
+          <label><input type="radio" name="category" checked={!categoryId} onChange={() => { setCategoryId(''); setPage(1); if (mode === 'search') syncSearchUrl(query.trim(), '', searchFilters); }} /> Tất cả danh mục</label>
           {categories.map((category, idx) => (
             <label key={category.id || `cat-${idx}`}>
               <input
                 type="radio"
                 name="category"
                 checked={categoryId === category.id}
-                onChange={() => { setCategoryId(category.id); setPage(1); }}
+                onChange={() => { setCategoryId(category.id); setPage(1); if (mode === 'search') syncSearchUrl(query.trim(), category.id, searchFilters); }}
               />
               {category.name || 'Danh mục khác'}
               <span className="filter-count">{category.recipeCount}</span>
             </label>
           ))}
         </fieldset>
+        {mode === 'search' ? (
+          <fieldset className="advanced-search-filters">
+            <legend>Bộ lọc nâng cao</legend>
+            <label className="field">Độ khó
+              <select value={searchFilters.difficulty ?? ''} onChange={(event) => updateSearchFilter('difficulty', event.target.value)}>
+                <option value="">Tất cả</option><option value="Easy">Dễ</option><option value="Medium">Trung bình</option><option value="Hard">Khó</option>
+              </select>
+            </label>
+            <label className="field">Thời gian nấu tối đa (phút)
+              <input type="number" min="1" value={searchFilters.maxCookTime ?? ''} onChange={(event) => updateSearchFilter('maxCookTime', event.target.value)} />
+            </label>
+            <label className="field">Calories tối đa
+              <input type="number" min="0" value={searchFilters.maxCalories ?? ''} onChange={(event) => updateSearchFilter('maxCalories', event.target.value)} />
+            </label>
+            <label className="field">Protein tối thiểu (g)
+              <input type="number" min="0" value={searchFilters.minProtein ?? ''} onChange={(event) => updateSearchFilter('minProtein', event.target.value)} />
+            </label>
+            <label className="field">Đánh giá tối thiểu
+              <input type="number" min="0" max="5" step="0.5" value={searchFilters.minRating ?? ''} onChange={(event) => updateSearchFilter('minRating', event.target.value)} />
+            </label>
+            <label className="field">Có nguyên liệu
+              <input value={searchFilters.includeIngredients ?? ''} onChange={(event) => updateSearchFilter('includeIngredients', event.target.value)} placeholder="thịt bò, hành" />
+            </label>
+            <label className="field">Loại trừ nguyên liệu
+              <input value={searchFilters.excludeIngredients ?? ''} onChange={(event) => updateSearchFilter('excludeIngredients', event.target.value)} placeholder="đậu phộng, tôm" />
+            </label>
+            <label className="field">Sắp xếp
+              <select value={searchFilters.sortBy ?? 'relevance'} onChange={(event) => updateSearchFilter('sortBy', event.target.value)}>
+                <option value="relevance">Liên quan</option><option value="rating">Đánh giá</option><option value="newest">Mới nhất</option><option value="cookTime">Thời gian nấu</option>
+              </select>
+            </label>
+          </fieldset>
+        ) : null}
         <p className="filter-note">Chỉ hiển thị công thức đã xuất bản.</p>
       </aside>
       <section className="recipe-results">

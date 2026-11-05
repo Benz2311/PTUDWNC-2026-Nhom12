@@ -1,4 +1,5 @@
 using CulinaryBlog.Application.Repositories;
+using CulinaryBlog.Application.DTOs.Admin;
 using CulinaryBlog.Domain.Entities;
 using CulinaryBlog.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -52,7 +53,9 @@ public class UserRepository : IUserRepository
         var lower = emailOrUserName.Trim().ToLowerInvariant();
         return await _db.Users
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.UserName.ToLower() == lower || x.Email.ToLower() == lower, cancellationToken);
+            .FirstOrDefaultAsync(
+                x => x.UserName.ToLower() == lower || x.Email.ToLower() == lower,
+                cancellationToken);
     }
 
     public async Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)
@@ -91,19 +94,76 @@ public class UserRepository : IUserRepository
                 x.Id.ToString(),
                 x.UserName,
                 x.Email,
-                x.FullName,
+                x.DisplayName,
                 x.AvatarUrl,
-                x.Bio))
+                x.Bio,
+                x.EmailConfirmed,
+                x.Roles ?? Array.Empty<string>(),
+                x.IsActive,
+                x.CreatedAt))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task<UserProfileDto?> GetProfileAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<UserProfileDto?> GetProfileAsync(string userId, CancellationToken cancellationToken = default)
     {
         if (Guid.TryParse(userId, out var guid))
         {
-            return GetProfileAsync(guid, cancellationToken);
+            return await GetProfileAsync(guid, cancellationToken);
         }
 
-        return Task.FromResult<UserProfileDto?>(null);
+        return null;
+    }
+
+    public async Task<(IReadOnlyList<AdminUserListItemDto> Items, int TotalCount)> GetUsersAsync(
+        int page, int pageSize, string? keyword, bool? isActive, CancellationToken cancellationToken = default)
+    {
+        var query = _db.Users.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var normalizedKeyword = keyword.Trim().ToUpperInvariant();
+            query = query.Where(x =>
+                x.UserName.ToUpper().Contains(normalizedKeyword) ||
+                x.Email.ToUpper().Contains(normalizedKeyword) ||
+                x.DisplayName.ToUpper().Contains(normalizedKeyword));
+        }
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(x => x.IsActive == isActive.Value);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var users = await query
+            .OrderByDescending(x => x.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new
+            {
+                Id = x.Id.ToString(),
+                x.UserName,
+                x.DisplayName,
+                x.Email,
+                x.AvatarUrl,
+                Roles = x.Roles ?? Array.Empty<string>(),
+                x.IsActive,
+                x.CreatedAt,
+                RecipeCount = _db.Recipes.Count(recipe => recipe.AuthorId == x.Id && !recipe.IsDeleted)
+            })
+            .ToListAsync(cancellationToken);
+
+        var items = users.Select(user => new AdminUserListItemDto(
+            user.Id,
+            user.UserName,
+            user.DisplayName,
+            user.Email,
+            user.AvatarUrl,
+            user.Roles,
+            user.IsActive,
+            new DateTimeOffset(DateTime.SpecifyKind(user.CreatedAt, DateTimeKind.Utc)),
+            user.RecipeCount)).ToArray();
+
+        return (items, totalCount);
     }
 }

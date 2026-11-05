@@ -388,6 +388,9 @@ export default function RecipeForm({
         Draft: 'Bản nháp',
         Published: 'Đã xuất bản',
         Archived: 'Đã lưu trữ',
+        PendingApproval: 'Chờ duyệt',
+        Approved: 'Đã duyệt',
+        Rejected: 'Bị từ chối',
       };
       setSuccessMessage(`Đã cập nhật trạng thái thành công: ${statusMap[data.status] || data.status}.`);
     } catch (error: unknown) {

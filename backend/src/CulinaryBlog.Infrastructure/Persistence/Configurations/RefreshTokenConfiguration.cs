@@ -15,6 +15,17 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
         builder.Property(x => x.TokenHash)
             .HasColumnName("TokenHash")
             .HasMaxLength(64)
+            .IsRequired()
+            .HasMaxLength(64);
+
+        builder.HasIndex(x => x.TokenHash)
+            .IsUnique();
+
+        builder.HasIndex(x => x.UserId);
+        builder.HasIndex(x => x.ExpiresAt);
+        builder.HasIndex(x => x.RevokedAt);
+
+        builder.Property(x => x.ExpiresAt)
             .IsRequired();
 
         builder.Property(x => x.ReplacedByTokenHash)

@@ -76,7 +76,6 @@ test("navigation links change the page route", async ({ page }) => {
   const firstNavLink = page.locator("nav a").first();
 
   if (await firstNavLink.isVisible()) {
-    const href = await firstNavLink.getAttribute("href");
     await firstNavLink.click();
 
     await page.waitForLoadState("networkidle");

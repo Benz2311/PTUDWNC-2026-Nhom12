@@ -7,6 +7,8 @@ import DifficultyBadge from './DifficultyBadge';
 import RecipeMeta from './RecipeMeta';
 import RecipeStatusBadge from './RecipeStatusBadge';
 import RecipeTimeInfo from './RecipeTimeInfo';
+import { RecipeInteractionPanel } from './RecipeInteractionPanel';
+import FollowAuthorButton from '@/components/social/FollowAuthorButton';
 
 const nutritionLabels = [
   ['calories', 'Calories', 'kcal'],
@@ -52,6 +54,11 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
         <h1 className="flow-title mt-4 text-3xl font-bold text-slate-950 md:text-5xl">{recipe.title}</h1>
         {recipe.description && <p className="detail-lead mx-auto mt-3 max-w-3xl text-slate-600">{recipe.description}</p>}
         <RecipeMeta category={recipe.category} author={recipe.author} publishedAt={recipe.publishedAt} />
+        {(recipe.authorId || recipe.author?.id) && (
+          <div className="mt-3 flex justify-center">
+            <FollowAuthorButton authorId={recipe.authorId ?? recipe.author.id} compact />
+          </div>
+        )}
         <RecipeTimeInfo
           prepTimeMinutes={recipe.prepTimeMinutes ?? recipe.prepTime}
           cookTimeMinutes={recipe.cookTimeMinutes ?? recipe.cookTime}
@@ -183,6 +190,8 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
           )}
         </aside>
       </div>
+
+      <RecipeInteractionPanel recipeId={recipe.id} />
 
       <Link className="outline-button detail-back" href="/search">
         ← Danh sách công thức

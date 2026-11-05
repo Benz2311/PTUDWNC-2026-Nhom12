@@ -4,23 +4,24 @@ using Microsoft.Extensions.Logging;
 
 namespace CulinaryBlog.Infrastructure.Caching;
 
-/// <summary>
-/// Triển khai ICacheService bao bọc IDistributedCache (Redis) với cơ chế Failover an toàn theo SRS v1.2.0:
-/// Khi Redis bị sập hoặc mất kết nối, tự động fallback truy vấn trực tiếp vào DB mà không quăng Exception.
-/// Hỗ trợ cả 2 interface ICacheService của Application và Application.Common.
-/// </summary>
-public class ResilientCacheService :
+public sealed class ResilientCacheService :
     CulinaryBlog.Application.Common.Interfaces.ICacheService,
     CulinaryBlog.Application.Interfaces.ICacheService
 {
-    private readonly IDistributedCache? _distributedCache;
-    private readonly ILogger<ResilientCacheService> _logger;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
     };
+    private static readonly TimeSpan CircuitBreakerCooldown = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan OperationTimeout = TimeSpan.FromMilliseconds(500);
 
-    public ResilientCacheService(ILogger<ResilientCacheService> logger, IDistributedCache? distributedCache = null)
+    private readonly IDistributedCache? _distributedCache;
+    private readonly ILogger<ResilientCacheService> _logger;
+    private long _circuitBreakerUntilTicks;
+
+    public ResilientCacheService(
+        ILogger<ResilientCacheService> logger,
+        IDistributedCache? distributedCache = null)
     {
         _logger = logger;
         _distributedCache = distributedCache;
@@ -28,73 +29,99 @@ public class ResilientCacheService :
 
     public async Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default)
     {
-        if (_distributedCache == null)
+        if (_distributedCache is null || IsCircuitOpen())
         {
             return default;
         }
 
         try
         {
-            var cachedBytes = await _distributedCache.GetAsync(key, cancellationToken);
-            if (cachedBytes == null || cachedBytes.Length == 0)
-            {
-                return default;
-            }
-
-            return JsonSerializer.Deserialize<T>(cachedBytes, JsonOptions);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(OperationTimeout);
+            var cachedBytes = await _distributedCache.GetAsync(key, timeout.Token);
+            CloseCircuit();
+            return cachedBytes is { Length: > 0 }
+                ? JsonSerializer.Deserialize<T>(cachedBytes, JsonOptions)
+                : default;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            // SRS Mục 4.5 & 6.4: Redis failover - nếu Redis down -> fallback database, không throw exception
-            _logger.LogWarning(ex, "Redis cache read error for key '{CacheKey}'. Falling back to database.", key);
+            OpenCircuit();
+            _logger.LogWarning(
+                exception,
+                "Redis cache read error for key '{CacheKey}'. Circuit opened for {CooldownSeconds}s.",
+                key,
+                CircuitBreakerCooldown.TotalSeconds);
             return default;
         }
     }
 
-    public async Task SetAsync<T>(string key, T value, TimeSpan? expiration = null, CancellationToken cancellationToken = default)
+    public async Task SetAsync<T>(
+        string key,
+        T value,
+        TimeSpan? expiration = null,
+        CancellationToken cancellationToken = default)
     {
-        if (_distributedCache == null || value == null)
+        if (_distributedCache is null || value is null || IsCircuitOpen())
         {
             return;
         }
 
         try
         {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(OperationTimeout);
             var bytes = JsonSerializer.SerializeToUtf8Bytes(value, JsonOptions);
             var options = new DistributedCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = expiration ?? TimeSpan.FromMinutes(1)
+                AbsoluteExpirationRelativeToNow = expiration ?? TimeSpan.FromMinutes(1),
             };
-
-            await _distributedCache.SetAsync(key, bytes, options, cancellationToken);
+            await _distributedCache.SetAsync(key, bytes, options, timeout.Token);
+            CloseCircuit();
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            _logger.LogWarning(ex, "Redis cache write error for key '{CacheKey}'. Skipping cache update.", key);
+            OpenCircuit();
+            _logger.LogWarning(
+                exception,
+                "Redis cache write error for key '{CacheKey}'. Circuit opened for {CooldownSeconds}s.",
+                key,
+                CircuitBreakerCooldown.TotalSeconds);
         }
     }
 
     public async Task RemoveAsync(string key, CancellationToken cancellationToken = default)
     {
-        if (_distributedCache == null)
+        if (_distributedCache is null || IsCircuitOpen())
         {
             return;
         }
 
         try
         {
-            await _distributedCache.RemoveAsync(key, cancellationToken);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(OperationTimeout);
+            await _distributedCache.RemoveAsync(key, timeout.Token);
+            CloseCircuit();
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            _logger.LogWarning(ex, "Redis cache remove error for key '{CacheKey}'. Skipping cache invalidate.", key);
+            OpenCircuit();
+            _logger.LogWarning(exception, "Redis cache remove error for key '{CacheKey}'.", key);
         }
     }
 
-    public async Task RemoveByPrefixAsync(string prefix, CancellationToken cancellationToken = default)
+    public Task RemoveByPrefixAsync(string prefix, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    private bool IsCircuitOpen()
     {
-        // IDistributedCache không hỗ trợ scan theo prefix mặc định;
-        // Bắt lỗi an toàn nếu có lỗi
-        await Task.CompletedTask;
+        var retryAt = Interlocked.Read(ref _circuitBreakerUntilTicks);
+        return retryAt > DateTime.UtcNow.Ticks;
     }
+
+    private void OpenCircuit() =>
+        Interlocked.Exchange(ref _circuitBreakerUntilTicks, DateTime.UtcNow.Add(CircuitBreakerCooldown).Ticks);
+
+    private void CloseCircuit() => Interlocked.Exchange(ref _circuitBreakerUntilTicks, 0);
 }

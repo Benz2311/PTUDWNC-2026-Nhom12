@@ -1,5 +1,9 @@
 @baseUrl = http://localhost:5000
 @accessToken = paste-access-token-here
+@authorId = 11111111-1111-4111-8111-111111111111
+@mealPlanId = 22222222-2222-4222-8222-222222222222
+@mealItemId = 33333333-3333-4333-8333-333333333333
+@imagePath = C:\temp\recipe.jpg
 
 ### Public: list published recipes
 GET {{baseUrl}}/api/v1/recipes?page=1&pageSize=12
@@ -22,10 +26,103 @@ Content-Type: application/json
   "password": "your-password"
 }
 
+### Public: request a password-reset email
+POST {{baseUrl}}/api/v1/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "your-email@example.com"
+}
+
+### Public: reset password using the emailed token
+POST {{baseUrl}}/api/v1/auth/reset-password
+Content-Type: application/json
+
+{
+  "token": "paste-reset-token-here",
+  "newPassword": "NewPassword123!"
+}
+
 ### Protected: get the current account
 GET {{baseUrl}}/api/v1/auth/me
 Authorization: Bearer {{accessToken}}
 Accept: application/json
+
+### Protected: follow an author
+POST {{baseUrl}}/api/v1/users/{{authorId}}/follow
+Authorization: Bearer {{accessToken}}
+
+### Protected: get follow status
+GET {{baseUrl}}/api/v1/users/{{authorId}}/follow-status
+Authorization: Bearer {{accessToken}}
+
+### Protected: unfollow an author
+DELETE {{baseUrl}}/api/v1/users/{{authorId}}/follow
+Authorization: Bearer {{accessToken}}
+
+### Protected: list an author's followers
+GET {{baseUrl}}/api/v1/users/{{authorId}}/followers?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Protected: get feed activities
+GET {{baseUrl}}/api/v1/me/feed?page=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+
+### Protected: set nutrition goals
+PUT {{baseUrl}}/api/v1/me/nutrition-goals
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "age": 30,
+  "gender": "Female",
+  "heightCm": 165,
+  "weightKg": 65,
+  "activityLevel": "Moderate",
+  "goalType": "Maintenance"
+}
+
+### Protected: get nutrition goals
+GET {{baseUrl}}/api/v1/me/nutrition-goals
+Authorization: Bearer {{accessToken}}
+
+### Protected: mark a meal as consumed
+PATCH {{baseUrl}}/api/v1/me/meal-plans/{{mealPlanId}}/items/{{mealItemId}}/consumed
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "consumed": true
+}
+
+### Protected: get today's consumed nutrition
+GET {{baseUrl}}/api/v1/me/nutrition-summary
+Authorization: Bearer {{accessToken}}
+
+### Protected: get this week's consumed nutrition
+GET {{baseUrl}}/api/v1/me/nutrition-summary?period=week
+Authorization: Bearer {{accessToken}}
+
+### Protected: suggest recipes from available ingredients
+POST {{baseUrl}}/api/v1/ai/suggest-by-ingredients
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "ingredients": ["tomato", "onion", "chicken"]
+}
+
+### Protected: extract a recipe draft from an image
+POST {{baseUrl}}/api/v1/ai/ocr-recipe
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=recipeBoundary
+
+--recipeBoundary
+Content-Disposition: form-data; name="image"; filename="recipe.jpg"
+Content-Type: image/jpeg
+
+< {{imagePath}}
+--recipeBoundary--
 
 ### Protected: create a recipe draft
 POST {{baseUrl}}/api/v1/recipes

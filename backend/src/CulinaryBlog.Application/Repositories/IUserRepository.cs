@@ -1,4 +1,5 @@
 using CulinaryBlog.Domain.Entities;
+using CulinaryBlog.Application.DTOs.Admin;
 
 namespace CulinaryBlog.Application.Repositories;
 
@@ -15,6 +16,8 @@ public interface IUserRepository
     Task UpdateAsync(ApplicationUser user, CancellationToken cancellationToken = default);
     Task<UserProfileDto?> GetProfileAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<UserProfileDto?> GetProfileAsync(string userId, CancellationToken cancellationToken = default);
+    Task<(IReadOnlyList<AdminUserListItemDto> Items, int TotalCount)> GetUsersAsync(
+        int page, int pageSize, string? keyword, bool? isActive, CancellationToken cancellationToken = default);
 }
 
 public record UserProfileDto(
@@ -23,4 +26,8 @@ public record UserProfileDto(
     string Email,
     string DisplayName,
     string? AvatarUrl,
-    string? Bio);
+    string? Bio,
+    bool EmailConfirmed,
+    string[] Roles,
+    bool IsActive,
+    DateTime CreatedAt);

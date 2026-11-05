@@ -13,9 +13,6 @@ const eslintConfig = [
   // Next.js + TypeScript base rules
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 
-  // Airbnb ruleset (compatible with flat config via FlatCompat)
-  ...compat.extends("airbnb", "airbnb-typescript"),
-
   // Prettier MUST be last — disables rules that conflict with Prettier formatting
   ...compat.extends("prettier"),
 
@@ -31,6 +28,8 @@ const eslintConfig = [
       "react/jsx-props-no-spreading": "off",
       // Allow functions as React components without .displayName
       "react/display-name": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-empty-object-type": "off",
     },
   },
 

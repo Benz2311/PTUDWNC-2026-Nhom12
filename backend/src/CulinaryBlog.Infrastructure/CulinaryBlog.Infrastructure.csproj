@@ -6,8 +6,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Google Auth -->
+    <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
+
     <!-- Seed -->
     <PackageReference Include="Bogus" Version="35.6.5" />
+    <PackageReference Include="HeyRed.ImageSharp.Heif" Version="2.1.3" />
+    <PackageReference Include="LibHeif.Native" Version="1.15.1" />
 
     <!-- EF Core -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
@@ -25,6 +34,8 @@
     <!-- JWT -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.19.2" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.2.0" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
 
     <!-- Redis -->
     <PackageReference Include="StackExchange.Redis" Version="2.8.24" />
@@ -47,14 +58,14 @@
     <PackageReference Include="Serilog.Sinks.Seq" Version="9.0.0" />
 
     <!-- OpenTelemetry -->
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.12.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.12.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.12.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.12.0-beta.1" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.16.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.16.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.16.0-beta.1" />
 
     <!-- Email -->
-    <PackageReference Include="MailKit" Version="4.16.0" />
+    <PackageReference Include="MailKit" Version="4.18.2" />
 
     <!-- Static analysis -->
     <PackageReference Include="SonarAnalyzer.CSharp" Version="10.7.0.110445">
@@ -86,6 +97,16 @@
     <Compile Include="Persistence\Migrations\20261003100000_AddRecipeNutritionSource.cs" />
     <Compile Include="Persistence\Migrations\20261008034322_AlignCurrentRecipeModel.cs" />
     <Compile Include="Persistence\Migrations\20261008034322_AlignCurrentRecipeModel.Designer.cs" />
+    <Compile Include="Persistence\Migrations\20261103025228_SetRecipeServingsDefault1.cs" />
+    <Compile Include="Persistence\Migrations\20261103025228_SetRecipeServingsDefault1.Designer.cs" />
+    <Compile Include="Persistence\Migrations\20261103043428_AddRecipeInteractionTables.cs" />
+    <Compile Include="Persistence\Migrations\20261103043428_AddRecipeInteractionTables.Designer.cs" />
+    <Compile Include="Persistence\Migrations\20261103051143_AddMealPlanAndShoppingList.cs" />
+    <Compile Include="Persistence\Migrations\20261103051143_AddMealPlanAndShoppingList.Designer.cs" />
+    <Compile Include="Persistence\Migrations\20261104082500_AddPersonalPlanningV2.cs" />
+    <Compile Include="Persistence\Migrations\20261104090000_AddRevisionsAndModeration.cs" />
+    <Compile Include="Persistence\Migrations\20261104100000_ExpandRecipeSearchVector.cs" />
+    <Compile Include="Persistence\Migrations\20261104120000_AddPhaseFourSocialNutrition.cs" />
     <Compile Include="Migrations\ApplicationDbContextModelSnapshot.cs" />
   </ItemGroup>
 

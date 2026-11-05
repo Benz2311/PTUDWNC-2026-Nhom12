@@ -5,13 +5,20 @@ import { useRouter } from 'next/navigation';
 import { apiFetch, apiJson, clearAuth } from '@/lib/api';
 import type { ApiError } from '@/lib/api';
 
-type User = { fullName: string; email: string; userName?: string; avatarUrl?: string | null; roles?: string[]; emailConfirmed?: boolean };
+type User = { displayName?: string; fullName?: string; email: string; userName?: string; avatarUrl?: string | null; roles?: string[]; emailConfirmed?: boolean };
+
+function getDisplayName(user: User | null | undefined): string {
+  const name = [user?.displayName, user?.fullName, user?.userName, user?.email]
+    .find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+  return name?.trim() || 'Người dùng';
+}
 
 export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loadError, setLoadError] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
@@ -24,8 +31,9 @@ export default function ProfilePage() {
 
     apiJson<User>('/api/v1/auth/me')
       .then((profile) => {
-        setUser(profile);
-        setFullName(profile.fullName);
+        const name = getDisplayName(profile);
+        setUser({ ...profile, displayName: name });
+        setDisplayName(name);
         setAvatarUrl(profile.avatarUrl ?? '');
       })
       .catch((error: ApiError) => {
@@ -47,9 +55,9 @@ export default function ProfilePage() {
       const updated = await apiFetch<User>('/api/v1/auth/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullName, avatarUrl: avatarUrl || null }),
+        body: JSON.stringify({ displayName, avatarUrl: avatarUrl || null }),
       });
-      setUser(updated);
+      setUser({ ...updated, displayName: getDisplayName(updated) });
       setMessage('Thông tin hồ sơ đã được cập nhật.');
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : 'Không thể cập nhật hồ sơ.');
@@ -82,25 +90,27 @@ export default function ProfilePage() {
     return <p className="loading-state">Đang tải hồ sơ...</p>;
   }
 
+  const name = getDisplayName(user);
+
   return (
     <>
       <div className="flow-kicker">Hồ sơ cá nhân</div>
-      <h1 className="flow-title">Bếp của {user.fullName}</h1>
+      <h1 className="flow-title">Bếp của {name}</h1>
       <p className="flow-description">Quản lý thông tin tài khoản và những công thức bạn đã chia sẻ.</p>
       <div className="profile-workspace">
         <aside className="recipe-filter-panel profile-menu">
-          <div className="profile-avatar" role={user.avatarUrl ? 'img' : undefined} aria-label={user.avatarUrl ? `Ảnh đại diện của ${user.fullName}` : undefined} style={user.avatarUrl ? { backgroundImage: `url("${user.avatarUrl}")` } : undefined}>{user.avatarUrl ? null : user.fullName.slice(0, 1).toUpperCase()}</div>
-          <strong>{user.fullName}</strong><span>{user.email}</span>
+          <div className="profile-avatar" role={user.avatarUrl ? 'img' : undefined} aria-label={user.avatarUrl ? `Ảnh đại diện của ${name}` : undefined} style={user.avatarUrl ? { backgroundImage: `url("${user.avatarUrl}")` } : undefined}>{user.avatarUrl ? null : name.slice(0, 1).toUpperCase()}</div>
+          <strong>{name}</strong><span>{user.email}</span>
           <a href="/profile" className="is-current">◉ Hồ sơ cá nhân</a>
           <a href="/recipes">▤ Công thức của tôi</a>
           <a href="/recipes/new">＋ Chia sẻ công thức</a>
-          {user.roles?.includes('Admin') && <a href="/admin">⚙ Quản trị hệ thống</a>}
+          {user.roles?.some((role) => role.trim().toLowerCase() === 'admin') && <a href="/admin">⚙ Quản trị hệ thống</a>}
           <button className="outline-button" type="button" onClick={handleLogout}>Đăng xuất</button>
         </aside>
         <section className="form-section profile-form-panel">
           <div className="form-section-heading"><span className="step-number">01</span><div><h2>Thông tin cá nhân</h2><p>Cập nhật tên hiển thị và ảnh đại diện.</p></div></div>
           <form className="auth-form" onSubmit={saveProfile}>
-            <label className="field"><span>Họ và tên</span><input required minLength={1} maxLength={100} value={fullName} onChange={(event) => setFullName(event.target.value)} /></label>
+            <label className="field"><span>Họ và tên</span><input required minLength={1} maxLength={100} value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
             <label className="field"><span>Email đăng nhập</span><input value={user.email} disabled /></label>
             <label className="field"><span>Đường dẫn ảnh đại diện</span><input type="url" value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} placeholder="https://..." /></label>
             <label className="field"><span>Trạng thái email</span><input value={user.emailConfirmed ? 'Đã xác nhận' : 'Chưa xác nhận'} disabled /></label>

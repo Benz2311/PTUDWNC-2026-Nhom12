@@ -18,6 +18,8 @@ import {
   type RecipeStep,
   type RecipeSummary,
   type RecipeTrashPage,
+  type RecipeRatingSummary,
+  type RecipeComment,
 } from '@/types/recipe';
 
 export type RecipeSort = 'newest' | 'oldest' | 'title' | 'cooktime';
@@ -286,5 +288,75 @@ export async function deleteRecipeImage(recipeId: string, imageId: string, etag:
   await apiFetch<void>(
     `${recipeBasePath}/${encodeURIComponent(recipeId)}/images/${encodeURIComponent(imageId)}`,
     { method: 'DELETE', headers: { 'If-Match': requireEtag(etag) } },
+  );
+}
+
+export async function getRecipeFavoriteStatus(recipeId: string): Promise<{ isFavorite: boolean }> {
+  return apiFetch<{ isFavorite: boolean }>(`${recipeBasePath}/${encodeURIComponent(recipeId)}/favorite`);
+}
+
+export async function toggleRecipeFavorite(recipeId: string): Promise<{ isFavorite: boolean }> {
+  return apiFetch<{ isFavorite: boolean }>(
+    `${recipeBasePath}/${encodeURIComponent(recipeId)}/favorite`,
+    { method: 'POST' },
+  );
+}
+
+export async function getRecipeRating(recipeId: string): Promise<RecipeRatingSummary> {
+  return apiFetch<RecipeRatingSummary>(
+    `${recipeBasePath}/${encodeURIComponent(recipeId)}/ratings`,
+    {},
+    false,
+  );
+}
+
+export async function setRecipeRating(recipeId: string, score: number): Promise<RecipeRatingSummary> {
+  return apiFetch<RecipeRatingSummary>(
+    `${recipeBasePath}/${encodeURIComponent(recipeId)}/ratings/me`,
+    { method: 'PUT', headers: jsonHeaders(), body: JSON.stringify({ score }) },
+  );
+}
+
+export async function getRecipeComments(recipeId: string, page = 1, pageSize = 20) {
+  const result = await apiFetch<unknown>(
+    `${recipeBasePath}/${encodeURIComponent(recipeId)}/comments?page=${page}&pageSize=${pageSize}`,
+    {},
+    false,
+  );
+
+  if (result && typeof result === 'object' && !Array.isArray(result)) {
+    const envelope = result as {
+      data?: unknown;
+      meta?: { page?: unknown; pageSize?: unknown; total?: unknown };
+    };
+    if (Array.isArray(envelope.data)) {
+      return {
+        items: envelope.data as RecipeComment[],
+        page: typeof envelope.meta?.page === 'number' ? envelope.meta.page : page,
+        pageSize: typeof envelope.meta?.pageSize === 'number' ? envelope.meta.pageSize : pageSize,
+        totalCount: typeof envelope.meta?.total === 'number' ? envelope.meta.total : envelope.data.length,
+      };
+    }
+  }
+
+  if (Array.isArray(result)) {
+    return { items: result as RecipeComment[], page, pageSize, totalCount: result.length };
+  }
+
+  return { items: [], page, pageSize, totalCount: 0 };
+}
+
+export async function createRecipeComment(
+  recipeId: string,
+  content: string,
+  parentCommentId?: string,
+): Promise<RecipeComment> {
+  return apiFetch<RecipeComment>(
+    `${recipeBasePath}/${encodeURIComponent(recipeId)}/comments`,
+    {
+      method: 'POST',
+      headers: jsonHeaders(),
+      body: JSON.stringify({ content, parentCommentId: parentCommentId ?? null }),
+    },
   );
 }

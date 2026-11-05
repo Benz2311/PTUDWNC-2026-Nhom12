@@ -7,10 +7,10 @@
 
   <ItemGroup>
     <!-- Explicitly pin patched transitive dependencies to resolve NuGet audit advisories -->
-    <PackageReference Include="MailKit" Version="4.16.0" />
-    <PackageReference Include="MimeKit" Version="4.16.0" />
-    <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="MailKit" Version="4.18.2" />
+    <PackageReference Include="MimeKit" Version="4.18.2" />
+    <PackageReference Include="OpenTelemetry.Api" Version="1.16.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -40,6 +40,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <UserSecretsId>CulinaryBlog.Api</UserSecretsId>
   </PropertyGroup>
 
 </Project>

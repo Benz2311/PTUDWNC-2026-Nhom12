@@ -9,6 +9,8 @@ import { createRecipe } from '@/lib/api/recipes';
 import { DIFFICULTY_MAP } from '@/types/recipe';
 import { ApiError } from '@/lib/api/client';
 import { StepEditor } from '@/components/recipe-management/StepEditor';
+import OcrRecipeImportModal from '@/components/ai/OcrRecipeImportModal';
+import type { OcrRecipeDraft } from '@/lib/api/phase-four';
 import type { Category } from '@/types/category';
 import type { RecipeStep } from '@/types/step';
 
@@ -66,6 +68,31 @@ export default function CreateRecipePage() {
     setIngredients((current) => current.filter((item) => item.id !== id).map((item, index) => ({ ...item, sortOrder: index })));
   };
 
+  const importOcrDraft = (draft: OcrRecipeDraft) => {
+    setTitle(draft.title);
+    setDescription(draft.description);
+    setContent(
+      draft.description ||
+      draft.steps.map((step) => [step.title, step.description].filter(Boolean).join('\n')).join('\n\n')
+    );
+    setIngredients(draft.ingredients.map((ingredient, index) => ({
+      id: crypto.randomUUID(),
+      name: ingredient.name,
+      quantity: normalizeOcrQuantity(ingredient.quantity),
+      unit: ingredient.unit ?? '',
+      notes: '',
+      sortOrder: index,
+    })));
+    setSteps(draft.steps.map((step, index) => ({
+      id: crypto.randomUUID(),
+      stepNumber: index + 1,
+      title: step.title || null,
+      description: step.description,
+      timerMinutes: null,
+      imageUrl: null,
+    })));
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError('');
@@ -85,7 +112,7 @@ export default function CreateRecipePage() {
 
     const validIngredients = ingredients.filter((item) => item.name.trim());
     const quantityPattern = /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/;
-    if (validIngredients.some((item) => !quantityPattern.test(item.quantity.trim()))) {
+    if (validIngredients.some((item) => item.quantity.trim() && !quantityPattern.test(item.quantity.trim()))) {
       setError('Quantity nguyên liệu phải là số thập phân, không dùng chuỗi phân số như 1/2.');
       return;
     }
@@ -104,7 +131,7 @@ export default function CreateRecipePage() {
         nutrition,
         ingredients: validIngredients.map((item) => ({
           name: item.name.trim(),
-          quantity: Number(item.quantity),
+          quantity: item.quantity.trim() ? Number(item.quantity) : null,
           unit: item.unit.trim() || null,
           notes: item.notes.trim() || null,
           sortOrder: item.sortOrder,
@@ -136,12 +163,15 @@ export default function CreateRecipePage() {
         <ArrowLeft className="h-4 w-4" /> Danh sách công thức
       </Link>
       <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-8">
-        <div className="mb-6 flex items-center gap-3">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
           <div className="rounded-xl bg-emerald-100 p-3 text-emerald-700"><ChefHat className="h-6 w-6" /></div>
           <div>
             <p className="text-sm text-slate-500">Trạng thái: Draft</p>
             <h1 className="text-2xl font-bold text-slate-950">Tạo công thức mới</h1>
           </div>
+          </div>
+          <OcrRecipeImportModal onImport={importOcrDraft} />
         </div>
 
         {error && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -198,4 +228,17 @@ export default function CreateRecipePage() {
       </form>
     </main>
   );
+}
+
+function normalizeOcrQuantity(quantity: string | null): string {
+  if (!quantity?.trim()) return '';
+  const value = quantity.trim();
+  const fraction = /^(\d+)\s*\/\s*(\d+)$/.exec(value);
+  if (fraction) {
+    const numerator = Number(fraction[1]);
+    const denominator = Number(fraction[2]);
+    return denominator > 0 ? String(numerator / denominator) : '';
+  }
+  const number = Number(value.replace(',', '.'));
+  return Number.isFinite(number) && number >= 0 ? String(number) : '';
 }

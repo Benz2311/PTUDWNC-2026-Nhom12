@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using CulinaryBlog.API.Extensions;
 using FluentAssertions;
@@ -50,7 +51,7 @@ public sealed class RateLimitingTests
         var uploadLimit = configuration.GetValue("RateLimiting:Upload:PermitLimit", 5);
 
         authLimit.Should().Be(10, "SRS yêu cầu Auth limit 10 req/min/IP");
-        generalLimit.Should().Be(100, "SRS yêu cầu General limit 100 req/min/IP");
+        generalLimit.Should().Be(100, "SRS yêu cầu General limit 100 req/min");
         uploadLimit.Should().Be(5, "SRS yêu cầu Upload limit 5 req/min/IP");
     }
 
@@ -93,6 +94,64 @@ public sealed class RateLimitingTests
         var body = await res3.Content.ReadAsStringAsync();
         body.Should().Contain("RATE_LIMIT_EXCEEDED");
         body.Should().Contain("Too Many Requests");
+    }
+
+    [Fact]
+    public async Task RateLimiting_GeneralPolicy_UsesIndependentLimitsPerAuthenticatedUser()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+
+        var inMemorySettings = new Dictionary<string, string?>
+        {
+            ["RateLimiting:General:PermitLimit"] = "1",
+            ["RateLimiting:General:WindowSeconds"] = "60"
+        };
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(inMemorySettings)
+            .Build();
+
+        builder.Services.AddRateLimitingConfiguration(configuration);
+
+        var app = builder.Build();
+        app.Use(async (context, next) =>
+        {
+            var userId = context.Request.Headers["X-Test-User"].ToString();
+            context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                new[] { new Claim(ClaimTypes.NameIdentifier, userId) },
+                "test"));
+            await next();
+        });
+        app.UseRateLimiter();
+        app.MapGet("/api/v1/test-user", () => Results.Ok())
+            .RequireRateLimiting(RateLimitingExtensions.GeneralPolicy);
+
+        await app.StartAsync();
+        var client = app.GetTestClient();
+
+        using var requests = new SemaphoreSlim(20);
+        var results = await Task.WhenAll(Enumerable.Range(1, 100).Select(async userNumber =>
+        {
+            await requests.WaitAsync();
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/test-user");
+                request.Headers.Add("X-Test-User", $"user-{userNumber}");
+                using var response = await client.SendAsync(request);
+                return response.StatusCode;
+            }
+            finally
+            {
+                requests.Release();
+            }
+        }));
+
+        results.Should().OnlyContain(status => status == HttpStatusCode.OK);
+
+        using var repeatRequest = new HttpRequestMessage(HttpMethod.Get, "/api/v1/test-user");
+        repeatRequest.Headers.Add("X-Test-User", "user-1");
+        var repeatedResponse = await client.SendAsync(repeatRequest);
+        repeatedResponse.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
     }
 
     [Fact]

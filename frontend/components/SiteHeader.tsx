@@ -7,6 +7,7 @@ import AuthNav from '@/components/auth/AuthNav';
 const navigation = [
   { href: '/recipes', label: 'Khám phá ẩm thực' },
   { href: '/recipes/new', label: 'Học nấu ăn' },
+  { href: '/meal-planner', label: 'Kế hoạch bữa ăn' },
   { href: '/about', label: 'Kết nối cộng đồng' },
 ];
 

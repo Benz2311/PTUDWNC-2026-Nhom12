@@ -1,28 +1,21 @@
-import axios from "axios";
+import { apiGet } from "./client";
 import type {
   Category,
   CategoryDetailResponse,
   CategoryStatistics,
 } from "@/types/category";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:5000/api/v1";
-
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-  timeout: 5000,
-});
-
 export async function getCategories(): Promise<Category[]> {
   try {
-    const response = await api.get<Category[]>(
-      "/categories"
-    );
-    return response.data;
+    const response = await apiGet<unknown>("/categories");
+    const payload = response.data as unknown;
+    if (Array.isArray(payload)) return payload as Category[];
+    if (payload && typeof payload === "object") {
+      const envelope = payload as { data?: unknown; items?: unknown };
+      if (Array.isArray(envelope.data)) return envelope.data as Category[];
+      if (Array.isArray(envelope.items)) return envelope.items as Category[];
+    }
+    return [];
   } catch {
     return [];
   }
@@ -32,7 +25,7 @@ export async function getCategoryStatistics():
   Promise<CategoryStatistics> {
   try {
     const response =
-      await api.get<CategoryStatistics>(
+      await apiGet<CategoryStatistics>(
         "/categories/statistics"
       );
     return response.data;
@@ -51,7 +44,7 @@ export async function getCategoryBySlug(
   slug: string
 ): Promise<CategoryDetailResponse | null> {
   try {
-    const response = await api.get<CategoryDetailResponse>(
+    const response = await apiGet<CategoryDetailResponse>(
       `/categories/${slug}`
     );
     return response.data;
@@ -59,4 +52,3 @@ export async function getCategoryBySlug(
     return null;
   }
 }
-

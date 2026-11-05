@@ -7,13 +7,27 @@ import type { ApiError } from '@/lib/api';
 
 type AuthUser = {
   id: string;
-  fullName: string;
+  displayName?: string;
+  fullName?: string;
+  userName?: string;
   email: string;
 };
 
 type AuthNavProps = {
   variant?: 'home' | 'flow';
 };
+
+let profileRequest: { token: string; promise: Promise<AuthUser> } | null = null;
+
+function getProfile(token: string): Promise<AuthUser> {
+  if (profileRequest?.token === token) return profileRequest.promise;
+
+  const promise = apiJson<AuthUser>('/api/v1/auth/me').finally(() => {
+    if (profileRequest?.promise === promise) profileRequest = null;
+  });
+  profileRequest = { token, promise };
+  return promise;
+}
 
 export default function AuthNav({ variant = 'home' }: AuthNavProps) {
   const router = useRouter();
@@ -38,13 +52,14 @@ export default function AuthNav({ variant = 'home' }: AuthNavProps) {
       setIsLoading(true);
       setLoadError(false);
       try {
-        const profile = await apiJson<AuthUser>('/api/v1/auth/me');
+        const profile = await getProfile(accessToken);
         if (version === requestVersion) {
           setUser(profile);
         }
       } catch (error) {
         if (version === requestVersion) {
           if ((error as ApiError).status === 401) {
+            clearAuth();
             setUser(null);
           } else {
             setLoadError(true);
@@ -58,21 +73,25 @@ export default function AuthNav({ variant = 'home' }: AuthNavProps) {
     }
 
     const handleAuthChange = () => void loadAuthState();
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'culinary_access_token' || event.key === null) {
+        void loadAuthState();
+      }
+    };
     window.addEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
-    window.addEventListener('storage', handleAuthChange);
+    window.addEventListener('storage', handleStorageChange);
     void loadAuthState();
 
     return () => {
       requestVersion++;
       window.removeEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
-      window.removeEventListener('storage', handleAuthChange);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
   async function handleLogout() {
     setIsLoggingOut(true);
     try {
-      await apiJson('/api/v1/auth/me');
       await apiFetch('/api/v1/auth/logout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -92,7 +111,7 @@ export default function AuthNav({ variant = 'home' }: AuthNavProps) {
       <nav className="flow-nav" aria-label="Điều hướng tài khoản">
         {isLoading ? <span aria-live="polite">Đang tải tài khoản...</span> : user ? (
           <>
-            <a href="/profile">Xin chào, {user.fullName}</a>
+            <a href="/profile">Xin chào, {user.displayName || user.fullName || user.userName || user.email}</a>
             <button className="flow-nav-button" type="button" onClick={handleLogout} disabled={isLoggingOut}>
               {isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
             </button>
@@ -110,7 +129,7 @@ export default function AuthNav({ variant = 'home' }: AuthNavProps) {
     <div className="auth-actions" aria-live="polite">
       {isLoading ? <span className="text-button">Đang tải...</span> : user ? (
         <>
-          <a className="text-button" href="/profile">Xin chào, {user.fullName}</a>
+          <a className="text-button" href="/profile">Xin chào, {user.displayName || user.fullName || user.userName || user.email}</a>
           <button className="outline-button" type="button" onClick={handleLogout} disabled={isLoggingOut}>
             {isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
           </button>

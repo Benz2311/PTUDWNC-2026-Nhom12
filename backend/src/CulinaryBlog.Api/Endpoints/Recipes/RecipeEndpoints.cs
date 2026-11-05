@@ -19,6 +19,7 @@ using CulinaryBlog.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using System.Text;
 using CulinaryBlog.Api.Helpers;
 using CulinaryBlog.Application.Interfaces;
 using CulinaryBlog.Domain.Entities;
@@ -70,10 +71,77 @@ public static class RecipeEndpoints
             .WithName("SearchRecipes")
             .WithSummary("Tìm kiếm công thức toàn văn và fuzzy");
 
+        group.MapGet("/{slug}/servings", PreviewRecipeServings)
+            .WithName("PreviewRecipeServings")
+            .WithSummary("Xem trước nguyên liệu và dinh dưỡng theo số khẩu phần")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound)
+            .ProducesValidationProblem();
+
+        group.MapPost("/{slug}/scale", ScaleRecipe)
+            .WithName("ScaleRecipe")
+            .WithSummary("Tính nguyên liệu và dinh dưỡng theo số khẩu phần")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound)
+            .ProducesValidationProblem();
+
+        group.MapGet("/{slug}/export/pdf", ExportRecipePdf)
+            .WithName("ExportRecipePdf")
+            .WithSummary("Xuất công thức thành file PDF có thể in");
+
         // TV2 + TV4: Chi tiết công thức với AsNoTracking, bảo vệ quyền, sắp xếp Step/Image và Double-Shield Cache
         group.MapGet("/{slug}", GetRecipeBySlug)
             .WithName("GetRecipeBySlug")
             .WithSummary("Lấy chi tiết công thức");
+
+        // Recipe interactions: favorite, rating and comments
+        group.MapPost("/{id:guid}/favorite", ToggleFavorite)
+            .RequireAuthorization()
+            .WithName("ToggleRecipeFavorite")
+            .WithSummary("Thêm hoặc bỏ công thức khỏi danh sách yêu thích");
+
+        group.MapGet("/{id:guid}/favorite", GetFavoriteStatus)
+            .RequireAuthorization()
+            .WithName("GetRecipeFavoriteStatus")
+            .WithSummary("Kiểm tra trạng thái yêu thích của công thức");
+
+        app.MapGet("/api/v1/me/favorites", GetMyFavorites)
+            .RequireAuthorization()
+            .WithName("GetMyFavoriteRecipes")
+            .WithSummary("Lấy danh sách công thức đã lưu");
+
+        group.MapGet("/{id:guid}/ratings", GetRecipeRatings)
+            .WithName("GetRecipeRatings")
+            .WithSummary("Lấy tổng quan đánh giá công thức");
+
+        group.MapPut("/{id:guid}/ratings/me", UpsertMyRating)
+            .RequireAuthorization()
+            .WithName("UpsertMyRecipeRating")
+            .WithSummary("Tạo hoặc cập nhật đánh giá của người dùng");
+
+        group.MapDelete("/{id:guid}/ratings/me", DeleteMyRating)
+            .RequireAuthorization()
+            .WithName("DeleteMyRecipeRating")
+            .WithSummary("Xóa đánh giá của người dùng");
+
+        group.MapGet("/{id:guid}/comments", GetRecipeComments)
+            .WithName("GetRecipeComments")
+            .WithSummary("Lấy danh sách bình luận công thức");
+
+        group.MapPost("/{id:guid}/comments", AddRecipeComment)
+            .RequireAuthorization()
+            .WithName("AddRecipeComment")
+            .WithSummary("Thêm bình luận hoặc trả lời bình luận công thức");
+
+        group.MapPut("/{id:guid}/comments/{commentId:guid}", UpdateRecipeComment)
+            .RequireAuthorization()
+            .WithName("UpdateRecipeComment")
+            .WithSummary("Cập nhật bình luận công thức");
+
+        group.MapDelete("/{id:guid}/comments/{commentId:guid}", DeleteRecipeComment)
+            .RequireAuthorization()
+            .WithName("DeleteRecipeComment")
+            .WithSummary("Xóa bình luận công thức");
 
         // TV4: Thêm ảnh cho công thức (Multipart Form Upload / JSON URL)
         group.MapPost("/{recipeId:guid}/images", AddRecipeImage)
@@ -323,10 +391,11 @@ public static class RecipeEndpoints
             return Results.Ok(privateResult);
         }
 
-        var cacheKey = CreatePublicRecipeListCacheKey(
+        var generation = await cache.GetAsync<string>("recipes:cache:generation", cancellationToken) ?? "initial";
+        var cacheKey = $"{generation}:{CreatePublicRecipeListCacheKey(
             effectivePage,
             effectivePageSize,
-            listOptions);
+            listOptions)}";
         var cachedResult = await cache.GetAsync<PagedResultDto<RecipeListItemDto>>(
             cacheKey,
             cancellationToken);
@@ -341,10 +410,168 @@ public static class RecipeEndpoints
         await cache.SetAsync(
             cacheKey,
             result,
-            TimeSpan.FromMinutes(1),
+            TimeSpan.FromMinutes(15),
             cancellationToken);
 
         return Results.Ok(result);
+    }
+
+    private static async Task<IResult> PreviewRecipeServings(
+        string slug,
+        int servings,
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (servings is < 1 or > 1000)
+        {
+            return Results.ValidationProblem(
+                new Dictionary<string, string[]>
+                {
+                    ["servings"] = ["Số khẩu phần phải nằm trong khoảng từ 1 đến 1000."]
+                },
+                statusCode: StatusCodes.Status422UnprocessableEntity,
+                type: "VALIDATION_ERROR");
+        }
+
+        var recipe = await db.Recipes
+            .AsNoTracking()
+            .Where(item =>
+                item.Slug == slug &&
+                !item.IsDeleted &&
+                item.Status == RecipeStatus.Published)
+            .Select(item => new
+            {
+                item.Id,
+                item.Servings,
+                Ingredients = item.Ingredients
+                    .Where(ingredient => !ingredient.IsDeleted)
+                    .OrderBy(ingredient => ingredient.SortOrder)
+                    .Select(ingredient => new
+                    {
+                        ingredient.Id,
+                        ingredient.Name,
+                        ingredient.Quantity,
+                        ingredient.Unit,
+                        ingredient.Notes,
+                    })
+                    .ToList(),
+                Nutrition = item.Nutrition == null
+                    ? null
+                    : new
+                    {
+                        item.Nutrition.Calories,
+                        item.Nutrition.Protein,
+                        item.Nutrition.Carbohydrates,
+                        item.Nutrition.Fat,
+                        item.Nutrition.Fiber,
+                        item.Nutrition.Sodium,
+                    },
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (recipe is null)
+        {
+            return Results.NotFound(new { title = "Không tìm thấy công thức đã xuất bản" });
+        }
+
+        var originalServings = Math.Max(recipe.Servings, 1);
+        var factor = (decimal)servings / originalServings;
+        var ingredients = recipe.Ingredients.Select(ingredient => new
+        {
+            ingredient.Id,
+            ingredient.Name,
+            Quantity = ingredient.Quantity.HasValue
+                ? ingredient.Quantity.Value * factor
+                : (decimal?)null,
+            ingredient.Unit,
+            ingredient.Notes,
+        });
+        var nutrition = recipe.Nutrition is null
+            ? null
+            : new
+            {
+                Calories = recipe.Nutrition.Calories * factor,
+                Protein = recipe.Nutrition.Protein * factor,
+                Carbohydrates = recipe.Nutrition.Carbohydrates * factor,
+                Fat = recipe.Nutrition.Fat * factor,
+                Fiber = recipe.Nutrition.Fiber * factor,
+                Sodium = recipe.Nutrition.Sodium * factor,
+            };
+
+        return Results.Ok(new
+        {
+            data = new
+            {
+                recipeId = recipe.Id,
+                originalServings,
+                targetServings = servings,
+                ingredients,
+                nutrition,
+            },
+        });
+    }
+
+    private sealed record ScaleRecipeRequest(int TargetServings);
+
+    private static Task<IResult> ScaleRecipe(
+        string slug,
+        ScaleRecipeRequest request,
+        ApplicationDbContext db,
+        CancellationToken cancellationToken) =>
+        PreviewRecipeServings(slug, request.TargetServings, db, cancellationToken);
+
+    private static async Task<IResult> ExportRecipePdf(
+        string slug,
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var recipe = await db.Recipes
+            .AsNoTracking()
+            .Include(x => x.Ingredients)
+            .Include(x => x.Steps)
+            .SingleOrDefaultAsync(x => x.Slug == slug && !x.IsDeleted && x.Status == RecipeStatus.Published, cancellationToken);
+        if (recipe is null)
+            return Results.NotFound(new { title = "Không tìm thấy công thức đã xuất bản" });
+
+        var lines = new List<string>
+        {
+            recipe.Title,
+            $"Khau phan: {recipe.Servings}",
+            string.Empty,
+            "NGUYEN LIEU"
+        };
+        lines.AddRange(recipe.Ingredients.OrderBy(x => x.SortOrder).Select(x => $"- {x.Name}: {x.Quantity} {x.Unit}"));
+        lines.Add(string.Empty);
+        lines.Add("CAC BUOC");
+        lines.AddRange(recipe.Steps.OrderBy(x => x.StepNumber).Select(x => $"{x.StepNumber}. {x.Title}: {x.Description}"));
+
+        var pdf = BuildSimplePdf(lines);
+        return Results.File(pdf, "application/pdf", $"{recipe.Slug}.pdf");
+    }
+
+    private static byte[] BuildSimplePdf(IEnumerable<string> lines)
+    {
+        var content = new StringBuilder("BT /F1 11 Tf 50 780 Td ");
+        foreach (var line in lines)
+        {
+            var safe = line.Replace("\\", "\\\\").Replace("(", "\\(").Replace(")", "\\)");
+            content.Append($"({safe}) Tj 0 -16 Td ");
+        }
+        content.Append("ET");
+        var stream = Encoding.ASCII.GetBytes(content.ToString());
+        using var output = new MemoryStream();
+        using var writer = new StreamWriter(output, Encoding.ASCII, leaveOpen: true);
+        writer.Write("%PDF-1.4\n");
+        writer.Write("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+        writer.Write("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
+        writer.Write("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n");
+        writer.Write("4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n");
+        writer.Write($"5 0 obj\n<< /Length {stream.Length} >>\nstream\n");
+        writer.Flush();
+        output.Write(stream);
+        writer.Write("\nendstream\nendobj\nxref\n0 6\n0000000000 65535 f \ntrailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n0\n%%EOF");
+        writer.Flush();
+        return output.ToArray();
     }
 
     private static string CreatePublicRecipeListCacheKey(
@@ -512,7 +739,8 @@ public static class RecipeEndpoints
         CancellationToken ct)
     {
         var normalizedSlug = slug.Trim().ToLowerInvariant();
-        var cacheKey = $"recipe:{normalizedSlug}";
+        var generation = await cache.GetAsync<string>("recipes:cache:generation", ct) ?? "initial";
+        var cacheKey = $"recipe:{generation}:{normalizedSlug}";
 
         Guid? currentUserId = null;
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
@@ -546,7 +774,7 @@ public static class RecipeEndpoints
             // Major-01 Fix: CHỈ cache công thức có trạng thái Published
             if (recipe.Status == RecipeStatus.Published)
             {
-                await cache.SetAsync(cacheKey, recipe, TimeSpan.FromMinutes(5), ct);
+                await cache.SetAsync(cacheKey, recipe, TimeSpan.FromMinutes(30), ct);
             }
 
             if (!string.IsNullOrEmpty(recipe.Version))
@@ -1271,6 +1499,9 @@ public static class RecipeEndpoints
         };
         recipe.Ingredients = ToIngredients(request.Ingredients);
         await recipeWriteService.CreateAsync(recipe, cancellationToken);
+        db.RecipeRevisions.Add(CulinaryBlog.Api.Endpoints.RevisionModerationEndpoints.CreateRevision(
+            recipe, authorId, 1, "Tạo công thức"));
+        await db.SaveChangesAsync(cancellationToken);
 
         SetRecipeEtag(httpContext, recipe);
         return Results.Created($"/api/v1/recipes/{recipe.Slug}", ApiResponse.Success(new { recipe.Id, recipe.Slug, version = recipe.xmin.ToString() }));
@@ -1356,6 +1587,16 @@ public static class RecipeEndpoints
             ToSteps(request.Steps),
             ToImages(request.Images),
             cancellationToken);
+        var nextRevision = await db.RecipeRevisions
+            .Where(item => item.RecipeId == recipe.Id)
+            .Select(item => (int?)item.Version)
+            .MaxAsync(cancellationToken) ?? 0;
+        db.RecipeRevisions.Add(CulinaryBlog.Api.Endpoints.RevisionModerationEndpoints.CreateRevision(
+            recipe,
+            GetUserId(principal),
+            nextRevision + 1,
+            "Cập nhật công thức"));
+        await db.SaveChangesAsync(cancellationToken);
 
         SetRecipeEtag(httpContext, recipe);
         return Results.Ok(ApiResponse.Success(new { recipe.Id, recipe.Slug, version = recipe.xmin.ToString() }));
@@ -1794,6 +2035,19 @@ public static class RecipeEndpoints
             return "Title must be between 5 and 200 characters.";
         }
 
+        var moderationText = string.Join(
+            '\n',
+            request.Title,
+            request.Description ?? string.Empty,
+            request.Content,
+            string.Join('\n', (request.Ingredients ?? []).Select(item => item.Name)),
+            string.Join('\n', (request.Steps ?? []).SelectMany(item => new[] { item.Title, item.Description })));
+        var moderationViolation = CulinaryBlog.Api.Helpers.ModerationTextFilter.FindViolation(moderationText);
+        if (moderationViolation is not null)
+        {
+            return $"Content moderation rejected the recipe ({moderationViolation}).";
+        }
+
         if (request.Description?.Length > 2000)
         {
             return "Description must be at most 2000 characters.";
@@ -1919,6 +2173,363 @@ public static class RecipeEndpoints
             })
             .ToList();
 
+    private static async Task<IResult> ToggleFavorite(
+        Guid id,
+        ClaimsPrincipal principal,
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetUserId(principal);
+        if (userId == Guid.Empty)
+        {
+            return Results.Unauthorized();
+        }
+
+        if (!await db.Recipes.AnyAsync(recipe => recipe.Id == id && !recipe.IsDeleted, cancellationToken))
+        {
+            return Results.NotFound(ApiResponse.Success<object>(new { message = "Không tìm thấy công thức." }));
+        }
+
+        var favorite = await db.RecipeFavorites
+            .SingleOrDefaultAsync(item => item.RecipeId == id && item.UserId == userId, cancellationToken);
+
+        if (favorite is null)
+        {
+            db.RecipeFavorites.Add(new RecipeFavorite
+            {
+                RecipeId = id,
+                UserId = userId
+            });
+        }
+        else
+        {
+            db.RecipeFavorites.Remove(favorite);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        var isFavorite = favorite is null;
+        return Results.Ok(ApiResponse.Success(new { recipeId = id, isFavorite }));
+    }
+
+    private static async Task<IResult> GetFavoriteStatus(
+        Guid id,
+        ClaimsPrincipal principal,
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetUserId(principal);
+        var isFavorite = userId != Guid.Empty &&
+            await db.RecipeFavorites.AnyAsync(
+                item => item.RecipeId == id && item.UserId == userId,
+                cancellationToken);
+        return Results.Ok(ApiResponse.Success(new { recipeId = id, isFavorite }));
+    }
+
+    private static async Task<IResult> GetMyFavorites(
+        ClaimsPrincipal principal,
+        ApplicationDbContext db,
+        int page = 1,
+        int pageSize = 12,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetUserId(principal);
+        if (userId == Guid.Empty)
+        {
+            return Results.Unauthorized();
+        }
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 50);
+        var query = db.RecipeFavorites
+            .AsNoTracking()
+            .Where(item => item.UserId == userId)
+            .Select(item => item.Recipe);
+
+        var total = await query.CountAsync(cancellationToken);
+        var recipes = await query
+            .OrderByDescending(recipe => recipe.UpdatedAt ?? recipe.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(recipe => new
+            {
+                recipe.Id,
+                recipe.Title,
+                recipe.Slug,
+                recipe.Description,
+                recipe.PublishedAt,
+                recipe.CoverImageUrl
+            })
+            .ToListAsync(cancellationToken);
+
+        var meta = new PaginationMeta(
+            page,
+            pageSize,
+            total,
+            (int)Math.Ceiling(total / (double)pageSize),
+            page * pageSize < total,
+            page > 1);
+        return Results.Ok(ApiResponse.Paged(recipes, meta));
+    }
+
+    private static async Task<IResult> GetRecipeRatings(
+        Guid id,
+        ClaimsPrincipal principal,
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var ratings = db.RecipeRatings.Where(item => item.RecipeId == id);
+        var ratingCount = await ratings.CountAsync(cancellationToken);
+        var averageRating = ratingCount == 0
+            ? 0
+            : await ratings.AverageAsync(item => (decimal)item.Score, cancellationToken);
+        var userId = GetUserId(principal);
+        var myScore = userId == Guid.Empty
+            ? (int?)null
+            : await ratings.Where(item => item.UserId == userId).Select(item => (int?)item.Score).SingleOrDefaultAsync(cancellationToken);
+
+        return Results.Ok(ApiResponse.Success(new
+        {
+            recipeId = id,
+            averageRating = Math.Round(averageRating, 1),
+            ratingCount,
+            myScore
+        }));
+    }
+
+    private static async Task<IResult> UpsertMyRating(
+        Guid id,
+        RatingRequest request,
+        ClaimsPrincipal principal,
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetUserId(principal);
+        if (userId == Guid.Empty)
+        {
+            return Results.Unauthorized();
+        }
+
+        if (request.Score is < 1 or > 5)
+        {
+            return Results.UnprocessableEntity(ApiResponse.Success<object>(new { message = "Điểm đánh giá phải từ 1 đến 5." }));
+        }
+
+        if (!await db.Recipes.AnyAsync(recipe => recipe.Id == id && !recipe.IsDeleted, cancellationToken))
+        {
+            return Results.NotFound(ApiResponse.Success<object>(new { message = "Không tìm thấy công thức." }));
+        }
+
+        var rating = await db.RecipeRatings.SingleOrDefaultAsync(
+            item => item.RecipeId == id && item.UserId == userId,
+            cancellationToken);
+
+        if (rating is null)
+        {
+            db.RecipeRatings.Add(new RecipeRating { RecipeId = id, UserId = userId, Score = request.Score });
+        }
+        else
+        {
+            rating.Score = request.Score;
+            rating.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return await GetRecipeRatings(id, principal, db, cancellationToken);
+    }
+
+    private static async Task<IResult> DeleteMyRating(
+        Guid id,
+        ClaimsPrincipal principal,
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetUserId(principal);
+        if (userId == Guid.Empty)
+        {
+            return Results.Unauthorized();
+        }
+
+        var rating = await db.RecipeRatings.SingleOrDefaultAsync(
+            item => item.RecipeId == id && item.UserId == userId,
+            cancellationToken);
+        if (rating is null)
+        {
+            return Results.NotFound(ApiResponse.Success<object>(new { message = "Không tìm thấy đánh giá." }));
+        }
+
+        db.RecipeRatings.Remove(rating);
+        await db.SaveChangesAsync(cancellationToken);
+        return await GetRecipeRatings(id, principal, db, cancellationToken);
+    }
+
+    private static async Task<IResult> GetRecipeComments(
+        Guid id,
+        ApplicationDbContext db,
+        int page = 1,
+        int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 50);
+        var query = db.RecipeComments
+            .AsNoTracking()
+            .Where(comment => comment.RecipeId == id &&
+                              comment.ParentCommentId == null &&
+                              comment.Status == CulinaryBlog.Domain.Enums.ModerationStatus.Approved);
+        var total = await query.CountAsync(cancellationToken);
+        var comments = await query
+            .OrderByDescending(comment => comment.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(comment => new
+            {
+                comment.Id,
+                comment.Content,
+                comment.CreatedAt,
+                comment.UpdatedAt,
+                Author = comment.User.DisplayName,
+                UserId = comment.UserId,
+                Replies = comment.Replies
+                    .Where(reply => !reply.IsDeleted &&
+                                    reply.Status == CulinaryBlog.Domain.Enums.ModerationStatus.Approved)
+                    .OrderBy(reply => reply.CreatedAt)
+                    .Select(reply => new
+                    {
+                        reply.Id,
+                        reply.Content,
+                        reply.CreatedAt,
+                        reply.UpdatedAt,
+                        Author = reply.User.DisplayName,
+                        UserId = reply.UserId,
+                    })
+                    .ToList()
+            })
+            .ToListAsync(cancellationToken);
+
+        var meta = new PaginationMeta(
+            page,
+            pageSize,
+            total,
+            (int)Math.Ceiling(total / (double)pageSize),
+            page * pageSize < total,
+            page > 1);
+        return Results.Ok(ApiResponse.Paged(comments, meta));
+    }
+
+    private static async Task<IResult> AddRecipeComment(
+        Guid id,
+        CommentRequest request,
+        ClaimsPrincipal principal,
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetUserId(principal);
+        if (userId == Guid.Empty)
+        {
+            return Results.Unauthorized();
+        }
+
+        var content = request.Content?.Trim() ?? string.Empty;
+        if (content.Length is < 1 or > 2000)
+        {
+            return Results.UnprocessableEntity(ApiResponse.Success<object>(new { message = "Nội dung bình luận phải từ 1 đến 2000 ký tự." }));
+        }
+        var moderationViolation = CulinaryBlog.Api.Helpers.ModerationTextFilter.FindViolation(content);
+        if (moderationViolation is not null)
+        {
+            return Results.UnprocessableEntity(new { code = moderationViolation, message = "Nội dung không vượt qua kiểm tra kiểm duyệt." });
+        }
+
+        if (!await db.Recipes.AnyAsync(recipe => recipe.Id == id && !recipe.IsDeleted, cancellationToken))
+        {
+            return Results.NotFound(ApiResponse.Success<object>(new { message = "Không tìm thấy công thức." }));
+        }
+
+        if (request.ParentCommentId.HasValue &&
+            !await db.RecipeComments.AnyAsync(
+                comment => comment.Id == request.ParentCommentId.Value &&
+                           comment.RecipeId == id &&
+                           comment.ParentCommentId == null,
+                cancellationToken))
+        {
+            return Results.NotFound(ApiResponse.Success<object>(new { message = "Không tìm thấy bình luận cha." }));
+        }
+
+        var comment = new RecipeComment
+        {
+            RecipeId = id,
+            UserId = userId,
+            ParentCommentId = request.ParentCommentId,
+            Content = content
+        };
+        db.RecipeComments.Add(comment);
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.Ok(ApiResponse.Success(new { comment.Id, comment.Content, comment.Status, comment.CreatedAt }));
+    }
+
+    private static async Task<IResult> UpdateRecipeComment(
+        Guid id,
+        Guid commentId,
+        CommentRequest request,
+        ClaimsPrincipal principal,
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var content = request.Content?.Trim() ?? string.Empty;
+        if (content.Length is < 1 or > 2000)
+        {
+            return Results.UnprocessableEntity(ApiResponse.Success<object>(new { message = "Nội dung bình luận phải từ 1 đến 2000 ký tự." }));
+        }
+        var moderationViolation = CulinaryBlog.Api.Helpers.ModerationTextFilter.FindViolation(content);
+        if (moderationViolation is not null)
+        {
+            return Results.UnprocessableEntity(new { code = moderationViolation, message = "Nội dung không vượt qua kiểm tra kiểm duyệt." });
+        }
+
+        var comment = await db.RecipeComments.SingleOrDefaultAsync(
+            item => item.Id == commentId && item.RecipeId == id,
+            cancellationToken);
+        if (comment is null)
+        {
+            return Results.NotFound(ApiResponse.Success<object>(new { message = "Không tìm thấy bình luận." }));
+        }
+        if (comment.UserId != GetUserId(principal) && !principal.IsInRole("Admin"))
+        {
+            return Results.Forbid();
+        }
+
+        comment.Content = content;
+        comment.Status = CulinaryBlog.Domain.Enums.ModerationStatus.Pending;
+        comment.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.Ok(ApiResponse.Success(new { comment.Id, comment.Content, comment.Status, comment.UpdatedAt }));
+    }
+
+    private static async Task<IResult> DeleteRecipeComment(
+        Guid id,
+        Guid commentId,
+        ClaimsPrincipal principal,
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var comment = await db.RecipeComments.SingleOrDefaultAsync(
+            item => item.Id == commentId && item.RecipeId == id,
+            cancellationToken);
+        if (comment is null)
+        {
+            return Results.NotFound(ApiResponse.Success<object>(new { message = "Không tìm thấy bình luận." }));
+        }
+        if (comment.UserId != GetUserId(principal) && !principal.IsInRole("Admin"))
+        {
+            return Results.Forbid();
+        }
+
+        comment.IsDeleted = true;
+        comment.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
+    }
+
     private static Guid GetUserId(ClaimsPrincipal principal) =>
         Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub"), out var userId)
             ? userId
@@ -1981,3 +2592,7 @@ public record UpdateRecipeImageRequest(
     int? OrderIndex = null,
     bool? IsPrimary = null
 );
+
+public record RatingRequest(int Score);
+
+public record CommentRequest(string? Content, Guid? ParentCommentId = null);

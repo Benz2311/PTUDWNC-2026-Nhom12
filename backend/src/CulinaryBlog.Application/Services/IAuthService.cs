@@ -12,6 +12,10 @@ public interface IAuthService
         LoginRequest request,
         string? ipAddress = null);
 
+    Task<AuthResponse> GoogleLoginAsync(
+        GoogleLoginRequest request,
+        string? ipAddress = null);
+
     Task<AuthResponse> RefreshAsync(
         RefreshRequest request,
         string? ipAddress = null);
@@ -19,4 +23,28 @@ public interface IAuthService
     Task LogoutAsync(string refreshToken);
 
     Task<UserResponse?> GetMeAsync(string userId);
+
+    Task ConfirmEmailAsync(ConfirmEmailRequest request);
+
+    Task ResendConfirmationEmailAsync(ResendConfirmationEmailRequest request);
+
+    Task<UserResponse> UpdateProfileAsync(string userId, UpdateProfileRequest request);
+
+    Task ChangePasswordAsync(string userId, ChangePasswordRequest request);
+
+    Task ForgotPasswordAsync(ForgotPasswordRequest request);
+
+    Task ResetPasswordAsync(ResetPasswordRequest request);
+
+    Task<bool> UpdateUserStatusAsync(
+        Guid adminUserId,
+        Guid targetUserId,
+        bool isActive,
+        CancellationToken cancellationToken = default);
+
+    Task UpdateUserRolesAsync(
+        Guid adminUserId,
+        Guid targetUserId,
+        string[] roles,
+        CancellationToken cancellationToken = default);
 }

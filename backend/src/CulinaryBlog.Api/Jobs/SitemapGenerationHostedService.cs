@@ -16,7 +16,7 @@ public sealed class SitemapGenerationHostedService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromHours(6));
-        do
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
@@ -32,7 +32,15 @@ public sealed class SitemapGenerationHostedService : BackgroundService
             {
                 _logger.LogError(exception, "Sitemap generation failed.");
             }
+
+            try
+            {
+                await timer.WaitForNextTickAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 }

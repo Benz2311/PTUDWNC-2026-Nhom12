@@ -6,7 +6,6 @@ export default function HomePage() {
   return (
     <div className="site-shell">
       <SiteHeader />
-
       <main id="top">
         <section className="hero-wrap">
           <div className="hero">

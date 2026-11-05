@@ -1,24 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { apiFetch, type ApiError } from '@/lib/api';
+import { getDeletedRecipes } from '@/lib/api/recipes';
+import type { RecipeTrashItem } from '@/types/recipe';
 import ConfirmationDialog from '@/components/recipe-management/ConfirmationDialog';
 
-type DeletedRecipe = {
-  id: string;
-  title: string;
-  slug: string;
-  status: string;
-  deletedAt: string;
-};
+const PAGE_SIZE = 12;
 
 type TrashAction = {
   type: 'restore' | 'purge';
-  recipe: DeletedRecipe;
+  recipe: RecipeTrashItem;
 };
 
 export default function RecipeTrash() {
-  const [recipes, setRecipes] = useState<DeletedRecipe[]>([]);
+  const [recipes, setRecipes] = useState<RecipeTrashItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
   const [loading, setLoading] = useState(true);
@@ -28,22 +27,28 @@ export default function RecipeTrash() {
   const [pendingAction, setPendingAction] = useState<TrashAction | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  async function loadTrash() {
+  const loadTrash = useCallback(async () => {
     setError('');
-    setFeedback('');
     setLoading(true);
     try {
-      setRecipes(await apiFetch<DeletedRecipe[]>('/api/v1/admin/recipes/trash'));
+      const result = await getDeletedRecipes(page, PAGE_SIZE);
+      if (page > 1 && page > result.totalPages) {
+        setPage(Math.max(1, result.totalPages));
+        return;
+      }
+      setRecipes(result.items);
+      setTotalCount(result.totalCount);
+      setTotalPages(result.totalPages);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không tải được thùng rác.');
     } finally {
       setLoading(false);
     }
-  }
+  }, [page]);
 
   useEffect(() => {
     void loadTrash();
-  }, []);
+  }, [loadTrash]);
 
   async function handleConfirmAction() {
     if (!pendingAction) return;
@@ -57,12 +62,18 @@ export default function RecipeTrash() {
     try {
       if (type === 'restore') {
         await apiFetch(`/api/v1/admin/recipes/${recipe.id}/restore`, { method: 'POST' });
-        setRecipes((current) => current.filter((item) => item.id !== recipe.id));
+        const remaining = recipes.filter((item) => item.id !== recipe.id);
+        setRecipes(remaining);
+        setTotalCount((count) => Math.max(0, count - 1));
         setFeedback(`Đã khôi phục thành công công thức "${recipe.title}".`);
+        if (remaining.length === 0 && page > 1) setPage((current) => current - 1);
       } else {
         await apiFetch(`/api/v1/admin/recipes/${recipe.id}/purge`, { method: 'DELETE' });
-        setRecipes((current) => current.filter((item) => item.id !== recipe.id));
+        const remaining = recipes.filter((item) => item.id !== recipe.id);
+        setRecipes(remaining);
+        setTotalCount((count) => Math.max(0, count - 1));
         setFeedback(`Đã xóa vĩnh viễn công thức "${recipe.title}" cùng toàn bộ dữ liệu liên quan.`);
+        if (remaining.length === 0 && page > 1) setPage((current) => current - 1);
       }
       setPendingAction(null);
     } catch (reason: unknown) {
@@ -93,6 +104,7 @@ export default function RecipeTrash() {
           🔄 Làm mới
         </button>
       </div>
+      <p>{totalCount} công thức trong thùng rác</p>
 
       {error && (
         <div className="form-error" role="alert" style={{ margin: '14px 0' }}>
@@ -119,7 +131,7 @@ export default function RecipeTrash() {
               <div className="recipe-admin-card-top">
                 <span className="status status-archived">{recipe.status}</span>
                 <span style={{ fontSize: 11, color: 'var(--ink-soft)' }}>
-                  Đã xóa {new Date(recipe.deletedAt).toLocaleString('vi-VN')}
+                  Đã xóa {recipe.deletedAt ? new Date(recipe.deletedAt).toLocaleString('vi-VN') : 'Không rõ thời điểm'}
                 </span>
               </div>
               <h3 style={{ margin: '10px 0 16px' }}>{recipe.title}</h3>
@@ -143,6 +155,18 @@ export default function RecipeTrash() {
               </div>
             </article>
           ))}
+        </div>
+      )}
+
+      {!loading && totalPages > 1 && (
+        <div className="pagination" aria-label="Phân trang thùng rác">
+          <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1}>
+            ← Trước
+          </button>
+          <span>Trang {page} / {totalPages}</span>
+          <button type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages}>
+            Sau →
+          </button>
         </div>
       )}
 

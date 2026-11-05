@@ -4,6 +4,9 @@ const statusLabels: Record<RecipeStatus, string> = {
   Draft: 'Bản nháp',
   Published: 'Đã xuất bản',
   Archived: 'Đã lưu trữ',
+  PendingApproval: 'Chờ duyệt',
+  Approved: 'Đã duyệt',
+  Rejected: 'Bị từ chối',
 };
 
 export default function RecipeStatusBadge({ status }: { status: RecipeStatus }) {
