@@ -19,7 +19,16 @@ import { useAuthStore } from '@/lib/auth-store';
 import { validateImageFile } from '@/lib/image-validator';
 import { StepItem } from './StepItem';
 
-export interface StepEditorProps {
+export type StepDraft = {
+  id?: string;
+  stepNumber?: number;
+  title: string;
+  description: string;
+  timerMinutes?: number | string | null;
+  imageUrl?: string | null;
+};
+
+export interface FullStepEditorProps {
   /**
    * Nếu có recipeId: Chế độ Direct API mode (CRUD trực tiếp với Backend).
    * Nếu không có recipeId: Chế độ Controlled mode (Quản lý local state cho Recipe mới).
@@ -43,6 +52,11 @@ export interface StepEditorProps {
   disabled?: boolean;
 }
 
+export type StepEditorProps = FullStepEditorProps & {
+  steps?: StepDraft[];
+  onChange?: (steps: StepDraft[]) => void;
+};
+
 const INITIAL_FORM_VALUES: StepFormValues = {
   title: '',
   description: '',
@@ -59,7 +73,97 @@ function isValidUrl(urlString: string): boolean {
   }
 }
 
-export const StepEditor: React.FC<StepEditorProps> = ({
+const DraftStepEditor: React.FC<{
+  steps: StepDraft[];
+  onChange: (steps: StepDraft[]) => void;
+}> = ({ steps, onChange }) => {
+  const update = (index: number, key: keyof StepDraft, value: string) => {
+    onChange(
+      steps.map((step, stepIndex) =>
+        stepIndex === index ? { ...step, [key]: value } : step
+      )
+    );
+  };
+
+  const move = (index: number, offset: -1 | 1) => {
+    const target = index + offset;
+    if (target < 0 || target >= steps.length) return;
+    const reordered = [...steps];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    onChange(reordered);
+  };
+
+  return (
+    <div className="step-editor">
+      {steps.map((step, index) => (
+        <div className="step-row" key={index}>
+          <strong>{String(index + 1).padStart(2, '0')}</strong>
+          <div className="form-grid">
+            <label className="field field-wide">
+              <span>Tiêu đề bước</span>
+              <input
+                maxLength={200}
+                value={step.title}
+                onChange={(event) => update(index, 'title', event.target.value)}
+                placeholder="Sơ chế nguyên liệu"
+              />
+            </label>
+            <label className="field field-wide">
+              <span>Hướng dẫn *</span>
+              <textarea
+                maxLength={2000}
+                rows={3}
+                value={step.description}
+                onChange={(event) => update(index, 'description', event.target.value)}
+                placeholder="Mô tả thao tác cần thực hiện..."
+              />
+            </label>
+          </div>
+          <div className="ingredient-row-actions">
+            <button
+              type="button"
+              aria-label="Chuyển bước lên"
+              disabled={index === 0}
+              onClick={() => move(index, -1)}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              aria-label="Chuyển bước xuống"
+              disabled={index === steps.length - 1}
+              onClick={() => move(index, 1)}
+            >
+              ↓
+            </button>
+            <button
+              className="small-button"
+              type="button"
+              onClick={() =>
+                onChange(
+                  steps.length === 1
+                    ? [{ title: '', description: '' }]
+                    : steps.filter((_, stepIndex) => stepIndex !== index)
+                )
+              }
+            >
+              Xóa bước
+            </button>
+          </div>
+        </div>
+      ))}
+      <button
+        className="small-button"
+        type="button"
+        onClick={() => onChange([...steps, { title: '', description: '' }])}
+      >
+        + Thêm bước
+      </button>
+    </div>
+  );
+};
+
+const FullStepEditor: React.FC<FullStepEditorProps> = ({
   recipeId,
   authorId,
   initialSteps = [],
@@ -878,6 +982,13 @@ export const StepEditor: React.FC<StepEditorProps> = ({
       )}
     </div>
   );
+};
+
+export const StepEditor: React.FC<StepEditorProps> = (props) => {
+  if (props.steps && props.onChange) {
+    return <DraftStepEditor steps={props.steps} onChange={props.onChange} />;
+  }
+  return <FullStepEditor {...props} />;
 };
 
 export default StepEditor;

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import type { RecipeImage, ImageFormValues, ImageValidationError } from '@/types/image';
 import {
   getRecipeImages,
@@ -15,7 +16,15 @@ import { useAuthStore } from '@/lib/auth-store';
 import { ImageCard } from './ImageCard';
 import { ImagePreview } from './ImagePreview';
 
-export interface ImageManagerProps {
+export type RecipeImageDraft = {
+  id?: string;
+  url: string;
+  altText: string;
+  isPrimary?: boolean;
+  orderIndex?: number;
+};
+
+export interface FullImageManagerProps {
   /**
    * Nếu có recipeId: Chế độ Existing Recipe (gọi REST API thật).
    * Nếu không có recipeId: Chế độ New Recipe (quản lý state cục bộ hoặc yêu cầu lưu Recipe trước).
@@ -26,6 +35,11 @@ export interface ImageManagerProps {
   onImagesChange?: (images: RecipeImage[]) => void;
   disabled?: boolean;
 }
+
+export type ImageManagerProps = FullImageManagerProps & {
+  images?: RecipeImageDraft[];
+  onFilesChange?: (files: File[]) => void;
+};
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -39,7 +53,110 @@ function isValidHttpUrl(urlString: string): boolean {
   }
 }
 
-export const ImageManager: React.FC<ImageManagerProps> = ({
+const DraftImageManager: React.FC<{
+  images?: RecipeImageDraft[];
+  onImagesChange?: (images: RecipeImageDraft[]) => void;
+  onFilesChange?: (files: File[]) => void;
+}> = ({ images = [], onImagesChange, onFilesChange }) => {
+  const [previews, setPreviews] = useState<{ name: string; url: string }[]>([]);
+
+  useEffect(() => {
+    return () => {
+      previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    };
+  }, [previews]);
+
+  const selectFiles = (fileList: FileList | null) => {
+    previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    const files = Array.from(fileList ?? []);
+    onFilesChange?.(files);
+    setPreviews(files.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })));
+  };
+
+  const updateAltText = (index: number, altText: string) => {
+    onImagesChange?.(
+      images.map((image, imageIndex) =>
+        imageIndex === index ? { ...image, altText } : image
+      )
+    );
+  };
+
+  const moveImage = (index: number, offset: -1 | 1) => {
+    const target = index + offset;
+    if (target < 0 || target >= images.length) return;
+    const reordered = [...images];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    onImagesChange?.(reordered);
+  };
+
+  return (
+    <div>
+      <label className="upload-dropzone">
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/avif"
+          multiple
+          onChange={(event) => selectFiles(event.target.files)}
+        />
+        <strong>Chọn ảnh món ăn</strong>
+        <span>JPG, PNG, WebP hoặc AVIF · Tối đa 5 MB/ảnh</span>
+      </label>
+      {images.length > 0 && (
+        <div className="upload-preview-grid">
+          {images.map((image, index) => (
+            <div className="upload-preview" key={`${image.url}-${index}`}>
+              <Image src={image.url} alt={image.altText} width={320} height={320} unoptimized />
+              <label className="field">
+                <span>Mô tả ảnh {index + 1}</span>
+                <input
+                  maxLength={300}
+                  value={image.altText}
+                  onChange={(event) => updateAltText(index, event.target.value)}
+                />
+              </label>
+              <div className="ingredient-row-actions">
+                <button
+                  type="button"
+                  aria-label="Chuyển ảnh lên"
+                  disabled={index === 0}
+                  onClick={() => moveImage(index, -1)}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  aria-label="Chuyển ảnh xuống"
+                  disabled={index === images.length - 1}
+                  onClick={() => moveImage(index, 1)}
+                >
+                  ↓
+                </button>
+              </div>
+            </div>
+          ))}
+          {previews.map((preview) => (
+            <div className="upload-preview" key={preview.url}>
+              <Image src={preview.url} alt={preview.name} width={320} height={320} unoptimized />
+              <span>{preview.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {images.length === 0 && previews.length > 0 && (
+        <div className="upload-preview-grid">
+          {previews.map((preview) => (
+            <div className="upload-preview" key={preview.url}>
+              <Image src={preview.url} alt={preview.name} width={320} height={320} unoptimized />
+              <span>{preview.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const FullImageManager: React.FC<FullImageManagerProps> = ({
   recipeId,
   authorId,
   initialImages = [],
@@ -998,3 +1115,18 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
     </div>
   );
 };
+
+export const ImageManager: React.FC<ImageManagerProps> = (props) => {
+  if (props.onFilesChange) {
+    return (
+      <DraftImageManager
+        images={props.images}
+        onImagesChange={props.onImagesChange as any}
+        onFilesChange={props.onFilesChange}
+      />
+    );
+  }
+  return <FullImageManager {...props} />;
+};
+
+export default ImageManager;

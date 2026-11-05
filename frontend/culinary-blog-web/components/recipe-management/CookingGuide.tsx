@@ -11,7 +11,7 @@ export default function CookingGuide({ slug }: { slug: string }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    apiFetch<RecipeDetail>(`/api/v1/recipes/${encodeURIComponent(slug)}`, {}, false)
+    apiFetch<RecipeDetail>(`/recipes/${encodeURIComponent(slug)}`, {}, false)
       .then(setRecipe)
       .catch((reason: Error) => setError(reason.message || 'Không tải được công thức.'));
   }, [slug]);
