@@ -333,6 +333,9 @@ try
     app.MapRecipeEndpoints();
     app.MapAuthEndpoints();
     app.MapAdminUsersEndpoints();
+    CulinaryBlog.Api.Endpoints.Collections.CollectionEndpoints.MapCollectionEndpoints(app);
+    CulinaryBlog.Api.Endpoints.Recipes.RecipeEngagementEndpoints.MapRecipeEngagementEndpoints(app);
+    CulinaryBlog.Api.Endpoints.Admin.AdminAnalyticsEndpoints.MapAdminAnalyticsEndpoints(app);
     CulinaryBlog.Api.Endpoints.Sitemap.SitemapEndpoints.MapSitemapEndpoints(app);
     // app.MapControllers();
 

@@ -61,6 +61,9 @@ public class ImageResizeJobTests : IDisposable
         public DbSet<ApplicationUser> Users => Set<ApplicationUser>();
         public DbSet<RecipeAuditLog> RecipeAuditLogs => Set<RecipeAuditLog>();
         public DbSet<RecipeSlugHistory> RecipeSlugHistories => Set<RecipeSlugHistory>();
+        public DbSet<RecipeCollection> RecipeCollections => Set<RecipeCollection>();
+        public DbSet<RecipeCollectionItem> RecipeCollectionItems => Set<RecipeCollectionItem>();
+        public DbSet<RecipeView> RecipeViews => Set<RecipeView>();
 
         public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction>(null!);
@@ -83,6 +86,9 @@ public class ImageResizeJobTests : IDisposable
             modelBuilder.Ignore<RecipeIngredient>();
             modelBuilder.Ignore<Category>();
             modelBuilder.Ignore<ApplicationUser>();
+            modelBuilder.Ignore<RecipeCollection>();
+            modelBuilder.Ignore<RecipeCollectionItem>();
+            modelBuilder.Ignore<RecipeView>();
         }
     }
 

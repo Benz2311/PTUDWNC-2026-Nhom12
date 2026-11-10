@@ -15,6 +15,9 @@ public interface IApplicationDbContext
     DbSet<ApplicationUser> Users { get; }
     DbSet<RecipeAuditLog> RecipeAuditLogs { get; }
     DbSet<RecipeSlugHistory> RecipeSlugHistories { get; }
+    DbSet<RecipeCollection> RecipeCollections { get; }
+    DbSet<RecipeCollectionItem> RecipeCollectionItems { get; }
+    DbSet<RecipeView> RecipeViews { get; }
 
     DatabaseFacade Database { get; }
 

@@ -14,6 +14,8 @@ import {
   ChevronDown,
   Layers,
   Users,
+  FolderHeart,
+  BarChart3,
 } from "lucide-react";
 import { getStoredToken, removeStoredToken } from "@/lib/api/client";
 import { buttonVariants } from "@/components/ui/Button";
@@ -108,6 +110,8 @@ export function Header() {
     { href: "/", label: "Trang chủ" },
     { href: "/categories", label: "Danh mục món ăn" },
     { href: "/recipes", label: "Khám phá công thức" },
+    { href: "/trending", label: "Thịnh hành" },
+    { href: "/collections", label: "Bộ sưu tập" },
     { href: "/dashboard/categories", label: "Thống kê" },
   ];
 
@@ -208,6 +212,10 @@ export function Header() {
                     <Users className="h-4 w-4 text-emerald-700" />
                     <span>Hồ sơ cá nhân</span>
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/collections")}>
+                    <FolderHeart className="h-4 w-4 text-emerald-700" />
+                    <span>Bộ sưu tập của tôi</span>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/recipes/create")}>
                     <PlusCircle className="h-4 w-4 text-emerald-700" />
                     <span>Tạo công thức mới</span>
@@ -218,6 +226,10 @@ export function Header() {
                   </DropdownMenuItem>
                   {user.role === "Admin" && (
                     <>
+                      <DropdownMenuItem onClick={() => router.push("/admin/analytics")}>
+                        <BarChart3 className="h-4 w-4 text-teal-700" />
+                        <span>Phân tích nâng cao (Admin)</span>
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => router.push("/admin/categories")}>
                         <Layers className="h-4 w-4 text-emerald-700" />
                         <span>Quản lý danh mục (Admin)</span>
@@ -326,6 +338,18 @@ export function Header() {
               <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-3 py-1">
                 Quản trị hệ thống
               </div>
+              <Link
+                href="/admin/analytics"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
+                  pathname.startsWith("/admin/analytics")
+                    ? "bg-emerald-700 text-white font-semibold"
+                    : "text-gray-700 hover:bg-emerald-50"
+                }`}
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span>Phân tích nâng cao</span>
+              </Link>
               <Link
                 href="/admin/categories"
                 onClick={() => setMobileMenuOpen(false)}

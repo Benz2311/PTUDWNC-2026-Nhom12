@@ -8,6 +8,8 @@ import RecipeMeta from './RecipeMeta';
 import RecipeStatusBadge from './RecipeStatusBadge';
 import RecipeTimeInfo from './RecipeTimeInfo';
 import { resolveImageUrl } from '@/lib/image-url';
+import { Bookmark } from 'lucide-react';
+import { SaveToCollectionModal } from '@/components/collections/SaveToCollectionModal';
 
 const nutritionLabels = [
   ['calories', 'Calories', 'kcal'],
@@ -25,6 +27,7 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
       (left.sortOrder ?? left.orderIndex ?? 0) - (right.sortOrder ?? right.orderIndex ?? 0)
   );
   const [activeImage, setActiveImage] = useState(0);
+  const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
   const selectedImage = images[activeImage];
   const rawCoverUrl =
     selectedImage?.url ??
@@ -56,9 +59,20 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
       </nav>
 
       <header className="recipe-detail-header mb-8">
-        <div className="recipe-detail-badges flex flex-wrap items-center gap-2 mb-3">
-          <RecipeStatusBadge status={String(recipe.status)} />
-          <DifficultyBadge difficulty={String(recipe.difficulty)} />
+        <div className="recipe-detail-badges flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <RecipeStatusBadge status={String(recipe.status)} />
+            <DifficultyBadge difficulty={String(recipe.difficulty)} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCollectionModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50/60 text-emerald-800 hover:bg-emerald-100/80 font-bold text-xs transition-colors cursor-pointer shadow-2xs"
+            title="Lưu công thức vào bộ sưu tập cá nhân"
+          >
+            <Bookmark className="h-3.5 w-3.5 fill-emerald-700/20" />
+            <span>Lưu bộ sưu tập</span>
+          </button>
         </div>
         <h1 className="flow-title text-3xl md:text-4xl font-bold text-slate-900 mb-3">{recipe.title}</h1>
         {recipe.description && <p className="detail-lead text-lg text-slate-600 mb-4">{recipe.description}</p>}
@@ -215,6 +229,13 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
           ← Khám phá thêm công thức
         </Link>
       </div>
+
+      <SaveToCollectionModal
+        recipeId={recipe.id}
+        recipeTitle={recipe.title}
+        isOpen={isCollectionModalOpen}
+        onClose={() => setIsCollectionModalOpen(false)}
+      />
     </article>
   );
 }

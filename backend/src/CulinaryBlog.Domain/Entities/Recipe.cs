@@ -65,6 +65,12 @@ public class Recipe : BaseEntity
     public ICollection<RecipeImage> Images { get; set; }
         = new List<RecipeImage>();
 
+    public ICollection<RecipeCollectionItem> CollectionItems { get; set; }
+        = new List<RecipeCollectionItem>();
+
+    public ICollection<RecipeView> RecipeViews { get; set; }
+        = new List<RecipeView>();
+
     public string? CoverImageUrl { get; set; }
 
     public DateTime? DeletedAt { get; set; }

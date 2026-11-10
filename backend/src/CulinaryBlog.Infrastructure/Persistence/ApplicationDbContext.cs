@@ -30,6 +30,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<RecipeImage> RecipeImages => Set<RecipeImage>();
     public DbSet<RecipeAuditLog> RecipeAuditLogs => Set<RecipeAuditLog>();
     public DbSet<RecipeSlugHistory> RecipeSlugHistories => Set<RecipeSlugHistory>();
+    public DbSet<RecipeCollection> RecipeCollections => Set<RecipeCollection>();
+    public DbSet<RecipeCollectionItem> RecipeCollectionItems => Set<RecipeCollectionItem>();
+    public DbSet<RecipeView> RecipeViews => Set<RecipeView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -82,6 +85,45 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Action).HasMaxLength(40).IsRequired();
             entity.HasIndex(x => new { x.RecipeId, x.CreatedAt });
+        });
+
+        modelBuilder.Entity<RecipeCollection>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(500);
+            entity.HasIndex(x => new { x.UserId, x.IsDeleted });
+            entity.HasOne(x => x.User)
+                .WithMany(u => u.Collections)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RecipeCollectionItem>(entity =>
+        {
+            entity.HasKey(x => new { x.CollectionId, x.RecipeId });
+            entity.HasOne(x => x.Collection)
+                .WithMany(c => c.Items)
+                .HasForeignKey(x => x.CollectionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Recipe)
+                .WithMany(r => r.CollectionItems)
+                .HasForeignKey(x => x.RecipeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RecipeView>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.IpAddress).HasMaxLength(45);
+            entity.Property(x => x.UserAgent).HasMaxLength(255);
+            entity.HasIndex(x => new { x.RecipeId, x.ViewedAt });
+            entity.HasIndex(x => x.ViewedAt);
+            entity.HasIndex(x => new { x.RecipeId, x.IpAddress, x.ViewedAt });
+            entity.HasOne(x => x.Recipe)
+                .WithMany(r => r.RecipeViews)
+                .HasForeignKey(x => x.RecipeId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -31,4 +31,7 @@ public class ApplicationUser
 
     public ICollection<Recipe> Recipes { get; set; }
         = new List<Recipe>();
+
+    public ICollection<RecipeCollection> Collections { get; set; }
+        = new List<RecipeCollection>();
 }
