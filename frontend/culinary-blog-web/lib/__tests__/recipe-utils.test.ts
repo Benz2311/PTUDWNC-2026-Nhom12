@@ -1,4 +1,4 @@
-import { formatTotalTime, generateSlug, truncate } from "@/lib/recipe-utils";
+import { formatTotalTime, generateSlug, truncate, parseFractionOrDecimal } from "@/lib/recipe-utils";
 
 describe("formatTotalTime", () => {
   it("returns '0 phút' for zero total time", () => {
@@ -55,5 +55,42 @@ describe("truncate", () => {
   it("returns exact length text unchanged", () => {
     const text = "Exactly ten";
     expect(truncate(text, 11)).toBe(text);
+  });
+});
+
+describe("parseFractionOrDecimal", () => {
+  it("parses pure integers correctly", () => {
+    expect(parseFractionOrDecimal("500")).toBe(500);
+    expect(parseFractionOrDecimal(250)).toBe(250);
+  });
+
+  it("parses decimals with dot or comma correctly", () => {
+    expect(parseFractionOrDecimal("1.5")).toBe(1.5);
+    expect(parseFractionOrDecimal("2,75")).toBe(2.75);
+  });
+
+  it("parses simple fractions correctly (SRS Appendix D UX requirement)", () => {
+    expect(parseFractionOrDecimal("1/2")).toBe(0.5);
+    expect(parseFractionOrDecimal("3/4")).toBe(0.75);
+    expect(parseFractionOrDecimal("2/3")).toBe(0.667);
+  });
+
+  it("parses mixed fractions correctly (SRS Appendix D UX requirement)", () => {
+    expect(parseFractionOrDecimal("1 1/2")).toBe(1.5);
+    expect(parseFractionOrDecimal("2 3/4")).toBe(2.75);
+  });
+
+  it("handles whitespace gracefully", () => {
+    expect(parseFractionOrDecimal("  1 / 2  ")).toBe(0.5);
+    expect(parseFractionOrDecimal(" 3   1/4 ")).toBe(3.25);
+  });
+
+  it("returns null for non-positive or invalid input", () => {
+    expect(parseFractionOrDecimal("0")).toBeNull();
+    expect(parseFractionOrDecimal("-1")).toBeNull();
+    expect(parseFractionOrDecimal("abc")).toBeNull();
+    expect(parseFractionOrDecimal("1/0")).toBeNull();
+    expect(parseFractionOrDecimal("")).toBeNull();
+    expect(parseFractionOrDecimal(null)).toBeNull();
   });
 });

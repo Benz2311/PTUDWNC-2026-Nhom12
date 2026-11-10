@@ -15,6 +15,9 @@ using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipeBySlug;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipes;
 using CulinaryBlog.Application.Features.Recipes.Queries.GetRecipesByCategory;
 using CulinaryBlog.Domain.Enums;
+using CulinaryBlog.Application.Common.Models;
+using CulinaryBlog.Application.Features.Search.Dtos;
+using CulinaryBlog.Application.Features.Search.Queries.SearchRecipes;
 using RecipeDetailApiDto = CulinaryBlog.Application.Features.Recipes.Dtos.RecipeDetailDto;
 using FluentAssertions;
 using MediatR;
@@ -184,8 +187,8 @@ public sealed class ChecklistEndpointTests
         var sender = new Mock<ISender>();
         var cache = new Mock<ICacheService>();
         sender.SetupSequence(item => item.Send(It.IsAny<UpdateCategoryCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateCategoryResult.NotFound)
-            .ReturnsAsync(UpdateCategoryResult.NameAlreadyExists);
+            .ReturnsAsync(new UpdateCategoryOutcome(UpdateCategoryResult.NotFound))
+            .ReturnsAsync(new UpdateCategoryOutcome(UpdateCategoryResult.NameAlreadyExists));
 
         var (app, client) = await StartApi(sender, cache);
         await using (app)
@@ -205,14 +208,15 @@ public sealed class ChecklistEndpointTests
     }
 
     [Fact]
-    public async Task UpdateCategory_AdminSuccessReturnsNoContent()
+    public async Task UpdateCategory_AdminSuccessReturnsUpdatedCategory()
     {
         var sender = new Mock<ISender>();
         var cache = new Mock<ICacheService>();
         sender.Setup(item => item.Send(
                 It.IsAny<UpdateCategoryCommand>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UpdateCategoryResult.Updated);
+            .ReturnsAsync(new UpdateCategoryOutcome(UpdateCategoryResult.Updated,
+                new CategoryDto(Guid.NewGuid(), "Updated", "original-slug", null, null, 0, 2)));
 
         var (app, client) = await StartApi(sender, cache);
         await using (app)
@@ -223,7 +227,12 @@ public sealed class ChecklistEndpointTests
                 $"/api/v1/categories/{Guid.NewGuid()}",
                 new { name = "Updated", description = "Description" });
 
-            response.StatusCode.Should().Be(System.Net.HttpStatusCode.NoContent);
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+            using var body = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var category = body.RootElement.GetProperty("data");
+            category.GetProperty("name").GetString().Should().Be("Updated");
+            category.GetProperty("slug").GetString().Should().Be("original-slug");
+            category.GetProperty("recipeCount").GetInt32().Should().Be(2);
         }
     }
 
@@ -304,6 +313,46 @@ public sealed class ChecklistEndpointTests
                 result,
                 TimeSpan.FromMinutes(1),
                 It.IsAny<CancellationToken>()), Times.Once);
+        }
+    }
+
+    [Theory]
+    [InlineData("q=p")]
+    [InlineData("q=pho&sortBy=unknown")]
+    [InlineData("q=pho&sortOrder=unknown")]
+    public async Task Search_InvalidQueryOrSort_Returns422(string query)
+    {
+        var sender = new Mock<ISender>();
+        var (app, client) = await StartApi(sender, new Mock<ICacheService>());
+        await using (app)
+        using (client)
+        {
+            var response = await client.GetAsync($"/api/v1/recipes/search?{query}");
+
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.UnprocessableEntity);
+            sender.VerifyNoOtherCalls();
+        }
+    }
+
+    [Theory]
+    [InlineData("asc", false)]
+    [InlineData("desc", true)]
+    public async Task Search_SortByServings_PassesRequestedDirection(string order, bool descending)
+    {
+        var sender = new Mock<ISender>();
+        sender.Setup(item => item.Send(
+                It.Is<SearchRecipesQuery>(query => query.SortBy == RecipeSortField.Servings && query.SortDescending == descending),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PagedResult<RecipeSearchResultDto>([], 0, 1, 10));
+
+        var (app, client) = await StartApi(sender, new Mock<ICacheService>());
+        await using (app)
+        using (client)
+        {
+            var response = await client.GetAsync($"/api/v1/recipes/search?q=pho&sortBy=servings&sortOrder={order}");
+
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+            sender.VerifyAll();
         }
     }
 
@@ -388,7 +437,7 @@ public sealed class ChecklistEndpointTests
     }
 
     [Fact]
-    public async Task RecipeDetail_PublishedIsCachedForFiveMinutes()
+    public async Task RecipeDetail_PublishedChecksCurrentStateWithoutSharedCaching()
     {
         var sender = new Mock<ISender>();
         var cache = new Mock<ICacheService>();
@@ -404,23 +453,26 @@ public sealed class ChecklistEndpointTests
         await using (app)
         using (client)
         {
-            var response = await client.GetAsync("/api/v1/recipes/Published");
+            var response = await client.GetAsync("/api/v1/recipes/published");
 
             response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
             sender.Verify(item => item.Send(
                 It.Is<GetRecipeBySlugQuery>(query => query.CurrentUserId == null && !query.IsAdmin),
                 It.IsAny<CancellationToken>()), Times.Once);
-            cache.Verify(item => item.SetAsync("recipe:published", recipe, TimeSpan.FromMinutes(5), It.IsAny<CancellationToken>()), Times.Once);
+            response.Headers.CacheControl!.NoStore.Should().BeTrue();
+            cache.VerifyNoOtherCalls();
         }
     }
 
     [Fact]
-    public async Task RecipeDetail_PublishedCacheHitSkipsQuery()
+    public async Task RecipeDetail_StalePublishedCacheCannotExposeDraft()
     {
         var sender = new Mock<ISender>();
         var cache = new Mock<ICacheService>();
         var recipe = MakeRecipeDetail(RecipeStatus.Published);
         recipe.Slug = "cached";
+        sender.Setup(item => item.Send(It.IsAny<GetRecipeBySlugQuery>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ForbiddenException());
         cache.Setup(item => item.GetAsync<RecipeDetailApiDto>("recipe:cached", It.IsAny<CancellationToken>()))
             .ReturnsAsync(recipe);
 
@@ -428,10 +480,11 @@ public sealed class ChecklistEndpointTests
         await using (app)
         using (client)
         {
-            var response = await client.GetAsync("/api/v1/recipes/Cached");
+            var response = await client.GetAsync("/api/v1/recipes/cached");
 
-            response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
-            sender.Verify(item => item.Send(It.IsAny<GetRecipeBySlugQuery>(), It.IsAny<CancellationToken>()), Times.Never);
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
+            sender.Verify(item => item.Send(It.IsAny<GetRecipeBySlugQuery>(), It.IsAny<CancellationToken>()), Times.Once);
+            cache.VerifyNoOtherCalls();
         }
     }
 
@@ -448,7 +501,7 @@ public sealed class ChecklistEndpointTests
         await using (app)
         using (client)
         {
-            var denied = await client.GetAsync("/api/v1/recipes/Draft");
+            var denied = await client.GetAsync("/api/v1/recipes/draft");
             denied.StatusCode.Should().Be(System.Net.HttpStatusCode.Forbidden);
 
             var ownerId = Guid.NewGuid();
@@ -458,7 +511,7 @@ public sealed class ChecklistEndpointTests
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(draft);
             SetUser(client, "Author", ownerId);
-            var allowed = await client.GetAsync("/api/v1/recipes/Draft");
+            var allowed = await client.GetAsync("/api/v1/recipes/draft");
 
             allowed.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
             cache.Verify(item => item.SetAsync(
@@ -487,7 +540,7 @@ public sealed class ChecklistEndpointTests
         using (client)
         {
             SetUser(client, "Admin", Guid.NewGuid());
-            var response = await client.GetAsync("/api/v1/recipes/Archived");
+            var response = await client.GetAsync("/api/v1/recipes/archived");
 
             response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
             cache.Verify(item => item.SetAsync(

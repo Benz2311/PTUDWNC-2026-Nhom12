@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -34,6 +34,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<global::Program>
             config.AddEnvironmentVariables();
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
+                ["Site:PublicBaseUrl"] = "https://blog.example.test",
                 ["RateLimiting:Auth:PermitLimit"] = "1000",
                 ["RateLimiting:Refresh:PermitLimit"] = "1000",
                 ["RateLimiting:General:PermitLimit"] = "1000"

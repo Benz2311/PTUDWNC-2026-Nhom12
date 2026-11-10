@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -134,6 +134,30 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Login_FiveIncorrectPasswords_LocksAccountEvenWithCorrectPassword()
+    {
+        var email = $"lockout-{Guid.NewGuid():N}@example.test";
+        const string password = "AuditPassword!42";
+        var registration = await _client.PostAsJsonAsync("/api/v1/auth/register", new
+        {
+            Email = email,
+            Password = password,
+            DisplayName = "Lockout integration test"
+        });
+        registration.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
+            var failed = await _client.PostAsJsonAsync("/api/v1/auth/login", new { Email = email, Password = "wrong" });
+            failed.StatusCode.Should().Be(attempt == 5 ? HttpStatusCode.Locked : HttpStatusCode.Unauthorized);
+        }
+
+        var blocked = await _client.PostAsJsonAsync("/api/v1/auth/login", new { Email = email, Password = password });
+        blocked.StatusCode.Should().Be(HttpStatusCode.Locked);
+        (await blocked.Content.ReadAsStringAsync()).Should().Contain("AUTH_ACCOUNT_LOCKED");
     }
 
     [Fact]
@@ -277,7 +301,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
-    public async Task ResendConfirmationEmail_ValidEmail_ReturnsNoContent()
+    public async Task ResendConfirmationEmail_ValidEmail_ReturnsAccepted()
     {
         // Arrange - register a user (email not confirmed)
         var userName = "resenduser_" + Guid.NewGuid().ToString("N")[..8];
@@ -295,12 +319,12 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
         var resendRequest = new ResendConfirmationEmailRequest { Email = email };
         var response = await _client.PostAsJsonAsync("/api/v1/auth/email/resend", resendRequest);
 
-        // Assert - always returns 204 to prevent user enumeration
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        // Assert - always returns 202 to prevent user enumeration
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
     }
 
     [Fact]
-    public async Task ResendConfirmationEmail_NonexistentEmail_ReturnsNoContent()
+    public async Task ResendConfirmationEmail_NonexistentEmail_ReturnsAccepted()
     {
         // Arrange
         var resendRequest = new ResendConfirmationEmailRequest { Email = "nonexistent@example.com" };
@@ -308,8 +332,8 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
         // Act
         var response = await _client.PostAsJsonAsync("/api/v1/auth/email/resend", resendRequest);
 
-        // Assert - always returns 204 to prevent user enumeration
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        // Assert - always returns 202 to prevent user enumeration
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
     }
 
     [Fact]
@@ -336,7 +360,7 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
     [InlineData("ALLUPPERCASE1!")]             // thiáº¿u chá»¯ thÆ°á»ng
     [InlineData("NoDigitsHere!")]              // thiáº¿u chá»¯ sá»‘
     [InlineData("NoSpecialChar1")]             // thiáº¿u kĂ½ tá»± Ä‘áº·c biá»‡t
-    public async Task Register_WeakPassword_ReturnsBadRequest(string password)
+    public async Task Register_WeakPassword_ReturnsUnprocessableEntity(string password)
     {
         // Arrange
         var request = new RegisterRequest
@@ -351,9 +375,10 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
         var response = await _client.PostAsJsonAsync("/api/v1/auth/register", request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
-        problem.GetProperty("status").GetInt32().Should().Be(400);
+        problem.GetProperty("status").GetInt32().Should().Be(422);
+        problem.GetProperty("errors").TryGetProperty("password", out _).Should().BeTrue();
     }
 
     // â”€â”€ Bá»¯a 5: Authorization 401/403 (NFR-SEC-006) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -589,5 +614,16 @@ public class AuthEndpointTests : IClassFixture<TestWebApplicationFactory>
         firstRefresh.StatusCode.Should().Be(HttpStatusCode.OK);
         reuseResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         familyResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("invalid.google.jwt.token")]
+    public async Task GoogleLogin_EmptyOrInvalidToken_ReturnsUnauthorized(string token)
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/google",
+            new GoogleLoginRequest { IdToken = token });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

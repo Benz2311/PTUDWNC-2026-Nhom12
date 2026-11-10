@@ -131,6 +131,12 @@ public class ImageResizeJobTests : IDisposable
                 It.IsAny<Stream>(),
                 "image/jpeg",
                 It.IsAny<CancellationToken>()))
+            .Callback<string, string, Stream, string, CancellationToken>((_, _, stream, _, _) =>
+            {
+                using var derived = Image.Load(stream);
+                derived.Width.Should().Be(800);
+                derived.Height.Should().Be(600);
+            })
             .ReturnsAsync(expectedMediumUrl);
 
         _storageServiceMock
@@ -140,6 +146,12 @@ public class ImageResizeJobTests : IDisposable
                 It.IsAny<Stream>(),
                 "image/jpeg",
                 It.IsAny<CancellationToken>()))
+            .Callback<string, string, Stream, string, CancellationToken>((_, _, stream, _, _) =>
+            {
+                using var derived = Image.Load(stream);
+                derived.Width.Should().Be(300);
+                derived.Height.Should().Be(300);
+            })
             .ReturnsAsync(expectedThumbUrl);
 
         // Act

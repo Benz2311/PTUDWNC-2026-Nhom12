@@ -143,7 +143,7 @@ public class CategoryCommandHandlerTests
             new UpdateCategoryCommand(category.Id, " New name ", null),
             CancellationToken.None);
 
-        result.Should().Be(UpdateCategoryResult.Updated);
+        result.Status.Should().Be(UpdateCategoryResult.Updated);
         category.Name.Should().Be("New name");
         category.Description.Should().BeNull();
         category.Slug.Should().Be("stable-slug");
@@ -184,7 +184,7 @@ public class CategoryCommandHandlerTests
             new UpdateCategoryCommand(category.Id, "Taken name", "Description"),
             CancellationToken.None);
 
-        result.Should().Be(UpdateCategoryResult.NameAlreadyExists);
+        result.Status.Should().Be(UpdateCategoryResult.NameAlreadyExists);
         unitOfWork.Verify(
             item => item.SaveChangesAsync(It.IsAny<CancellationToken>()),
             Times.Never);

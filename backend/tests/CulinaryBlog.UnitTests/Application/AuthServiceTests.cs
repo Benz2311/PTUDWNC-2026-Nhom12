@@ -50,6 +50,7 @@ public AuthServiceTests()
         var configBuilder = new ConfigurationBuilder();
         configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
         {
+            ["Site:PublicBaseUrl"] = "https://blog.example.test",
             [$"{JwtSettings.Section}:SecretKey"] = jwtSettings.SecretKey,
             [$"{JwtSettings.Section}:Issuer"] = jwtSettings.Issuer,
             [$"{JwtSettings.Section}:Audience"] = jwtSettings.Audience,
@@ -59,6 +60,14 @@ public AuthServiceTests()
             [$"{GoogleAuthSettings.Section}:ClientSecret"] = googleAuthSettings.ClientSecret,
         });
         
+        _tokenRepoMock.Setup(x => x.WithSessionLockAsync(It.IsAny<string>(), It.IsAny<Func<RefreshToken?, Task<AuthResponse?>>>()))
+            .Returns(async (string hash, Func<RefreshToken?, Task<AuthResponse?>> action) =>
+                await action(await _tokenRepoMock.Object.GetByTokenHashWithUserAsync(hash)));
+
+        _tokenRepoMock.Setup(x => x.WithSessionLockAsync(It.IsAny<string>(), It.IsAny<Func<RefreshToken?, Task<bool>>>()))
+            .Returns(async (string hash, Func<RefreshToken?, Task<bool>> action) =>
+                await action(await _tokenRepoMock.Object.GetByTokenHashWithUserAsync(hash)));
+
         _configuration = configBuilder.Build();
 
         _jwtTokenGeneratorMock.Setup(x => x.GenerateAccessToken(It.IsAny<ApplicationUser>(), It.IsAny<IEnumerable<string>>(), It.IsAny<TimeSpan>()))
@@ -182,17 +191,18 @@ public AuthServiceTests()
     }
 
     [Fact]
-    public async Task LoginAsync_InactiveUser_ThrowsUnauthorizedAuthException()
+    public async Task LoginAsync_InactiveUser_ThrowsAccountDisabledException()
     {
         // Arrange
-        var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = "banned", IsActive = false };
+        var user = new ApplicationUser { Id = Guid.NewGuid(), UserName = "banned", PasswordHash = "hashed", IsActive = false };
         _userRepoMock.Setup(x => x.GetByEmailOrUserNameAsync("banned", default)).ReturnsAsync(user);
 
+        _hasherMock.Setup(x => x.VerifyHashedPassword(user, "hashed", "any")).Returns(PasswordVerificationResult.Success);
         var request = new LoginRequest { UserNameOrEmail = "banned", Password = "any" };
 
         // Act & Assert
         var act = () => _sut.LoginAsync(request);
-        await act.Should().ThrowAsync<UnauthorizedAuthException>().WithMessage("*Account is inactive*");
+        await act.Should().ThrowAsync<AccountDisabledException>().WithMessage("*Account is inactive*");
     }
 
     [Fact]
@@ -247,7 +257,7 @@ public AuthServiceTests()
         result.AccessToken.Should().NotBeNullOrWhiteSpace();
         result.RefreshToken.Should().NotBeNullOrWhiteSpace();
         _tokenRepoMock.Verify(x => x.RevokeAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<string>(), default), Times.Once);
-        _uowMock.Verify(x => x.SaveChangesAsync(default), Times.AtLeast(2));
+        _tokenRepoMock.Verify(x => x.AddAsync(It.Is<RefreshToken>(token => token.FamilyId == storedToken.FamilyId), default), Times.Once);
     }
 
     [Fact]
@@ -273,6 +283,7 @@ public AuthServiceTests()
         // Act & Assert
         var act = () => _sut.RefreshAsync(request);
         await act.Should().ThrowAsync<UnauthorizedAuthException>().WithMessage("*revoked*");
+        _tokenRepoMock.Verify(x => x.RevokeFamilyAsync(user.Id, storedToken.FamilyId), Times.Once);
     }
 
     [Fact]
@@ -301,17 +312,19 @@ public AuthServiceTests()
     }
 
     [Fact]
-    public async Task LogoutAsync_ValidToken_CallsRevokeAndSaves()
+    public async Task LogoutAsync_ValidToken_RevokesOnlyItsFamily()
     {
         // Arrange
         var token = "token_to_logout";
+        var storedToken = new RefreshToken { UserId = Guid.NewGuid() };
+        _tokenRepoMock.Setup(x => x.GetByTokenHashWithUserAsync(It.IsAny<string>(), default))
+            .ReturnsAsync(storedToken);
 
         // Act
         await _sut.LogoutAsync(token);
 
         // Assert
-        _tokenRepoMock.Verify(x => x.RevokeAsync(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), null, default), Times.Once);
-        _uowMock.Verify(x => x.SaveChangesAsync(default), Times.Once);
+        _tokenRepoMock.Verify(x => x.RevokeFamilyAsync(storedToken.UserId, storedToken.FamilyId), Times.Once);
     }
 
     [Fact]
@@ -339,5 +352,36 @@ public AuthServiceTests()
         result.Should().NotBeNull();
         result!.UserName.Should().Be("john");
         result.DisplayName.Should().Be("John Chef");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task GoogleLoginAsync_NullOrWhitespaceToken_ThrowsUnauthorizedAuthException(string? token)
+    {
+        // Arrange
+        var request = new GoogleLoginRequest { IdToken = token! };
+
+        // Act
+        var act = () => _sut.GoogleLoginAsync(request);
+
+        // Assert
+        await act.Should().ThrowAsync<UnauthorizedAuthException>()
+            .WithMessage("*Google ID token is required*");
+    }
+
+    [Fact]
+    public async Task GoogleLoginAsync_MalformedToken_ThrowsUnauthorizedAuthException()
+    {
+        // Arrange
+        var request = new GoogleLoginRequest { IdToken = "malformed.jwt.token" };
+
+        // Act
+        var act = () => _sut.GoogleLoginAsync(request);
+
+        // Assert
+        await act.Should().ThrowAsync<UnauthorizedAuthException>()
+            .WithMessage("*Invalid Google token*");
     }
 }
