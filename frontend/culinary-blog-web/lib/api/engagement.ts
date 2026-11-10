@@ -52,3 +52,4 @@ export async function recordRecipeView(slug: string): Promise<boolean> {
     return false;
   }
 }
+

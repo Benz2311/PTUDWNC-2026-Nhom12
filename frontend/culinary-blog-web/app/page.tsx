@@ -24,7 +24,6 @@ import { Pagination } from "@/components/common/Pagination";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
-import { RecipeRecommendations } from "@/components/recipes/RecipeRecommendations";
 
 export default function HomePage() {
   const router = useRouter();
@@ -291,11 +290,6 @@ export default function HomePage() {
             </p>
           )}
         </div>
-      </section>
-
-      {/* ── 2.5 RECOMMENDATIONS SECTION ───────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <RecipeRecommendations limit={3} />
       </section>
 
       {/* ── 3. PUBLIC LAYOUT: SIDEBAR + MAIN CONTENT ────────────────── */}

@@ -176,3 +176,4 @@ export function CollectionModal({
 }
 
 export default CollectionModal;
+

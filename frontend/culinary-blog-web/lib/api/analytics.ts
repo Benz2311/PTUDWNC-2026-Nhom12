@@ -23,3 +23,4 @@ export async function getCategoryPerformanceAnalytics(
   );
   return unwrapData(response);
 }
+

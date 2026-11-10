@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { getRolesFromToken } from '@/lib/jwt';
 import { getRecipeBySlug } from '@/lib/api/recipes';
-import { recordRecipeView } from '@/lib/api/engagement';
 import type { RecipeDetail } from '@/types/recipe';
 import RecipeDetailSkeleton from '@/components/recipes/RecipeDetailSkeleton';
 import { RecipeDetailView } from '@/components/recipes/RecipeDetailView';
@@ -44,8 +43,6 @@ export default function RecipeDetailPage() {
       }
       setRecipe(data);
       setStatus('ready');
-      // Record view with anti-spam check
-      recordRecipeView(slug).catch(() => {});
     } catch (err: unknown) {
       const anyErr = err as { status?: number; statusCode?: number; response?: { status?: number }; message?: string };
       const statusCode = anyErr?.status ?? anyErr?.statusCode ?? anyErr?.response?.status;
