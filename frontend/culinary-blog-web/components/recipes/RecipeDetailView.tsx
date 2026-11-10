@@ -68,6 +68,23 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
           cookTimeMinutes={recipe.cookTimeMinutes ?? recipe.cookTime}
           servings={recipe.servings}
         />
+        {recipe.steps && recipe.steps.length > 0 && (
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Link
+              href={`/recipes/${recipe.slug}/cook`}
+              data-testid="btn-start-cooking"
+              className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all"
+            >
+              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              <span>Bắt đầu nấu ăn</span>
+            </Link>
+            <span className="text-xs text-slate-500 font-medium">
+              Chế độ theo dõi từng bước kết hợp hẹn giờ thông minh
+            </span>
+          </div>
+        )}
       </header>
 
       <section className="recipe-detail-gallery mb-10" aria-label="Thư viện ảnh công thức">
@@ -137,7 +154,19 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
           <section className="detail-section bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-slate-900">Các bước thực hiện</h2>
-              <span className="text-sm text-slate-500">{recipe.steps?.length ?? 0} bước</span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-slate-500">{recipe.steps?.length ?? 0} bước</span>
+                {recipe.steps && recipe.steps.length > 0 && (
+                  <Link
+                    href={`/recipes/${recipe.slug}/cook`}
+                    data-testid="btn-start-cooking-section"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                  >
+                    <span>Vào chế độ nấu</span>
+                    <span>→</span>
+                  </Link>
+                )}
+              </div>
             </div>
             {!recipe.steps || recipe.steps.length === 0 ? (
               <p className="detail-content text-slate-500">Chưa có hướng dẫn chế biến.</p>
