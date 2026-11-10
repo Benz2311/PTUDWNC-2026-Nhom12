@@ -2,6 +2,7 @@
 
 import React from 'react';
 import type { RecipeImage } from '@/types/image';
+import { resolveImageUrl } from '@/lib/image-url';
 
 interface ImageCardProps {
   image: RecipeImage;
@@ -41,7 +42,10 @@ export function ImageCard({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={image.thumbnailUrl || image.mediumUrl || image.originalUrl}
+          src={
+            resolveImageUrl(image.thumbnailUrl || image.mediumUrl || image.originalUrl) ??
+            (image.thumbnailUrl || image.mediumUrl || image.originalUrl)
+          }
           alt={image.altText || `Ảnh công thức ${index + 1}`}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           onError={(e) => {

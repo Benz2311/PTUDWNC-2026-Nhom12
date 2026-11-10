@@ -17,6 +17,7 @@ import {
 } from '@/lib/api/steps';
 import { useAuthStore } from '@/lib/auth-store';
 import { validateImageFile } from '@/lib/image-validator';
+import { resolveImageUrl } from '@/lib/image-url';
 import { StepItem } from './StepItem';
 
 export type StepDraft = {
@@ -26,6 +27,10 @@ export type StepDraft = {
   description: string;
   timerMinutes?: number | string | null;
   imageUrl?: string | null;
+  imageFile?: File | null;
+  imagePreviewUrl?: string | null;
+  uploadStatus?: 'idle' | 'uploading' | 'success' | 'error';
+  uploadError?: string | null;
 };
 
 export interface FullStepEditorProps {
@@ -76,11 +81,27 @@ function isValidUrl(urlString: string): boolean {
 const DraftStepEditor: React.FC<{
   steps: StepDraft[];
   onChange: (steps: StepDraft[]) => void;
-}> = ({ steps, onChange }) => {
-  const update = (index: number, key: keyof StepDraft, value: string) => {
+  recipeId?: string;
+}> = ({ steps, onChange, recipeId }) => {
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const [showManualUrl, setShowManualUrl] = useState<Record<number, boolean>>({});
+
+  const update = (
+    index: number,
+    key: keyof StepDraft,
+    value: string | number | null | undefined | File
+  ) => {
     onChange(
       steps.map((step, stepIndex) =>
         stepIndex === index ? { ...step, [key]: value } : step
+      )
+    );
+  };
+
+  const updatePatch = (index: number, patch: Partial<StepDraft>) => {
+    onChange(
+      steps.map((step, stepIndex) =>
+        stepIndex === index ? { ...step, ...patch } : step
       )
     );
   };
@@ -93,71 +114,465 @@ const DraftStepEditor: React.FC<{
     onChange(reordered);
   };
 
+  const handleFileChange = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate client-side (size <= 5MB, format jpg/png/webp/avif)
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      updatePatch(index, {
+        uploadStatus: 'error',
+        uploadError: validation.errorMessage || 'Tệp hình ảnh không hợp lệ (tối đa 5 MB, định dạng JPG, PNG, WebP, AVIF).',
+      });
+      e.target.value = '';
+      return;
+    }
+
+    // Local object URL for preview
+    const previewUrl = URL.createObjectURL(file);
+
+    if (recipeId) {
+      // In Edit mode (recipeId exists), upload directly to MinIO
+      setUploadingIndex(index);
+      updatePatch(index, {
+        imageFile: file,
+        imagePreviewUrl: previewUrl,
+        uploadStatus: 'uploading',
+        uploadError: null,
+      });
+
+      try {
+        const res = await uploadStepImageFile(recipeId, file);
+        if (res?.url) {
+          updatePatch(index, {
+            imageUrl: res.url,
+            imageFile: null,
+            imagePreviewUrl: null,
+            uploadStatus: 'success',
+            uploadError: null,
+          });
+        }
+      } catch (err: unknown) {
+        updatePatch(index, {
+          imageFile: file,
+          imagePreviewUrl: previewUrl,
+          uploadStatus: 'error',
+          uploadError: err instanceof Error ? err.message : 'Tải ảnh lên máy chủ thất bại.',
+        });
+      } finally {
+        setUploadingIndex(null);
+        e.target.value = '';
+      }
+    } else {
+      // In Create mode (no recipeId yet), keep file and preview in memory
+      updatePatch(index, {
+        imageFile: file,
+        imagePreviewUrl: previewUrl,
+        imageUrl: '', // Crucial: never set blob URL as imageUrl!
+        uploadStatus: 'idle',
+        uploadError: null,
+      });
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    const step = steps[index];
+    if (typeof window !== 'undefined' && step.imagePreviewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(step.imagePreviewUrl);
+    }
+    updatePatch(index, {
+      imageUrl: '',
+      imageFile: null,
+      imagePreviewUrl: null,
+      uploadStatus: 'idle',
+      uploadError: null,
+    });
+    const fileInput = document.getElementById(`step-file-${index}`) as HTMLInputElement | null;
+    if (fileInput) fileInput.value = '';
+  };
+
+  const handleRetryUpload = async (index: number) => {
+    const step = steps[index];
+    if (!step.imageFile) return;
+
+    if (!recipeId) {
+      updatePatch(index, {
+        uploadStatus: 'idle',
+        uploadError: null,
+      });
+      return;
+    }
+
+    setUploadingIndex(index);
+    updatePatch(index, {
+      uploadStatus: 'uploading',
+      uploadError: null,
+    });
+
+    try {
+      const res = await uploadStepImageFile(recipeId, step.imageFile);
+      if (res?.url) {
+        updatePatch(index, {
+          imageUrl: res.url,
+          imageFile: null,
+          imagePreviewUrl: null,
+          uploadStatus: 'success',
+          uploadError: null,
+        });
+      }
+    } catch (err: unknown) {
+      updatePatch(index, {
+        uploadStatus: 'error',
+        uploadError: err instanceof Error ? err.message : 'Tải ảnh lên máy chủ thất bại.',
+      });
+    } finally {
+      setUploadingIndex(null);
+    }
+  };
+
   return (
-    <div className="step-editor">
-      {steps.map((step, index) => (
-        <div className="step-row" key={index}>
-          <strong>{String(index + 1).padStart(2, '0')}</strong>
-          <div className="form-grid">
-            <label className="field field-wide">
-              <span>Tiêu đề bước</span>
-              <input
-                maxLength={200}
-                value={step.title}
-                onChange={(event) => update(index, 'title', event.target.value)}
-                placeholder="Sơ chế nguyên liệu"
-              />
-            </label>
-            <label className="field field-wide">
-              <span>Hướng dẫn *</span>
-              <textarea
-                maxLength={2000}
-                rows={3}
-                value={step.description}
-                onChange={(event) => update(index, 'description', event.target.value)}
-                placeholder="Mô tả thao tác cần thực hiện..."
-              />
-            </label>
+    <div className="step-editor space-y-5">
+      {steps.map((step, index) => {
+        const currentPreview = step.imagePreviewUrl || step.imageUrl;
+        const isUrlInputVisible =
+          showManualUrl[index] ||
+          (Boolean(step.imageUrl) && !step.imageFile && !step.imagePreviewUrl && showManualUrl[index] !== false);
+
+        return (
+          <div
+            className="step-row bg-gray-50/70 hover:bg-white rounded-2xl border border-gray-200 hover:border-emerald-200 p-5 sm:p-6 space-y-4 transition-all shadow-2xs"
+            key={index}
+          >
+            <div className="step-row-header flex items-center justify-between pb-3 border-b border-gray-100">
+              <span className="step-badge inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                Bước {String(index + 1).padStart(2, '0')}
+              </span>
+              <div className="ingredient-row-actions flex items-center gap-1.5">
+                <button
+                  type="button"
+                  aria-label="Chuyển bước lên"
+                  title="Di chuyển lên"
+                  disabled={index === 0}
+                  onClick={() => move(index, -1)}
+                  className="p-1.5 text-xs font-bold rounded-lg border border-gray-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-30 transition-colors cursor-pointer"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  aria-label="Chuyển bước xuống"
+                  title="Di chuyển xuống"
+                  disabled={index === steps.length - 1}
+                  onClick={() => move(index, 1)}
+                  className="p-1.5 text-xs font-bold rounded-lg border border-gray-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-30 transition-colors cursor-pointer"
+                >
+                  ↓
+                </button>
+                <button
+                  className="small-button text-xs font-bold px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 bg-rose-50/50 hover:bg-rose-100 transition-colors cursor-pointer ml-1"
+                  type="button"
+                  onClick={() =>
+                    onChange(
+                      steps.length === 1
+                        ? [{ title: '', description: '', timerMinutes: '', imageUrl: '' }]
+                        : steps.filter((_, stepIndex) => stepIndex !== index)
+                    )
+                  }
+                >
+                  🗑️ Xóa bước
+                </button>
+              </div>
+            </div>
+
+            <div className="w-full space-y-4">
+              <div className="w-full space-y-1.5">
+                <label
+                  htmlFor={`step-title-${index}`}
+                  className="block text-xs sm:text-sm font-semibold text-gray-800"
+                >
+                  Tiêu đề bước <span className="text-gray-400 font-normal text-xs">(tùy chọn)</span>
+                </label>
+                <input
+                  id={`step-title-${index}`}
+                  data-testid={`input-step-title-${index}`}
+                  maxLength={200}
+                  value={step.title}
+                  onChange={(event) => update(index, 'title', event.target.value)}
+                  placeholder="Ví dụ: Sơ chế nguyên liệu hoặc Xào thơm hành tỏi..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none text-sm transition-all shadow-2xs"
+                />
+              </div>
+
+              <div className="w-full space-y-1.5">
+                <label
+                  htmlFor={`step-description-${index}`}
+                  className="block text-xs sm:text-sm font-semibold text-gray-800"
+                >
+                  Hướng dẫn thực hiện * <span className="text-emerald-700 font-semibold">(Bắt buộc)</span>
+                </label>
+                <textarea
+                  id={`step-description-${index}`}
+                  data-testid={`input-step-description-${index}`}
+                  required
+                  maxLength={2000}
+                  rows={3}
+                  value={step.description}
+                  onChange={(event) => update(index, 'description', event.target.value)}
+                  placeholder="Mô tả cụ thể các thao tác thực hiện, căn lửa, thời gian hoặc dấu hiệu nhận biết..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none text-sm transition-all leading-relaxed shadow-2xs"
+                />
+              </div>
+
+              {/* Timer (1/3) & Image (2/3) Section on Desktop, 1 Column Full Width on Mobile */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 w-full pt-1 items-start">
+                {/* Column 1: TimerMinutes (takes 1 of 3 columns = 1/3 width on md+) */}
+                <div className="md:col-span-1 w-full space-y-1.5">
+                  <label
+                    htmlFor={`step-timer-${index}`}
+                    className="block text-xs sm:text-sm font-semibold text-gray-800 whitespace-nowrap"
+                  >
+                    ⏱️ Thời gian hẹn giờ <span className="text-gray-500 font-normal text-xs">(phút, 0-1440)</span>
+                  </label>
+                  <div className="relative w-full">
+                    <input
+                      id={`step-timer-${index}`}
+                      data-testid={`input-step-timer-${index}`}
+                      type="number"
+                      min="0"
+                      max="1440"
+                      step="1"
+                      value={step.timerMinutes ?? ''}
+                      onChange={(event) => update(index, 'timerMinutes', event.target.value)}
+                      placeholder="Ví dụ: 15"
+                      className="w-full pl-3.5 pr-14 py-2.5 text-sm font-medium rounded-xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 transition-all shadow-2xs"
+                    />
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-semibold pointer-events-none select-none">
+                      phút
+                    </span>
+                  </div>
+                </div>
+
+                {/* Column 2: Image Section (takes 2 of 3 columns = 2/3 width on md+) */}
+                <div className="md:col-span-2 w-full space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label
+                      htmlFor={`step-image-${index}`}
+                      className="block text-xs sm:text-sm font-semibold text-gray-800"
+                    >
+                      🖼️ Ảnh minh họa bước nấu <span className="text-gray-500 font-normal text-xs">(tùy chọn)</span>
+                    </label>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Hidden file input */}
+                      <input
+                        type="file"
+                        id={`step-file-${index}`}
+                        data-testid={`input-step-file-${index}`}
+                        accept="image/jpeg,image/png,image/webp,image/avif"
+                        className="hidden"
+                        onChange={(e) => handleFileChange(index, e)}
+                      />
+
+                      {/* Button: Chọn ảnh từ máy */}
+                      <button
+                        type="button"
+                        data-testid={`btn-upload-step-image-${index}`}
+                        disabled={uploadingIndex === index}
+                        onClick={() => {
+                          document.getElementById(`step-file-${index}`)?.click();
+                        }}
+                        className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        <span>
+                          {uploadingIndex === index
+                            ? 'Đang tải lên...'
+                            : currentPreview
+                              ? 'Thay ảnh từ máy'
+                              : 'Chọn ảnh từ máy'}
+                        </span>
+                      </button>
+
+                      {/* Toggle Button: Nhập URL */}
+                      <button
+                        type="button"
+                        data-testid={`btn-toggle-step-url-${index}`}
+                        onClick={() =>
+                          setShowManualUrl((prev) => ({
+                            ...prev,
+                            [index]: !isUrlInputVisible,
+                          }))
+                        }
+                        className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 border border-gray-200 transition-colors cursor-pointer"
+                        title="Nhập URL ảnh trực tiếp (tùy chọn phụ)"
+                      >
+                        <span>{isUrlInputVisible ? 'Thu gọn URL' : 'Nhập URL'}</span>
+                      </button>
+
+                      {/* Button: Gỡ ảnh */}
+                      {Boolean(currentPreview || step.imageFile) && (
+                        <button
+                          type="button"
+                          data-testid={`btn-remove-step-image-${index}`}
+                          onClick={() => handleRemoveImage(index)}
+                          className="inline-flex items-center gap-1 text-xs text-rose-600 hover:text-rose-700 font-semibold hover:underline cursor-pointer ml-1"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          <span>Gỡ ảnh</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Upload / Validation Error Banner */}
+                  {step.uploadError && (
+                    <div
+                      data-testid={`step-image-error-${index}`}
+                      className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs animate-in fade-in"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>⚠️</span>
+                        <span className="font-medium">{step.uploadError}</span>
+                      </div>
+                      {step.imageFile && (
+                        <button
+                          type="button"
+                          data-testid={`btn-retry-step-image-${index}`}
+                          disabled={uploadingIndex === index}
+                          onClick={() => handleRetryUpload(index)}
+                          className="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-semibold hover:bg-rose-700 transition-colors text-[11px] shrink-0 cursor-pointer disabled:opacity-50"
+                        >
+                          {uploadingIndex === index ? 'Đang thử lại...' : 'Thử lại'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Collapsible Manual URL input */}
+                  {isUrlInputVisible && (
+                    <div className="relative w-full animate-in fade-in">
+                      <input
+                        id={`step-image-${index}`}
+                        data-testid={`input-step-image-${index}`}
+                        type="url"
+                        maxLength={500}
+                        value={step.imageUrl ?? ''}
+                        onChange={(event) => {
+                          const val = event.target.value;
+                          if (typeof window !== 'undefined' && step.imagePreviewUrl?.startsWith('blob:')) {
+                            URL.revokeObjectURL(step.imagePreviewUrl);
+                          }
+                          updatePatch(index, {
+                            imageUrl: val,
+                            imageFile: null,
+                            imagePreviewUrl: null,
+                            uploadStatus: 'idle',
+                            uploadError: null,
+                          });
+                        }}
+                        placeholder="https://images.unsplash.com/... hoặc đường dẫn URL ảnh"
+                        className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 transition-all shadow-2xs"
+                      />
+                    </div>
+                  )}
+
+                  {/* Thumbnail Preview Card */}
+                  {currentPreview && (
+                    <div
+                      data-testid={`step-image-preview-${index}`}
+                      className="flex items-center gap-3.5 p-3 bg-white rounded-xl border border-emerald-200/90 shadow-2xs w-full animate-in fade-in"
+                    >
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-gray-200 relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={resolveImageUrl(currentPreview) || currentPreview}
+                          alt={step.title || `Ảnh minh họa bước ${index + 1}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                        {uploadingIndex === index && (
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                            <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0 text-xs">
+                        <p
+                          className="font-semibold text-gray-800 truncate"
+                          title={step.imageFile ? step.imageFile.name : (step.imageUrl ?? '')}
+                        >
+                          {step.imageFile
+                            ? `📁 ${step.imageFile.name} (${(step.imageFile.size / 1024).toFixed(0)} KB)`
+                            : step.imageUrl}
+                        </p>
+
+                        {/* Status Badges */}
+                        {uploadingIndex === index ? (
+                          <p className="text-amber-600 font-medium text-[11px] mt-1 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                            <span>Đang tải ảnh lên MinIO...</span>
+                          </p>
+                        ) : step.imageFile ? (
+                          <p className="text-blue-600 font-medium text-[11px] mt-1 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                            <span>
+                              {recipeId
+                                ? 'Ảnh đã chọn từ máy tính'
+                                : 'Ảnh từ máy (sẽ tải lên khi lưu nháp)'}
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="text-emerald-700 font-medium text-[11px] mt-1 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                            <span>✓ Ảnh đã lưu trên máy chủ</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          data-testid={`btn-change-step-image-${index}`}
+                          onClick={() => {
+                            document.getElementById(`step-file-${index}`)?.click();
+                          }}
+                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors cursor-pointer"
+                          title="Thay ảnh khác từ máy"
+                        >
+                          🔄
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(index)}
+                          className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors cursor-pointer"
+                          title="Gỡ ảnh này"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="ingredient-row-actions">
-            <button
-              type="button"
-              aria-label="Chuyển bước lên"
-              disabled={index === 0}
-              onClick={() => move(index, -1)}
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              aria-label="Chuyển bước xuống"
-              disabled={index === steps.length - 1}
-              onClick={() => move(index, 1)}
-            >
-              ↓
-            </button>
-            <button
-              className="small-button"
-              type="button"
-              onClick={() =>
-                onChange(
-                  steps.length === 1
-                    ? [{ title: '', description: '' }]
-                    : steps.filter((_, stepIndex) => stepIndex !== index)
-                )
-              }
-            >
-              Xóa bước
-            </button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
       <button
-        className="small-button"
+        className="small-button inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all cursor-pointer shadow-2xs"
         type="button"
-        onClick={() => onChange([...steps, { title: '', description: '' }])}
+        onClick={() => onChange([...steps, { title: '', description: '', timerMinutes: '', imageUrl: '' }])}
       >
-        + Thêm bước
+        ＋ Thêm bước thực hiện
       </button>
     </div>
   );
@@ -799,11 +1214,8 @@ const FullStepEditor: React.FC<FullStepEditorProps> = ({
                   data-testid="btn-upload-step-image"
                   disabled={isActionDisabled}
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1"
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
                   <span>{isUploadingImage ? 'Đang tải...' : 'Tải ảnh từ máy'}</span>
                 </button>
               </div>
@@ -984,11 +1396,15 @@ const FullStepEditor: React.FC<FullStepEditorProps> = ({
   );
 };
 
-export const StepEditor: React.FC<StepEditorProps> = (props) => {
-  if (props.steps && props.onChange) {
-    return <DraftStepEditor steps={props.steps} onChange={props.onChange} />;
+export const StepEditor: React.FC<StepEditorProps> = ({
+  steps,
+  onChange,
+  ...restProps
+}) => {
+  if (steps && onChange) {
+    return <DraftStepEditor steps={steps} onChange={onChange} />;
   }
-  return <FullStepEditor {...props} />;
+  return <FullStepEditor {...restProps} />;
 };
 
 export default StepEditor;

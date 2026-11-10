@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import type { RecipeStatus } from '@/types/recipe';
+import { useState, useCallback } from 'react';
+import { normalizeRecipeStatus, type RecipeStatus } from '@/types/recipe';
 import ConfirmationDialog from './ConfirmationDialog';
 
 export type RecipeLifecycleAction = 'publish' | 'unpublish' | 'archive' | 'unarchive';
 
 type RecipeActionsProps = {
-  status: RecipeStatus;
+  status: RecipeStatus | string | number;
   disabled: boolean;
   onAction: (action: RecipeLifecycleAction) => Promise<void> | void;
   onDelete: () => Promise<void> | void;
@@ -23,8 +23,9 @@ export default function RecipeActions({
 }: RecipeActionsProps) {
   const [activeDialog, setActiveDialog] = useState<RecipeLifecycleAction | 'delete' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const currentStatus = normalizeRecipeStatus(status);
 
-  async function handleConfirm() {
+  const handleConfirm = useCallback(async () => {
     if (!activeDialog) return;
     setIsProcessing(true);
     try {
@@ -37,20 +38,21 @@ export default function RecipeActions({
     } finally {
       setIsProcessing(false);
     }
-  }
+  }, [activeDialog, onAction, onDelete]);
 
   return (
     <>
-      <div className="recipe-actions-panel" aria-label="Thao tác vòng đời công thức">
-        <div className="recipe-actions-title">
+      <div className="recipe-actions-panel bg-emerald-50/70 border border-emerald-200/90 rounded-2xl p-5 sm:p-6 mb-6 shadow-2xs" aria-label="Thao tác vòng đời công thức">
+        <div className="recipe-actions-title text-xs font-bold uppercase tracking-wider text-emerald-900 mb-3 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-600" />
           <span>Hành động vòng đời công thức:</span>
         </div>
 
-        <div className="form-actions-buttons">
-          {status === 'Draft' && (
+        <div className="form-actions-buttons flex flex-wrap items-center gap-2.5">
+          {currentStatus === 'Draft' && (
             <>
               <button
-                className="primary-button action-btn-publish"
+                className="primary-button action-btn-publish px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 shadow-sm transition-all cursor-pointer disabled:opacity-50"
                 disabled={disabled || Boolean(publishBlocker)}
                 onClick={() => setActiveDialog('publish')}
                 type="button"
@@ -59,7 +61,7 @@ export default function RecipeActions({
                 🚀 Xuất bản (Publish)
               </button>
               <button
-                className="outline-button action-btn-archive"
+                className="outline-button action-btn-archive px-4 py-2.5 rounded-xl text-sm font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 transition-all cursor-pointer disabled:opacity-50"
                 disabled={disabled}
                 onClick={() => setActiveDialog('archive')}
                 type="button"
@@ -69,10 +71,10 @@ export default function RecipeActions({
             </>
           )}
 
-          {status === 'Published' && (
+          {currentStatus === 'Published' && (
             <>
               <button
-                className="outline-button action-btn-unpublish"
+                className="outline-button action-btn-unpublish px-4 py-2.5 rounded-xl text-sm font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 transition-all cursor-pointer disabled:opacity-50"
                 disabled={disabled}
                 onClick={() => setActiveDialog('unpublish')}
                 type="button"
@@ -80,7 +82,7 @@ export default function RecipeActions({
                 ↩ Hủy xuất bản (Unpublish)
               </button>
               <button
-                className="outline-button action-btn-archive"
+                className="outline-button action-btn-archive px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-300 transition-all cursor-pointer disabled:opacity-50"
                 disabled={disabled}
                 onClick={() => setActiveDialog('archive')}
                 type="button"
@@ -90,9 +92,9 @@ export default function RecipeActions({
             </>
           )}
 
-          {status === 'Archived' && (
+          {currentStatus === 'Archived' && (
             <button
-              className="primary-button action-btn-unarchive"
+              className="primary-button action-btn-unarchive px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 shadow-sm transition-all cursor-pointer disabled:opacity-50"
               disabled={disabled}
               onClick={() => setActiveDialog('unarchive')}
               type="button"
@@ -102,7 +104,7 @@ export default function RecipeActions({
           )}
 
           <button
-            className="delete-action action-btn-delete"
+            className="delete-action action-btn-delete px-4 py-2.5 rounded-xl text-sm font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer disabled:opacity-50 ml-auto"
             disabled={disabled}
             onClick={() => setActiveDialog('delete')}
             type="button"
@@ -111,8 +113,8 @@ export default function RecipeActions({
           </button>
         </div>
 
-        {publishBlocker && status === 'Draft' && (
-          <div className="publish-blocker-note" role="alert">
+        {publishBlocker && currentStatus === 'Draft' && (
+          <div className="publish-blocker-note mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-800 flex items-center gap-2" role="alert">
             <span>⚠️ Chưa đủ điều kiện xuất bản: {publishBlocker}</span>
           </div>
         )}

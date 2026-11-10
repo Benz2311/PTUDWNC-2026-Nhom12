@@ -1,8 +1,8 @@
 'use client';
 
-import { FormEvent, useEffect, useState, useMemo } from 'react';
+import { FormEvent, useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch, apiJson, type ApiError } from '@/lib/api';
+import { apiJson, type ApiError } from '@/lib/api';
 import {
   changeRecipeStatus,
   createRecipe,
@@ -10,14 +10,20 @@ import {
   updateRecipe,
 } from '@/lib/api/recipes';
 import Link from 'next/link';
-import { ImageManager, type RecipeImageDraft } from './ImageManager';
+import { ImageManager } from './ImageManager';
+import type { RecipeImage } from '@/types/image';
 import IngredientEditor, { IngredientDraft } from './IngredientEditor';
 import NutritionEditor, { NutritionData } from './NutritionEditor';
 import RecipeActions, { RecipeLifecycleAction } from './RecipeActions';
 import { StepEditor, type StepDraft } from './StepEditor';
+import { uploadStepImageFile } from '@/lib/api/steps';
+import { uploadRecipeImageFile } from '@/lib/api/images';
+import { parseFractionOrDecimal } from '@/lib/recipe-utils';
 import {
   difficultyLevelSchema,
   recipeDraftRequestSchema,
+  normalizeRecipeStatus,
+  normalizeRecipeDifficulty,
   type DifficultyLevel,
   type RecipeDetail,
   type RecipeStatus,
@@ -25,7 +31,6 @@ import {
 import RecipeFormLayout from '@/components/recipes/RecipeFormLayout';
 
 type Category = { id: string; name: string };
-type UploadedImage = { url: string; originalName: string };
 type UserProfile = { id: string; fullName: string; email: string; emailConfirmed?: boolean };
 
 export type InitialRecipe = RecipeDetail;
@@ -60,9 +65,10 @@ export default function RecipeForm({
   const [ingredients, setIngredients] = useState<IngredientDraft[]>([
     { name: '', quantity: '', unit: '', notes: '', orderIndex: 0 },
   ]);
-  const [steps, setSteps] = useState<StepDraft[]>([{ title: '', description: '' }]);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [images, setImages] = useState<RecipeImageDraft[]>([]);
+  const [steps, setSteps] = useState<StepDraft[]>([
+    { title: '', description: '', timerMinutes: '', imageUrl: '' },
+  ]);
+  const [images, setImages] = useState<RecipeImage[]>([]);
   const [nutrition, setNutrition] = useState<NutritionData>({
     calories: '0',
     protein: '0',
@@ -73,7 +79,7 @@ export default function RecipeForm({
   });
 
   // State management & lifecycle
-  const [status, setStatus] = useState<RecipeStatus>((initialRecipe?.status as RecipeStatus) ?? 'Draft');
+  const [status, setStatus] = useState<RecipeStatus>(normalizeRecipeStatus(initialRecipe?.status));
   const [etag, setEtag] = useState(initialEtag);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
@@ -131,14 +137,14 @@ export default function RecipeForm({
     if (!initialRecipe) return;
 
     setTitle(initialRecipe.title ?? '');
-    setStatus((initialRecipe.status as RecipeStatus) ?? 'Draft');
+    setStatus(normalizeRecipeStatus(initialRecipe.status));
     setDescription(initialRecipe.description ?? '');
     setContent(initialRecipe.content ?? '');
     setCategoryId(initialRecipe.categoryId ?? '');
     setPrepTimeMinutes(String(initialRecipe.prepTimeMinutes));
     setCookTimeMinutes(String(initialRecipe.cookTimeMinutes));
     setServings(String(initialRecipe.servings));
-    setDifficulty((initialRecipe.difficulty as DifficultyLevel) ?? 'Easy');
+    setDifficulty(normalizeRecipeDifficulty(initialRecipe.difficulty));
 
     if (initialRecipe.ingredients.length > 0) {
       const sorted = [...initialRecipe.ingredients].sort(
@@ -160,15 +166,28 @@ export default function RecipeForm({
 
     setSteps(
       initialRecipe.steps.length > 0
-        ? initialRecipe.steps.map((s) => ({ title: s.title ?? '', description: s.description ?? '' }))
-        : [{ title: '', description: '' }],
+        ? initialRecipe.steps.map((s) => ({
+            id: s.id,
+            stepNumber: s.stepNumber,
+            title: s.title ?? '',
+            description: s.description ?? '',
+            timerMinutes: s.timerMinutes !== null && s.timerMinutes !== undefined ? String(s.timerMinutes) : '',
+            imageUrl: s.imageUrl ?? '',
+          }))
+        : [{ title: '', description: '', timerMinutes: '', imageUrl: '' }],
     );
 
     setImages(
       initialRecipe.images.map((image) => ({
-        url: (image as any).url || (image as any).originalUrl || '',
+        id: image.id,
+        recipeId: (image as any).recipeId || initialRecipe.id,
+        originalUrl: (image as any).originalUrl || (image as any).url || '',
+        mediumUrl: (image as any).mediumUrl || (image as any).url || '',
+        thumbnailUrl: (image as any).thumbnailUrl || (image as any).url || '',
         altText: image.altText ?? initialRecipe.title,
-      })),
+        isPrimary: image.isPrimary ?? false,
+        orderIndex: image.orderIndex ?? (image as any).sortOrder ?? 0,
+      }))
     );
 
     if (initialRecipe.nutrition) {
@@ -185,11 +204,11 @@ export default function RecipeForm({
 
   // Compute publish eligibility condition
   const publishBlocker = useMemo(() => {
-    if (!title.trim() || title.trim().length < 5 || title.trim().length > 200) {
-      return 'Tiêu đề công thức phải từ 5 đến 200 ký tự.';
+    if (!title.trim() || title.trim().length < 3 || title.trim().length > 200) {
+      return 'Tiêu đề công thức phải từ 3 đến 200 ký tự.';
     }
-    if (!content.trim()) {
-      return 'Nội dung hướng dẫn tổng quát không được để trống.';
+    if (description.trim().length < 10 || description.trim().length > 2000) {
+      return 'Mô tả phải từ 10 đến 2.000 ký tự.';
     }
     if (!categoryId) {
       return 'Chưa chọn danh mục món ăn.';
@@ -220,7 +239,7 @@ export default function RecipeForm({
     return null;
   }, [
     title,
-    content,
+    description,
     categoryId,
     prepTimeMinutes,
     cookTimeMinutes,
@@ -255,26 +274,35 @@ export default function RecipeForm({
     setSuccessMessage('');
     setIs409Conflict(false);
 
-    if (imageFiles.some((file) => file.size > 5 * 1024 * 1024)) {
-      setMessage('Mỗi tệp ảnh tải lên không được vượt quá 5 MB.');
-      setSaving(false);
-      return;
-    }
-
     try {
-      let uploadedImages: RecipeImageDraft[] = [];
-      if (imageFiles.length > 0) {
-        const uploadData = new FormData();
-        imageFiles.forEach((file) => uploadData.append('files', file));
-        const uploaded = await apiFetch<UploadedImage[]>('/api/v1/files/images', {
-          method: 'POST',
-          body: uploadData,
-        });
-        uploadedImages = uploaded.map((image) => ({ url: image.url, altText: title }));
-      }
-
       if (recipeId && !etag) {
         throw new Error('Không nhận được phiên bản công thức (ETag). Hãy tải lại trang trước khi lưu.');
+      }
+
+      // Trong chế độ chỉnh sửa (Edit mode): nếu có bước nào vừa chọn file chưa tải lên, upload lên MinIO trước
+      const currentSteps = [...steps];
+      if (recipeId) {
+        await Promise.all(
+          currentSteps.map(async (s, i) => {
+            if (s.imageFile && (!s.imageUrl || s.uploadStatus === 'error')) {
+              try {
+                const res = await uploadStepImageFile(recipeId, s.imageFile);
+                if (res?.url) {
+                  currentSteps[i] = {
+                    ...s,
+                    imageUrl: res.url,
+                    imageFile: null,
+                    imagePreviewUrl: null,
+                    uploadStatus: 'success',
+                    uploadError: null,
+                  };
+                }
+              } catch (err) {
+                throw new Error(`Tải ảnh bước ${i + 1} thất bại: ${err instanceof Error ? err.message : 'Lỗi kết nối'}`);
+              }
+            }
+          })
+        );
       }
 
       const requestPayload = {
@@ -285,7 +313,7 @@ export default function RecipeForm({
         prepTimeMinutes: Number(prepTimeMinutes),
         cookTimeMinutes: Number(cookTimeMinutes),
         servings: Number(servings),
-        difficulty,
+        difficulty: normalizeRecipeDifficulty(difficulty),
         nutrition: {
           calories: Math.max(0, Number(nutrition.calories) || 0),
           protein: Math.max(0, Number(nutrition.protein) || 0),
@@ -298,18 +326,42 @@ export default function RecipeForm({
           .filter((ingredient) => ingredient.name.trim())
           .map((ingredient, index) => ({
             name: ingredient.name.trim(),
-            quantity: ingredient.quantity ? Number(ingredient.quantity) : null,
+            quantity: parseFractionOrDecimal(ingredient.quantity),
             unit: ingredient.unit.trim() || null,
             notes: ingredient.notes.trim() || null,
             orderIndex: ingredient.orderIndex !== undefined ? ingredient.orderIndex : index,
           })),
-        images: [...images, ...uploadedImages],
-        steps: steps
-          .filter((step) => step.description.trim())
-          .map((step) => ({
-            title: step.title.trim(),
-            description: step.description.trim(),
+        images: (images as any[])
+          .filter((img) => {
+            const u = img.url || img.originalUrl;
+            return Boolean(u && typeof u === 'string' && u.trim().length > 0 && !u.startsWith('blob:'));
+          })
+          .map((img) => ({
+            url: (img.url || img.originalUrl).trim(),
+            altText: img.altText || null,
           })),
+        steps: currentSteps
+          .filter((step) => step.description.trim())
+          .map((step) => {
+            const timer =
+              step.timerMinutes !== '' && step.timerMinutes !== null && step.timerMinutes !== undefined
+                ? Math.round(Number(step.timerMinutes))
+                : null;
+            // Tuyệt đối không ghi URL dạng 'blob:' vào PostgreSQL!
+            const validImageUrl =
+              step.imageUrl &&
+              typeof step.imageUrl === 'string' &&
+              step.imageUrl.trim().length > 0 &&
+              !step.imageUrl.startsWith('blob:')
+                ? step.imageUrl.trim()
+                : null;
+            return {
+              title: step.title.trim(),
+              description: step.description.trim(),
+              timerMinutes: timer !== null && !isNaN(timer) && timer >= 0 ? timer : null,
+              imageUrl: validImageUrl,
+            };
+          }),
       };
 
       const validation = recipeDraftRequestSchema.safeParse(requestPayload);
@@ -320,18 +372,122 @@ export default function RecipeForm({
         );
       }
 
-      const response = recipeId
-        ? await updateRecipe(recipeId, validation.data, etag)
-        : await createRecipe(validation.data);
+      if (recipeId) {
+        const response = await updateRecipe(recipeId, validation.data, etag);
+        const newEtag = ('version' in response && response.version) ? String(response.version) : etag;
+        setEtag(newEtag);
+        setSuccessMessage('Đã lưu thay đổi công thức thành công!');
+        router.push(`/recipes/${response.slug}`);
+      } else {
+        // CHẾ ĐỘ TẠO MỚI (Create Mode)
+        // 1. Tạo bản nháp công thức trong PostgreSQL để lấy Recipe ID và ETag
+        const response = await createRecipe(validation.data);
+        const newRecipeId = response.id;
+        const newSlug = response.slug;
+        const newEtag = ('version' in response && response.version) ? String(response.version) : etag;
 
-      const newEtag = ('version' in response && response.version) ? String(response.version) : etag;
-      setEtag(newEtag);
-      setSuccessMessage(
-        recipeId ? 'Đã lưu thay đổi công thức thành công!' : 'Đã tạo bản nháp công thức thành công!',
-      );
+        // 2. Tải lên ảnh món ăn nếu người dùng đã chọn file từ máy trong ImageManager
+        const imagesWithFiles = (images as any[]).filter((img) => Boolean(img.file));
+        if (imagesWithFiles.length > 0) {
+          await Promise.all(
+            imagesWithFiles.map(async (img) => {
+              try {
+                await uploadRecipeImageFile(
+                  newRecipeId,
+                  img.file,
+                  img.altText || undefined,
+                  img.isPrimary
+                );
+              } catch (upErr) {
+                console.error('Tải ảnh món ăn thất bại:', upErr);
+              }
+            })
+          );
+        }
 
-      // Redirect to recipe detail view
-      router.push(`/recipes/${response.slug}`);
+        // 3. Tải lên ảnh bước nấu cho những bước người dùng đã chọn file từ máy
+        const stepsWithFiles = currentSteps.filter((s) => Boolean(s.imageFile));
+        if (stepsWithFiles.length > 0) {
+          const uploadErrors: string[] = [];
+          await Promise.all(
+            currentSteps.map(async (s, i) => {
+              if (s.imageFile) {
+                try {
+                  const res = await uploadStepImageFile(newRecipeId, s.imageFile);
+                  if (res?.url) {
+                    currentSteps[i] = {
+                      ...s,
+                      imageUrl: res.url,
+                      imageFile: null,
+                      imagePreviewUrl: null,
+                      uploadStatus: 'success',
+                      uploadError: null,
+                    };
+                  }
+                } catch (upErr) {
+                  const errMsg = upErr instanceof Error ? upErr.message : 'Tải ảnh thất bại';
+                  uploadErrors.push(`Bước ${i + 1} (${errMsg})`);
+                  currentSteps[i] = {
+                    ...s,
+                    uploadStatus: 'error',
+                    uploadError: errMsg,
+                  };
+                }
+              }
+            })
+          );
+
+          // 3. Nếu có ít nhất 1 ảnh tải lên thành công, cập nhật lại steps trong PostgreSQL
+          const hasUploadedStepImages = currentSteps.some(
+            (s) => s.imageUrl && !s.imageUrl.startsWith('blob:')
+          );
+          if (hasUploadedStepImages) {
+            const updatedStepPayloads = currentSteps
+              .filter((step) => step.description.trim())
+              .map((step) => {
+                const timer =
+                  step.timerMinutes !== '' && step.timerMinutes !== null && step.timerMinutes !== undefined
+                    ? Math.round(Number(step.timerMinutes))
+                    : null;
+                const cleanUrl =
+                  step.imageUrl &&
+                  typeof step.imageUrl === 'string' &&
+                  step.imageUrl.trim().length > 0 &&
+                  !step.imageUrl.startsWith('blob:')
+                    ? step.imageUrl.trim()
+                    : null;
+                return {
+                  title: step.title.trim(),
+                  description: step.description.trim(),
+                  timerMinutes: timer !== null && !isNaN(timer) && timer >= 0 ? timer : null,
+                  imageUrl: cleanUrl,
+                };
+              });
+
+            await updateRecipe(
+              newRecipeId,
+              {
+                ...validation.data,
+                steps: updatedStepPayloads,
+              },
+              newEtag
+            );
+          }
+
+          // 4. Nếu có bước nào bị lỗi tải ảnh, báo rõ cho người dùng và không chuyển trang
+          if (uploadErrors.length > 0) {
+            setSteps(currentSteps);
+            setMessage(
+              `Công thức đã tạo nháp thành công, nhưng ảnh bước nấu tải lên thất bại: ${uploadErrors.join('; ')}. Vui lòng thử lại.`
+            );
+            setSaving(false);
+            return;
+          }
+        }
+
+        setSuccessMessage('Đã tạo bản nháp công thức thành công!');
+        router.push(`/recipes/${newSlug}`);
+      }
     } catch (error: unknown) {
       const apiErr = error as ApiError;
       if (apiErr.status === 409 || apiErr.message?.includes('409') || apiErr.message?.includes('thay đổi bởi một yêu cầu khác')) {
@@ -348,7 +504,7 @@ export default function RecipeForm({
   }
 
   // Change recipe lifecycle state
-  async function changeStatus(action: RecipeLifecycleAction) {
+  const changeStatus = useCallback(async (action: RecipeLifecycleAction) => {
     if (!recipeId || !etag) {
       setMessage('Không nhận được phiên bản công thức (ETag). Hãy tải lại trang trước khi thực hiện.');
       return;
@@ -367,7 +523,8 @@ export default function RecipeForm({
     try {
       const result = await changeRecipeStatus(recipeId, action, etag);
       const newEtag = ('version' in result && (result as any).version) ? String((result as any).version) : etag;
-      setStatus(result.status as RecipeStatus);
+      const normalizedStatus = normalizeRecipeStatus(result.status);
+      setStatus(normalizedStatus);
       setEtag(newEtag);
 
       const statusMap: Record<RecipeStatus, string> = {
@@ -375,7 +532,7 @@ export default function RecipeForm({
         Published: 'Đã xuất bản',
         Archived: 'Đã lưu trữ',
       };
-      setSuccessMessage(`Đã cập nhật trạng thái thành công: ${statusMap[result.status as RecipeStatus] || result.status}.`);
+      setSuccessMessage(`Đã cập nhật trạng thái thành công: ${statusMap[normalizedStatus] || normalizedStatus}.`);
     } catch (error: unknown) {
       const apiErr = error as ApiError;
       if (apiErr.status === 409 || apiErr.message?.includes('409')) {
@@ -389,10 +546,10 @@ export default function RecipeForm({
     } finally {
       setSaving(false);
     }
-  }
+  }, [recipeId, etag, publishBlocker]);
 
   // Delete recipe
-  async function deleteRecipe() {
+  const deleteRecipe = useCallback(async () => {
     if (!recipeId || !etag) return;
 
     setSaving(true);
@@ -414,7 +571,7 @@ export default function RecipeForm({
       }
       setSaving(false);
     }
-  }
+  }, [recipeId, etag, router]);
 
   return (
     <form className="recipe-form" onSubmit={submit}>
@@ -451,38 +608,40 @@ export default function RecipeForm({
         )}
 
         {/* Section 01: Core Recipe Metadata */}
-        <div className="form-section">
-          <div className="form-section-heading">
-            <span className="step-number">01</span>
+        <div className="form-section bg-white rounded-2xl border border-gray-200/80 shadow-xs p-6 sm:p-8 space-y-6">
+          <div className="form-section-heading flex items-start gap-3.5 pb-4 border-b border-gray-100">
+            <span className="step-number w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center text-xs shrink-0 shadow-2xs">01</span>
             <div>
-              <h2>Thông tin món ăn</h2>
-              <p>Đặt nền tảng cho công thức: tên món, danh mục, thời gian, khẩu phần và độ khó.</p>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight">Thông tin món ăn</h2>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Đặt nền tảng cho công thức: tên món, danh mục, thời gian, khẩu phần và độ khó.</p>
             </div>
           </div>
 
-          <div className="form-grid">
-            <label className="field field-wide" htmlFor="recipe-title">
-              <span>Tên công thức * (5 - 200 ký tự)</span>
+          <div className="form-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <label className="field field-wide col-span-1 sm:col-span-2 lg:col-span-4 block" htmlFor="recipe-title">
+              <span className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">Tên công thức * (3 - 200 ký tự)</span>
               <input
                 id="recipe-title"
                 required
-                minLength={5}
+                minLength={3}
                 maxLength={200}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="Ví dụ: Phở bò tái lăn Hà Nội truyền thống"
                 disabled={saving}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition-all text-sm shadow-2xs"
               />
             </label>
 
-            <label className="field" htmlFor="recipe-category">
-              <span>Danh mục món ăn *</span>
+            <label className="field col-span-1 sm:col-span-2 block" htmlFor="recipe-category">
+              <span className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">Danh mục món ăn *</span>
               <select
                 id="recipe-category"
                 required
                 value={categoryId}
                 onChange={(event) => setCategoryId(event.target.value)}
                 disabled={saving}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition-all text-sm shadow-2xs cursor-pointer"
               >
                 <option value="" disabled>
                   -- Chọn danh mục --
@@ -495,47 +654,8 @@ export default function RecipeForm({
               </select>
             </label>
 
-            <label className="field" htmlFor="recipe-prep-time">
-              <span>Thời gian chuẩn bị (phút) *</span>
-              <input
-                id="recipe-prep-time"
-                required
-                min="1"
-                type="number"
-                value={prepTimeMinutes}
-                onChange={(event) => setPrepTimeMinutes(event.target.value)}
-                disabled={saving}
-              />
-            </label>
-
-            <label className="field" htmlFor="recipe-cook-time">
-              <span>Thời gian nấu (phút) *</span>
-              <input
-                id="recipe-cook-time"
-                required
-                min="0"
-                type="number"
-                value={cookTimeMinutes}
-                onChange={(event) => setCookTimeMinutes(event.target.value)}
-                disabled={saving}
-              />
-            </label>
-
-            <label className="field" htmlFor="recipe-servings">
-              <span>Khẩu phần (người ăn) *</span>
-              <input
-                id="recipe-servings"
-                required
-                min="1"
-                type="number"
-                value={servings}
-                onChange={(event) => setServings(event.target.value)}
-                disabled={saving}
-              />
-            </label>
-
-            <label className="field" htmlFor="recipe-difficulty">
-              <span>Độ khó</span>
+            <label className="field col-span-1 block" htmlFor="recipe-difficulty">
+              <span className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">Độ khó</span>
               <select
                 id="recipe-difficulty"
                 value={difficulty}
@@ -544,6 +664,7 @@ export default function RecipeForm({
                   if (result.success) setDifficulty(result.data);
                 }}
                 disabled={saving}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition-all text-sm shadow-2xs cursor-pointer"
               >
                 <option value="Easy">Easy (Dễ làm)</option>
                 <option value="Medium">Medium (Trung bình)</option>
@@ -552,40 +673,85 @@ export default function RecipeForm({
               </select>
             </label>
 
-            <label className="field field-wide" htmlFor="recipe-description">
-              <span>Mô tả ngắn gọn (Tối đa 2.000 ký tự)</span>
+            <label className="field col-span-1 block" htmlFor="recipe-servings">
+              <span className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">Khẩu phần (người ăn) *</span>
+              <input
+                id="recipe-servings"
+                required
+                min="1"
+                type="number"
+                value={servings}
+                onChange={(event) => setServings(event.target.value)}
+                disabled={saving}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition-all text-sm shadow-2xs"
+              />
+            </label>
+
+            <label className="field col-span-1 block" htmlFor="recipe-prep-time">
+              <span className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">Thời gian chuẩn bị (phút) *</span>
+              <input
+                id="recipe-prep-time"
+                required
+                min="1"
+                type="number"
+                value={prepTimeMinutes}
+                onChange={(event) => setPrepTimeMinutes(event.target.value)}
+                disabled={saving}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition-all text-sm shadow-2xs"
+              />
+            </label>
+
+            <label className="field col-span-1 block" htmlFor="recipe-cook-time">
+              <span className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">Thời gian nấu (phút) *</span>
+              <input
+                id="recipe-cook-time"
+                required
+                min="0"
+                type="number"
+                value={cookTimeMinutes}
+                onChange={(event) => setCookTimeMinutes(event.target.value)}
+                disabled={saving}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition-all text-sm shadow-2xs"
+              />
+            </label>
+
+            <label className="field field-wide col-span-1 sm:col-span-2 lg:col-span-4 block" htmlFor="recipe-description">
+              <span className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">Mô tả ngắn gọn * (10 - 2.000 ký tự)</span>
               <input
                 id="recipe-description"
+                required
+                minLength={10}
                 maxLength={2000}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="Một đoạn giới thiệu ngắn cuốn hút về hương vị, xuất xứ hoặc nét đặc trưng của món ăn"
                 disabled={saving}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition-all text-sm shadow-2xs"
               />
             </label>
 
-            <label className="field field-wide" htmlFor="recipe-content">
-              <span>Cách thực hiện tổng quát *</span>
+            <label className="field field-wide col-span-1 sm:col-span-2 lg:col-span-4 block" htmlFor="recipe-content">
+              <span className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5">Ghi chú thêm (không bắt buộc)</span>
               <textarea
                 id="recipe-content"
-                required
-                rows={5}
+                rows={4}
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
                 placeholder="Mô tả tổng quan quy trình nấu, lưu ý khi chọn nguyên liệu hoặc bí quyết canh lửa..."
                 disabled={saving}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition-all text-sm shadow-2xs leading-relaxed"
               />
             </label>
           </div>
         </div>
 
         {/* Section 02: Ingredient Management */}
-        <div className="form-section">
-          <div className="form-section-heading">
-            <span className="step-number">02</span>
+        <div className="form-section bg-white rounded-2xl border border-gray-200/80 shadow-xs p-6 sm:p-8 space-y-6">
+          <div className="form-section-heading flex items-start gap-3.5 pb-4 border-b border-gray-100">
+            <span className="step-number w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center text-xs shrink-0 shadow-2xs">02</span>
             <div>
-              <h2>Nguyên liệu</h2>
-              <p>Thêm, sửa, xóa và sắp xếp nguyên liệu theo thứ tự chuẩn bị hoặc trình tự nấu.</p>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight">Nguyên liệu</h2>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Thêm, sửa, xóa và sắp xếp nguyên liệu theo thứ tự chuẩn bị hoặc trình tự nấu.</p>
             </div>
           </div>
           <IngredientEditor
@@ -596,24 +762,24 @@ export default function RecipeForm({
         </div>
 
         {/* Section 03: Recipe Steps (Võ Hùng Mạnh's StepEditor) */}
-        <div className="form-section">
-          <div className="form-section-heading">
-            <span className="step-number">03</span>
+        <div className="form-section bg-white rounded-2xl border border-gray-200/80 shadow-xs p-6 sm:p-8 space-y-6">
+          <div className="form-section-heading flex items-start gap-3.5 pb-4 border-b border-gray-100">
+            <span className="step-number w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center text-xs shrink-0 shadow-2xs">03</span>
             <div>
-              <h2>Các bước thực hiện</h2>
-              <p>Mô tả chi tiết từng bước nấu ăn. Cần ít nhất 1 bước để có thể xuất bản công thức.</p>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight">Các bước thực hiện</h2>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Mô tả chi tiết từng bước nấu ăn. Cần ít nhất 1 bước để có thể xuất bản công thức.</p>
             </div>
           </div>
-          <StepEditor steps={steps} onChange={setSteps} />
+          <StepEditor steps={steps} onChange={setSteps} recipeId={recipeId} />
         </div>
 
         {/* Section 04: Nutrition Management (NutritionEditor) */}
-        <div className="form-section">
-          <div className="form-section-heading">
-            <span className="step-number">04</span>
+        <div className="form-section bg-white rounded-2xl border border-gray-200/80 shadow-xs p-6 sm:p-8 space-y-6">
+          <div className="form-section-heading flex items-start gap-3.5 pb-4 border-b border-gray-100">
+            <span className="step-number w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center text-xs shrink-0 shadow-2xs">04</span>
             <div>
-              <h2>Giá trị dinh dưỡng</h2>
-              <p>Hàm lượng dinh dưỡng tham khảo cho mỗi khẩu phần: Calories, Protein, Carbs, Fat, Fiber và Sodium.</p>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight">Giá trị dinh dưỡng</h2>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Hàm lượng dinh dưỡng tham khảo cho mỗi khẩu phần: Calories, Protein, Carbs, Fat, Fiber và Sodium.</p>
             </div>
           </div>
           <NutritionEditor
@@ -624,27 +790,30 @@ export default function RecipeForm({
         </div>
 
         {/* Section 05: Photos & Media (Võ Hùng Mạnh's ImageManager) */}
-        <div className="form-section">
-          <div className="form-section-heading">
-            <span className="step-number">05</span>
+        <div className="form-section bg-white rounded-2xl border border-gray-200/80 shadow-xs p-6 sm:p-8 space-y-6">
+          <div className="form-section-heading flex items-start gap-3.5 pb-4 border-b border-gray-100">
+            <span className="step-number w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center text-xs shrink-0 shadow-2xs">05</span>
             <div>
-              <h2>Hình ảnh món ăn</h2>
-              <p>Tải lên nhiều hình ảnh minh họa sống động, dung lượng tối đa 5 MB mỗi ảnh.</p>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight">Hình ảnh món ăn</h2>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Tải lên nhiều hình ảnh minh họa sống động, dung lượng tối đa 5 MB mỗi ảnh.</p>
             </div>
           </div>
           <ImageManager
-            images={images}
+            recipeId={recipeId}
+            authorId={initialRecipe?.authorId}
+            initialImages={initialRecipe?.images as any}
+            images={images as any}
             onImagesChange={(imgs: any) => setImages(imgs)}
-            onFilesChange={setImageFiles}
+            disabled={saving}
           />
         </div>
       </RecipeFormLayout>
 
       {/* General Error Message */}
       {message && (
-        <p className="form-error" role="alert">
-          {message}
-        </p>
+        <div className="form-error p-4 bg-rose-50 border border-rose-200 rounded-xl text-sm font-medium text-rose-700 my-6 flex items-center gap-2 shadow-2xs" role="alert">
+          <span>⚠️ {message}</span>
+        </div>
       )}
 
       {/* Lifecycle Actions (Publish, Archive, Unpublish, Delete) */}
@@ -659,12 +828,15 @@ export default function RecipeForm({
       )}
 
       {/* Form Submission Actions */}
-      <div className="form-actions">
-        <Link className="outline-button" href="/recipes">
+      <div className="form-actions flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-6 border-t border-gray-200 mt-8">
+        <Link
+          className="outline-button w-full sm:w-auto px-5 py-2.5 rounded-xl text-sm font-semibold text-gray-700 bg-white hover:bg-gray-100 border border-gray-300 transition-all text-center cursor-pointer shadow-2xs"
+          href="/recipes"
+        >
           Hủy bỏ
         </Link>
         <button
-          className="primary-button"
+          className="primary-button w-full sm:w-auto px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
           disabled={saving || !categoryId || (Boolean(recipeId) && !etag)}
           type="submit"
         >

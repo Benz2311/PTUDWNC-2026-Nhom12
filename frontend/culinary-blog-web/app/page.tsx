@@ -144,7 +144,8 @@ export default function HomePage() {
   };
 
   // Convert categories to format expected by PublicSidebar
-  const sidebarCategories = categories.map((c) => ({
+  const safeCategories = Array.isArray(categories) ? categories : [];
+  const sidebarCategories = safeCategories.map((c) => ({
     id: c.id,
     name: c.name,
     slug: c.slug,
@@ -153,7 +154,7 @@ export default function HomePage() {
   }));
 
   // Top featured categories for the quick highlights row
-  const featuredCategories = categories.slice(0, 6);
+  const featuredCategories = safeCategories.slice(0, 6);
 
   return (
     <div className="min-h-screen overflow-x-hidden">
@@ -389,8 +390,8 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Loading State Skeleton */}
-          {loadingRecipes && (
+          {/* Loading State Skeleton for Initial Fetch */}
+          {loadingRecipes && recipesData.items.length === 0 && (
             <div className="py-2">
               <LoadingSkeleton variant="grid" count={filters.pageSize || 9} />
             </div>
@@ -417,23 +418,34 @@ export default function HomePage() {
             />
           )}
 
-          {/* Main Recipe Cards Grid */}
-          {!loadingRecipes && !recipesError && recipesData.items.length > 0 && (
-            <div className="grid-recipes">
-              {recipesData.items.map((recipe) => (
-                <RecipeCard key={recipe.id} recipe={recipe} />
-              ))}
-            </div>
-          )}
+          {/* Main Recipe Cards Grid with Smooth Transition */}
+          {recipesData.items.length > 0 && !recipesError && (
+            <div className="space-y-8 relative">
+              {loadingRecipes && (
+                <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-2xl pointer-events-none">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-white shadow-md rounded-full text-xs font-semibold text-emerald-800 border border-emerald-100">
+                    <ChefHat className="h-4 w-4 animate-spin text-emerald-600" />
+                    <span>Đang cập nhật danh sách...</span>
+                  </div>
+                </div>
+              )}
 
-          {/* Shared Pagination Component */}
-          {!loadingRecipes && !recipesError && recipesData.totalPages > 1 && (
-            <div className="mt-10 border-t border-gray-100 pt-6">
-              <Pagination
-                page={recipesData.page}
-                totalPages={recipesData.totalPages}
-                onPageChange={handlePageChange}
-              />
+              <div className={`grid-recipes transition-opacity ${loadingRecipes ? "opacity-50" : "opacity-100"}`}>
+                {recipesData.items.map((recipe) => (
+                  <RecipeCard key={recipe.id} recipe={recipe} />
+                ))}
+              </div>
+
+              {/* Shared Pagination Component */}
+              {recipesData.totalPages > 1 && (
+                <div className="mt-10 border-t border-gray-100 pt-6">
+                  <Pagination
+                    page={recipesData.page}
+                    totalPages={recipesData.totalPages}
+                    onPageChange={handlePageChange}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

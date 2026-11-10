@@ -587,7 +587,7 @@ export default function ProfilePage({ initialUser }: ProfilePageProps) {
           <div>
             <h3 className="font-semibold text-red-800">Đăng xuất</h3>
             <p className="mt-1 text-sm text-red-600">
-              Bạn sẽ bị đăng xuất khỏi tất cả thiết bị.
+              Bạn sẽ đăng xuất khỏi phiên hiện tại trên trình duyệt này.
             </p>
           </div>
           <button

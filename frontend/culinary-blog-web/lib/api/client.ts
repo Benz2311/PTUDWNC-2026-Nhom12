@@ -17,23 +17,103 @@ export function unwrapData<T>(response: { data: ApiResponse<T, any> | T }): T {
 }
 
 /** Helper chuyển đổi paged response { data: T[], meta: PaginationMeta } sang PagedResult<T> */
-export function unwrapPaged<T>(response: { data: ApiResponse<T[], PaginationMeta> | any }): PagedResult<T> {
-  const payload = response.data as any;
-  if (payload && typeof payload === "object" && "data" in payload && Array.isArray(payload.data)) {
-    const meta = payload.meta;
+export function unwrapPaged<T>(response: { data: ApiResponse<T[], PaginationMeta> | any } | any): PagedResult<T> {
+  if (!response || typeof response !== "object") {
     return {
-      items: payload.data,
-      page: meta?.page ?? 1,
-      pageSize: meta?.pageSize ?? payload.data.length,
-      totalCount: meta?.total ?? payload.data.length,
-      totalPages: meta?.totalPages ?? 1,
-      hasNextPage: meta?.hasNextPage ?? false,
-      hasPreviousPage: meta?.hasPreviousPage ?? false,
+      items: [],
+      page: 1,
+      pageSize: 10,
+      totalCount: 0,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPreviousPage: false,
     };
   }
-  if (payload && typeof payload === "object" && "items" in payload) {
-    return payload as PagedResult<T>;
+
+  let payload = response;
+  let meta: any = response.meta;
+
+  if (response.data !== undefined) {
+    if (
+      response.data &&
+      typeof response.data === "object" &&
+      ("data" in response.data || "items" in response.data || "meta" in response.data)
+    ) {
+      payload = response.data;
+      meta = response.data.meta || meta;
+    } else {
+      payload = response.data;
+    }
   }
+
+  if (payload && payload.meta) {
+    meta = payload.meta;
+  }
+
+  // Case A: payload.data là Array [...], meta là PaginationMeta (Chuẩn SRS Backend)
+  if (payload && Array.isArray(payload.data)) {
+    const items = payload.data as T[];
+    const page = Number(meta?.page ?? 1);
+    const pageSize = Number(meta?.pageSize ?? (items.length || 9));
+    const totalCount = Number(meta?.total ?? meta?.totalCount ?? items.length);
+    const totalPages = Number(
+      meta?.totalPages ?? (pageSize > 0 ? Math.ceil(totalCount / pageSize) : 1)
+    );
+    return {
+      items,
+      page,
+      pageSize,
+      totalCount,
+      totalPages,
+      hasNextPage: Boolean(meta?.hasNextPage ?? (page < totalPages)),
+      hasPreviousPage: Boolean(meta?.hasPreviousPage ?? (page > 1)),
+    };
+  }
+
+  // Case B: payload.items là Array [...] (PagedResultDto)
+  if (payload && Array.isArray(payload.items)) {
+    const items = payload.items as T[];
+    const page = Number(payload.page ?? meta?.page ?? 1);
+    const pageSize = Number(payload.pageSize ?? meta?.pageSize ?? (items.length || 9));
+    const totalCount = Number(
+      payload.totalCount ?? payload.total ?? meta?.total ?? items.length
+    );
+    const totalPages = Number(
+      payload.totalPages ??
+        meta?.totalPages ??
+        (pageSize > 0 ? Math.ceil(totalCount / pageSize) : 1)
+    );
+    return {
+      items,
+      page,
+      pageSize,
+      totalCount,
+      totalPages,
+      hasNextPage: Boolean(payload.hasNextPage ?? (page < totalPages)),
+      hasPreviousPage: Boolean(payload.hasPreviousPage ?? (page > 1)),
+    };
+  }
+
+  // Case C: payload chính nó là một Array
+  if (Array.isArray(payload)) {
+    const items = payload as T[];
+    const page = Number(meta?.page ?? 1);
+    const pageSize = Number(meta?.pageSize ?? (items.length || 9));
+    const totalCount = Number(meta?.total ?? meta?.totalCount ?? items.length);
+    const totalPages = Number(
+      meta?.totalPages ?? (pageSize > 0 ? Math.ceil(totalCount / pageSize) : 1)
+    );
+    return {
+      items,
+      page,
+      pageSize,
+      totalCount,
+      totalPages,
+      hasNextPage: Boolean(meta?.hasNextPage ?? (page < totalPages)),
+      hasPreviousPage: Boolean(meta?.hasPreviousPage ?? (page > 1)),
+    };
+  }
+
   return {
     items: [],
     page: 1,
@@ -45,8 +125,53 @@ export function unwrapPaged<T>(response: { data: ApiResponse<T[], PaginationMeta
   };
 }
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api/v1";
+export function getApiBaseUrl(): string {
+  // 1. Môi trường Browser
+  if (typeof window !== "undefined") {
+    const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+    if (!envUrl) {
+      return "/api/v1";
+    }
+    // Nếu là relative path
+    if (envUrl.startsWith("/")) {
+      const clean = envUrl.replace(/\/+$/, "");
+      return clean.endsWith("/api/v1") ? clean : clean.endsWith("/api") ? `${clean}/v1` : `${clean}/api/v1`;
+    }
+    // Nếu là URL tuyệt đối
+    try {
+      const parsed = new URL(envUrl);
+      // Nếu browser đang truy cập cùng host (ví dụ localhost:8088) nhưng envUrl bị bake là port khác (ví dụ 5000):
+      if (
+        (parsed.hostname === window.location.hostname || parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") &&
+        parsed.port !== window.location.port &&
+        window.location.port !== ""
+      ) {
+        return "/api/v1";
+      }
+      const clean = envUrl.replace(/\/+$/, "");
+      return clean.endsWith("/api/v1") ? clean : clean.endsWith("/api") ? `${clean}/v1` : `${clean}/api/v1`;
+    } catch {
+      return "/api/v1";
+    }
+  }
+
+  // 2. Môi trường Server-Side (Node.js SSR trong Docker)
+  const internalUrl = process.env.INTERNAL_API_URL?.trim();
+  if (internalUrl) {
+    const clean = internalUrl.replace(/\/+$/, "");
+    return clean.endsWith("/api/v1") ? clean : clean.endsWith("/api") ? `${clean}/v1` : `${clean}/api/v1`;
+  }
+
+  const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (envUrl) {
+    const clean = envUrl.replace(/\/+$/, "");
+    return clean.endsWith("/api/v1") ? clean : clean.endsWith("/api") ? `${clean}/v1` : `${clean}/api/v1`;
+  }
+
+  return "http://api:8080/api/v1";
+}
+
+const BASE_URL = getApiBaseUrl();
 
 /**
  * Axios Instance dùng chung cho toàn bộ ứng dụng.
@@ -109,8 +234,11 @@ interface ProblemDetails {
   traceId?: string;
 }
 
-// Request Interceptor — tự động gắn Bearer Token vào mọi request
+// Request Interceptor — tự động gắn Bearer Token vào mọi request và cập nhật baseURL động
 apiClient.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    config.baseURL = getApiBaseUrl();
+  }
   const token = authStorage.getAccessToken();
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;

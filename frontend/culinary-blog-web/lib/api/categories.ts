@@ -19,7 +19,8 @@ export class CategoryConflictError extends Error {
 export async function getCategories(): Promise<Category[]> {
   try {
     const response = await apiClient.get<ApiResponse<Category[]>>("/categories");
-    return unwrapData(response);
+    const data = unwrapData(response);
+    return Array.isArray(data) ? data : [];
   } catch (err) {
     console.error("Failed to fetch categories:", err);
     return [];

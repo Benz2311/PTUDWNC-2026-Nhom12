@@ -8,7 +8,7 @@ export function Footer() {
   return (
     <footer className="w-full border-t border-emerald-100 bg-white text-gray-600 text-sm mt-auto">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Brand Info */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
@@ -20,7 +20,7 @@ export function Footer() {
                   Culinary<span className="text-amber-500">Blog</span>
                 </span>
                 <span className="block text-[11px] font-semibold text-emerald-700">
-                  PTUDWNC 2026 - Nhóm 12
+                  Nền tảng chia sẻ & học nấu ăn
                 </span>
               </div>
             </div>
@@ -71,28 +71,6 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Project & Group Info */}
-          <div>
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4 border-l-2 border-emerald-600 pl-2">
-              Thông tin nhóm 12
-            </h4>
-            <ul className="space-y-2 text-xs text-gray-500">
-              <li>
-                <span className="font-semibold text-gray-700">Học phần:</span> Phát triển ứng dụng Web nâng cao
-              </li>
-              <li>
-                <span className="font-semibold text-gray-700">Thành viên phụ trách UI:</span>
-                <br />
-                <span className="text-emerald-800 font-medium">Lê Thị Ánh Nhung (2312709)</span>
-              </li>
-              <li>
-                <span className="font-semibold text-gray-700">Kiến trúc hệ thống:</span>
-                <br />
-                Clean Architecture + Next.js 15
-              </li>
-            </ul>
-          </div>
-
           {/* Dashboard & Admin Quick Links */}
           <div>
             <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4 border-l-2 border-emerald-600 pl-2">
@@ -134,7 +112,7 @@ export function Footer() {
         {/* Bottom copyright */}
         <div className="mt-10 border-t border-gray-100 pt-6 flex flex-col sm:flex-row justify-between items-center text-xs text-gray-400 gap-2">
           <p className="flex items-center gap-1 text-center sm:text-left">
-            © {currentYear} Culinary Blog. Bản quyền thuộc về Nhóm 12 - PTUDWNC. Xây dựng với{" "}
+            © {currentYear} Culinary Blog. Xây dựng với{" "}
             <Heart className="h-3.5 w-3.5 text-red-500 fill-red-500 inline" /> vì tình yêu ẩm thực.
           </p>
           <div className="flex items-center gap-4 text-gray-500">

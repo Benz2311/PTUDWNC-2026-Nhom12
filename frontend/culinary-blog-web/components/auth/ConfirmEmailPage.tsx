@@ -14,7 +14,6 @@ const inputClasses =
 
 export default function ConfirmEmailPage() {
   const searchParams = useSearchParams();
-  const userId = searchParams.get("userId");
   const token = searchParams.get("token");
 
   const [state, setState] = useState<VerifyState>("verifying");
@@ -27,7 +26,7 @@ export default function ConfirmEmailPage() {
     let cancelled = false;
 
     (async () => {
-      if (!userId || !token) {
+      if (!token) {
         if (!cancelled) {
           setState("invalid");
         }
@@ -55,7 +54,7 @@ export default function ConfirmEmailPage() {
     return () => {
       cancelled = true;
     };
-  }, [userId, token]);
+  }, [token]);
 
   const handleResend = async () => {
     if (!resendEmail.includes("@")) {

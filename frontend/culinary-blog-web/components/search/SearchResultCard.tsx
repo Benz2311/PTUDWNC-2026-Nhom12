@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import type { SearchResult } from '@/types/search';
+import { resolveImageUrl } from '@/lib/image-url';
 
 export interface SearchResultCardProps {
   recipe: SearchResult;
@@ -36,7 +37,7 @@ export function SearchResultCard({ recipe, index }: SearchResultCardProps) {
           {recipe.primaryImageUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
-              src={recipe.primaryImageUrl}
+              src={resolveImageUrl(recipe.primaryImageUrl)}
               alt={recipe.title}
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               onError={(e) => {

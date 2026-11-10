@@ -1,149 +1,112 @@
-'use client';
+import type { Metadata } from "next";
+import { cache } from "react";
+import { normalizeRecipeStatus, type RecipeDetail } from "@/types/recipe";
+import RecipeDetailClient from "./RecipeDetailClient";
 
-import { useCallback, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { getRecipeBySlug } from '@/lib/api/recipes';
-import type { RecipeDetail } from '@/types/recipe';
-import RecipeDetailSkeleton from '@/components/recipes/RecipeDetailSkeleton';
-import { RecipeDetailView } from '@/components/recipes/RecipeDetailView';
+type Props = { params: Promise<{ slug: string }> };
 
-export default function RecipeDetailPage() {
-  const router = useRouter();
-  const params = useParams<{ slug: string }>();
-  const slug = typeof params?.slug === 'string' ? decodeURIComponent(params.slug) : '';
+const getPublicRecipe = cache(async (slug: string): Promise<RecipeDetail | null> => {
+  const api = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL;
+  if (!api) return null;
 
-  const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'not-found' | 'forbidden' | 'error'>('loading');
-  const [errorMessage, setErrorMessage] = useState<string>('');
+  const base = api.replace(/\/+$/, "").replace(/\/api\/v1$/, "");
+  try {
+    const response = await fetch(`${base}/api/v1/recipes/${encodeURIComponent(slug)}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!response.ok) return null;
 
-  const loadRecipe = useCallback(async () => {
-    if (!slug) {
-      setStatus('not-found');
-      return;
-    }
-
-    // Nếu slug là 'create', chuyển hướng an toàn sang trang tạo công thức riêng
-    if (slug === 'create') {
-      router.replace('/recipes/create');
-      return;
-    }
-
-    setStatus('loading');
-    setErrorMessage('');
-
-    try {
-      const data = await getRecipeBySlug(slug);
-      if (!data) {
-        setStatus('not-found');
-        return;
-      }
-      setRecipe(data);
-      setStatus('ready');
-    } catch (err: unknown) {
-      const anyErr = err as { status?: number; statusCode?: number; response?: { status?: number }; message?: string };
-      const statusCode = anyErr?.status ?? anyErr?.statusCode ?? anyErr?.response?.status;
-      if (statusCode === 404) {
-        setStatus('not-found');
-      } else if (statusCode === 401 || statusCode === 403) {
-        setStatus('forbidden');
-      } else {
-        setErrorMessage(anyErr?.message || 'Không thể tải thông tin công thức vào lúc này.');
-        setStatus('error');
-      }
-    }
-  }, [slug, router]);
-
-  useEffect(() => {
-    if (slug === 'create') {
-      router.replace('/recipes/create');
-      return;
-    }
-    loadRecipe();
-  }, [slug, loadRecipe, router]);
-
-  if (status === 'loading') {
-    return <RecipeDetailSkeleton />;
+    const { data } = await response.json() as { data?: RecipeDetail };
+    return data && normalizeRecipeStatus(data.status) === "Published" ? data : null;
+  } catch {
+    return null;
   }
+});
 
-  if (status === 'not-found') {
-    return (
-      <section className="mx-auto max-w-2xl px-4 py-16 text-center" role="status">
-        <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 mb-3">
-          404 Not Found
-        </span>
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Không tìm thấy công thức</h1>
-        <p className="text-slate-600 mb-6">
-          Công thức với đường dẫn <strong>{slug}</strong> không tồn tại hoặc đã bị gỡ khỏi hệ thống.
-        </p>
-        <div className="flex justify-center gap-3">
-          <Link
-            href="/"
-            className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 shadow-xs"
-          >
-            Về trang chủ
-          </Link>
-          <Link
-            href="/search"
-            className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Tìm kiếm công thức
-          </Link>
-        </div>
-      </section>
-    );
+function publicOrigin(): URL | undefined {
+  const value = process.env.PUBLIC_ORIGIN ?? process.env.NEXT_PUBLIC_API_URL;
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return new URL(url.origin);
+  } catch {
+    return undefined;
   }
+}
 
-  if (status === 'forbidden') {
-    return (
-      <section className="mx-auto max-w-2xl px-4 py-16 text-center" role="alert">
-        <span className="inline-block rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800 mb-3">
-          Hạn chế truy cập
-        </span>
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Công thức chưa được công khai</h1>
-        <p className="text-slate-600 mb-6">
-          Công thức ở trạng thái <strong>Draft</strong> hoặc <strong>Archived</strong> chỉ hiển thị cho tác giả sở hữu hoặc quản trị viên.
-        </p>
-        <div className="flex justify-center gap-3">
-          <Link
-            href="/login"
-            className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
-          >
-            Đăng nhập để xem
-          </Link>
-          <Link
-            href="/"
-            className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Về trang chủ
-          </Link>
-        </div>
-      </section>
-    );
+function recipeImage(recipe: RecipeDetail, origin: URL): string | undefined {
+  const primary = recipe.images.find((image) => image.isPrimary) ?? recipe.images[0];
+  const image = primary?.mediumUrl ?? primary?.originalUrl ?? recipe.coverImageUrl;
+  if (!image) return undefined;
+  try {
+    const url = new URL(image, origin);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    if (url.pathname.startsWith("/culinaryblog/") &&
+        ["localhost", "127.0.0.1", "minio"].includes(url.hostname)) {
+      return new URL(url.pathname + url.search, origin).href;
+    }
+    return url.href;
+  } catch {
+    return undefined;
   }
+}
 
-  if (status === 'error' || !recipe) {
-    return (
-      <section className="mx-auto max-w-2xl px-4 py-16 text-center" role="alert">
-        <span className="inline-block rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800 mb-3">
-          Lỗi tải trang
-        </span>
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Đã xảy ra sự cố</h1>
-        <p className="text-slate-600 mb-6">{errorMessage || 'Không thể hiển thị công thức này.'}</p>
-        <button
-          type="button"
-          onClick={loadRecipe}
-          className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 cursor-pointer"
-        >
-          Thử lại
-        </button>
-      </section>
-    );
-  }
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const recipe = await getPublicRecipe(slug);
+  if (!recipe) return { robots: { index: false, follow: false } };
+
+  const title = recipe.title;
+  const description = recipe.description;
+  const origin = publicOrigin();
+  if (!origin) return { title, description };
+
+  const url = new URL(`/recipes/${encodeURIComponent(recipe.slug)}`, origin).href;
+  const image = recipeImage(recipe, origin);
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { type: "article", title, description, url, images: image ? [image] : [] },
+    twitter: { card: image ? "summary_large_image" : "summary", title, description, images: image ? [image] : [] },
+  };
+}
+
+export default async function RecipeDetailPage({ params }: Props) {
+  const { slug } = await params;
+  const recipe = await getPublicRecipe(slug);
+  const origin = publicOrigin();
+  const prep = recipe?.prepTimeMinutes ?? recipe?.prepTime;
+  const cook = recipe?.cookTimeMinutes ?? recipe?.cookTime;
+  const jsonLd = recipe && origin ? {
+    "@context": "https://schema.org",
+    "@type": "Recipe",
+    name: recipe.title,
+    description: recipe.description,
+    image: recipeImage(recipe, origin),
+    author: { "@type": "Person", name: recipe.author.displayName },
+    datePublished: recipe.publishedAt ?? undefined,
+    prepTime: prep === undefined ? undefined : `PT${prep}M`,
+    cookTime: cook === undefined ? undefined : `PT${cook}M`,
+    totalTime: prep === undefined || cook === undefined ? undefined : `PT${prep + cook}M`,
+    recipeYield: String(recipe.servings),
+    recipeCategory: recipe.category.name,
+    recipeIngredient: recipe.ingredients.map((item) =>
+      [item.quantity, item.unit, item.name].filter((part) => part != null && part !== "").join(" ")),
+    recipeInstructions: recipe.steps.map((step) => ({
+      "@type": "HowToStep",
+      name: step.title ?? undefined,
+      text: step.description,
+    })),
+  } : undefined;
 
   return (
-    <article className="mx-auto max-w-5xl px-4 py-8">
-      <RecipeDetailView recipe={recipe} />
-    </article>
+    <>
+      {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{
+        __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
+      }} />}
+      <RecipeDetailClient />
+    </>
   );
 }

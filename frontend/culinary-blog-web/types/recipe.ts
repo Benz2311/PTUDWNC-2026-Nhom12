@@ -5,6 +5,30 @@ import { z } from "zod";
 export const recipeStatusSchema = z.enum(["Draft", "Published", "Archived"]);
 export type RecipeStatus = z.infer<typeof recipeStatusSchema>;
 
+export const STATUS_MAP: Record<string, number> = {
+  Draft: 0,
+  Published: 1,
+  Archived: 2,
+};
+
+export const REVERSE_STATUS_MAP: Record<number, RecipeStatus> = {
+  0: "Draft",
+  1: "Published",
+  2: "Archived",
+};
+
+export function normalizeRecipeStatus(status?: RecipeStatus | string | number | null): RecipeStatus {
+  if (status === null || status === undefined) return "Draft";
+  if (typeof status === "number") {
+    return REVERSE_STATUS_MAP[status] ?? "Draft";
+  }
+  const str = String(status).trim();
+  if (str === "0" || str.toLowerCase() === "draft") return "Draft";
+  if (str === "1" || str.toLowerCase() === "published") return "Published";
+  if (str === "2" || str.toLowerCase() === "archived") return "Archived";
+  return "Draft";
+}
+
 export const difficultyLevelSchema = z.enum(["Easy", "Medium", "Hard", "Expert"]);
 export type DifficultyLevel = z.infer<typeof difficultyLevelSchema>;
 export type RecipeDifficulty = DifficultyLevel;
@@ -22,6 +46,25 @@ export const REVERSE_DIFFICULTY_MAP: Record<number, RecipeDifficulty> = {
   3: "Hard",
   4: "Expert",
 };
+
+export function normalizeRecipeDifficulty(
+  difficulty?: DifficultyLevel | string | number | null
+): DifficultyLevel {
+  if (difficulty === null || difficulty === undefined) return "Easy";
+  if (typeof difficulty === "number") {
+    return REVERSE_DIFFICULTY_MAP[difficulty] ?? "Easy";
+  }
+  const str = String(difficulty).trim();
+  const num = Number(str);
+  if (!isNaN(num) && REVERSE_DIFFICULTY_MAP[num]) {
+    return REVERSE_DIFFICULTY_MAP[num];
+  }
+  const cap = (str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()) as DifficultyLevel;
+  if (cap === "Easy" || cap === "Medium" || cap === "Hard" || cap === "Expert") {
+    return cap;
+  }
+  return "Easy";
+}
 
 export type { PagedResult };
 
@@ -221,9 +264,9 @@ export const recipeSummarySchema = z.object({
 
 export const recipeDraftRequestSchema = z.object({
   categoryId: z.string().uuid(),
-  title: z.string().trim().min(5).max(200),
-  description: z.string().max(2000),
-  content: z.string().trim().min(1),
+  title: z.string().trim().min(3).max(200),
+  description: z.string().trim().min(10).max(2000),
+  content: z.string().trim().optional(),
   prepTimeMinutes: z.number().int().positive(),
   cookTimeMinutes: z.number().int().nonnegative(),
   servings: z.number().int().positive(),
@@ -255,6 +298,8 @@ export const recipeDraftRequestSchema = z.object({
     z.object({
       title: z.string().max(200),
       description: z.string().trim().min(1).max(2000),
+      timerMinutes: z.number().int().nonnegative().max(1440).nullable().optional(),
+      imageUrl: z.string().max(500).nullable().optional(),
     })
   ),
 });

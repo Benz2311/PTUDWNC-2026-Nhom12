@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChefHat, SlidersHorizontal, RotateCcw, Utensils } from "lucide-react";
 import { getRecipes } from "@/lib/api/recipes";
 import { getCategories } from "@/lib/api/categories";
@@ -13,9 +13,12 @@ import { ErrorState } from "@/components/common/ErrorState";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Pagination } from "@/components/common/Pagination";
 import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
 
 function RecipesListContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+
   const initialCategory = searchParams.get("category") || "";
   const initialDifficulty = searchParams.get("difficulty") || "";
   const initialSort = searchParams.get("sort") || "newest";
@@ -25,7 +28,7 @@ function RecipesListContent() {
   const [recipesData, setRecipesData] = useState<PagedResult<RecipeListItem>>({
     items: [],
     totalCount: 0,
-    page: 1,
+    page: initialPage,
     pageSize: 9,
     totalPages: 1,
     hasNextPage: false,
@@ -39,6 +42,19 @@ function RecipesListContent() {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync state when URL search params change (e.g. Back/Forward button, direct link)
+  useEffect(() => {
+    const p = parseInt(searchParams.get("page") || "1", 10) || 1;
+    const cat = searchParams.get("category") || "";
+    const diff = searchParams.get("difficulty") || "";
+    const sort = searchParams.get("sort") || "newest";
+
+    setCurrentPage(p);
+    setSelectedCategory(cat);
+    setSelectedDifficulty(diff);
+    setSelectedSort(sort);
+  }, [searchParams]);
 
   // Load categories
   useEffect(() => {
@@ -74,11 +90,50 @@ function RecipesListContent() {
     loadRecipes();
   }, [loadRecipes]);
 
+  const buildLinkUrl = useCallback(
+    (pageNumber: number, cat = selectedCategory, diff = selectedDifficulty, sort = selectedSort) => {
+      const params = new URLSearchParams();
+      if (cat) params.set("category", cat);
+      if (diff) params.set("difficulty", diff);
+      if (sort && sort !== "newest") params.set("sort", sort);
+      if (pageNumber > 1) params.set("page", String(pageNumber));
+      const qs = params.toString();
+      return qs ? `/recipes?${qs}` : "/recipes";
+    },
+    [selectedCategory, selectedDifficulty, selectedSort]
+  );
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage === currentPage) return;
+    setCurrentPage(newPage);
+    router.push(buildLinkUrl(newPage), { scroll: false });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleCategoryChange = (cat: string) => {
+    setSelectedCategory(cat);
+    setCurrentPage(1);
+    router.push(buildLinkUrl(1, cat, selectedDifficulty, selectedSort), { scroll: false });
+  };
+
+  const handleDifficultyChange = (diff: string) => {
+    setSelectedDifficulty(diff);
+    setCurrentPage(1);
+    router.push(buildLinkUrl(1, selectedCategory, diff, selectedSort), { scroll: false });
+  };
+
+  const handleSortChange = (sort: string) => {
+    setSelectedSort(sort);
+    setCurrentPage(1);
+    router.push(buildLinkUrl(1, selectedCategory, selectedDifficulty, sort), { scroll: false });
+  };
+
   const handleResetFilters = () => {
     setSelectedCategory("");
     setSelectedDifficulty("");
     setSelectedSort("newest");
     setCurrentPage(1);
+    router.push("/recipes", { scroll: false });
   };
 
   return (
@@ -118,10 +173,7 @@ function RecipesListContent() {
             <select
               aria-label="Lọc theo danh mục"
               value={selectedCategory}
-              onChange={(e) => {
-                setSelectedCategory(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => handleCategoryChange(e.target.value)}
               className="text-xs rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-600"
             >
               <option value="">Tất cả danh mục</option>
@@ -136,10 +188,7 @@ function RecipesListContent() {
             <select
               aria-label="Lọc theo độ khó"
               value={selectedDifficulty}
-              onChange={(e) => {
-                setSelectedDifficulty(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => handleDifficultyChange(e.target.value)}
               className="text-xs rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-600"
             >
               <option value="">Mọi độ khó</option>
@@ -153,10 +202,7 @@ function RecipesListContent() {
             <select
               aria-label="Sắp xếp công thức"
               value={selectedSort}
-              onChange={(e) => {
-                setSelectedSort(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => handleSortChange(e.target.value)}
               className="text-xs rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-600"
             >
               <option value="newest">Mới nhất</option>
@@ -179,7 +225,7 @@ function RecipesListContent() {
         </div>
 
         {/* Recipe Grid / States */}
-        {loading ? (
+        {loading && recipesData.items.length === 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 6 }).map((_, idx) => (
               <LoadingSkeleton key={idx} />
@@ -195,8 +241,18 @@ function RecipesListContent() {
             onAction={handleResetFilters}
           />
         ) : (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-8 relative">
+            {/* Smooth Page Transition indicator */}
+            {loading && (
+              <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-2xl pointer-events-none">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-white shadow-md rounded-full text-xs font-semibold text-emerald-800 border border-emerald-100">
+                  <ChefHat className="h-4 w-4 animate-spin text-emerald-600" />
+                  <span>Đang tải công thức...</span>
+                </div>
+              </div>
+            )}
+
+            <div className={cn("grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity", loading ? "opacity-50" : "opacity-100")}>
               {recipesData.items.map((recipe) => (
                 <RecipeCard key={recipe.id} recipe={recipe} />
               ))}
@@ -208,7 +264,8 @@ function RecipesListContent() {
                 <Pagination
                   page={recipesData.page}
                   totalPages={recipesData.totalPages}
-                  onPageChange={(p) => setCurrentPage(p)}
+                  onPageChange={handlePageChange}
+                  buildLinkUrl={buildLinkUrl}
                 />
               </div>
             )}

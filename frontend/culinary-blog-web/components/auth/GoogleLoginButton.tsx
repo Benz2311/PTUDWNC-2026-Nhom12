@@ -26,6 +26,8 @@ export default function GoogleLoginButton({ onCredential }: GoogleLoginButtonPro
   const containerRef = useRef<HTMLDivElement>(null);
   const [unavailable, setUnavailable] = useState(false);
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const onCredentialRef = useRef(onCredential);
+  onCredentialRef.current = onCredential;
 
   useEffect(() => {
     if (!clientId) {
@@ -33,32 +35,43 @@ export default function GoogleLoginButton({ onCredential }: GoogleLoginButtonPro
       return;
     }
 
+    let rendered = false;
+
     const render = () => {
-      if (!window.google || !containerRef.current) {
+      if (!window.google || !containerRef.current || rendered) {
         return;
       }
 
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: ({ credential }) => {
-          onCredential(credential).catch(() => undefined);
-        },
-      });
-      containerRef.current.replaceChildren();
-      window.google.accounts.id.renderButton(containerRef.current, {
-        theme: "outline",
-        size: "large",
-        width: 360,
-      });
+      try {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: ({ credential }) => {
+            onCredentialRef.current(credential).catch(() => undefined);
+          },
+        });
+        containerRef.current.replaceChildren();
+        window.google.accounts.id.renderButton(containerRef.current, {
+          theme: "outline",
+          size: "large",
+          width: 360,
+        });
+        rendered = true;
+      } catch (e) {
+        console.warn("[GoogleLoginButton] Render error:", e);
+      }
     };
 
     const existing = document.querySelector<HTMLScriptElement>(
       'script[src="https://accounts.google.com/gsi/client"]'
     );
     if (existing) {
-      existing.addEventListener("load", render);
-      render();
-      return () => existing.removeEventListener("load", render);
+      if (window.google) {
+        render();
+      } else {
+        existing.addEventListener("load", render);
+        return () => existing.removeEventListener("load", render);
+      }
+      return;
     }
 
     const script = document.createElement("script");
@@ -67,8 +80,7 @@ export default function GoogleLoginButton({ onCredential }: GoogleLoginButtonPro
     script.onload = render;
     script.onerror = () => setUnavailable(true);
     document.head.appendChild(script);
-    return () => script.remove();
-  }, [clientId, onCredential]);
+  }, [clientId]);
 
   if (unavailable) {
     return <p className="text-center text-sm text-gray-500">Google Login chưa được cấu hình.</p>;

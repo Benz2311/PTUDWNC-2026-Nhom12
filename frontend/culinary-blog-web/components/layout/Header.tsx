@@ -15,8 +15,9 @@ import {
   Layers,
   Users,
 } from "lucide-react";
-import { getStoredToken, removeStoredToken, setStoredToken } from "@/lib/api/client";
-import { Button } from "@/components/ui/Button";
+import { getStoredToken, removeStoredToken } from "@/lib/api/client";
+import { buttonVariants } from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -43,14 +44,11 @@ export function Header() {
     email: "",
     role: "Guest",
   });
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [tokenInput, setTokenInput] = useState("");
 
-  // Sync token state on mount
+  // Sync token state on mount & route change
   useEffect(() => {
     const saved = getStoredToken();
     if (saved) {
-      setTokenInput(saved);
       try {
         const payload = JSON.parse(atob(saved.split(".")[1]));
         const role =
@@ -78,7 +76,7 @@ export function Header() {
         role: "Guest",
       });
     }
-  }, []);
+  }, [pathname]);
 
   // Sync search input if on search page
   useEffect(() => {
@@ -103,32 +101,14 @@ export function Header() {
       email: "",
       role: "Guest",
     });
-    setTokenInput("");
-    window.location.reload();
-  };
-
-  const handleApplyRole = (role: "Guest" | "Author" | "Admin", tokenVal?: string) => {
-    if (role === "Guest") {
-      removeStoredToken();
-      setUser({ name: "Khách", email: "", role: "Guest" });
-    } else {
-      const token = tokenVal || `mock_${role.toLowerCase()}_token`;
-      setStoredToken(token);
-      setUser({
-        name: role === "Admin" ? "Quản trị viên Demo" : "Đầu bếp Demo",
-        email: `${role.toLowerCase()}@culinaryblog.vn`,
-        role,
-      });
-    }
-    setIsAuthModalOpen(false);
-    window.location.reload();
+    window.location.href = "/";
   };
 
   const navLinks = [
     { href: "/", label: "Trang chủ" },
     { href: "/categories", label: "Danh mục món ăn" },
     { href: "/recipes", label: "Khám phá công thức" },
-    { href: "/dashboard/statistics", label: "Thống kê" },
+    { href: "/dashboard/categories", label: "Thống kê" },
   ];
 
   return (
@@ -143,12 +123,9 @@ export function Header() {
               </svg>
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center">
                 <span className="text-xl font-extrabold tracking-tight text-emerald-900">
                   Culinary<span className="text-amber-500">Blog</span>
-                </span>
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                  Nhóm 12
                 </span>
               </div>
               <p className="text-[11px] text-gray-500 hidden sm:block">
@@ -205,24 +182,6 @@ export function Header() {
 
           {/* 4. Auth & User Profile Section */}
           <div className="flex items-center gap-2">
-            {/* Quick Role Simulator Button for Demonstration */}
-            <button
-              onClick={() => setIsAuthModalOpen(true)}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-emerald-200 bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer"
-              title="Đổi vai trò để thử nghiệm phân quyền"
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  user.role === "Admin"
-                    ? "bg-purple-600"
-                    : user.role === "Author"
-                    ? "bg-emerald-600"
-                    : "bg-gray-400"
-                }`}
-              />
-              <span className="text-[11px] font-semibold">{user.role}</span>
-            </button>
-
             {user.role !== "Guest" ? (
               /* User Dropdown Menu */
               <DropdownMenu>
@@ -245,6 +204,10 @@ export function Header() {
                     </span>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push("/profile")}>
+                    <Users className="h-4 w-4 text-emerald-700" />
+                    <span>Hồ sơ cá nhân</span>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/recipes/create")}>
                     <PlusCircle className="h-4 w-4 text-emerald-700" />
                     <span>Tạo công thức mới</span>
@@ -279,22 +242,20 @@ export function Header() {
             ) : (
               /* Guest Auth Buttons */
               <div className="hidden sm:flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="text-xs"
+                <Link
+                  href="/login"
+                  data-testid="header-login-btn"
+                  className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-xs")}
                 >
                   Đăng nhập
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="text-xs font-semibold"
+                </Link>
+                <Link
+                  href="/register"
+                  data-testid="header-register-btn"
+                  className={cn(buttonVariants({ variant: "default", size: "sm" }), "text-xs font-semibold")}
                 >
                   Đăng ký
-                </Button>
+                </Link>
               </div>
             )}
 
@@ -389,142 +350,75 @@ export function Header() {
                 <Users className="h-4 w-4" />
                 <span>Quản lý người dùng</span>
               </Link>
+              <Link
+                href="/admin/recipes/trash"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
+                  pathname.startsWith("/admin/recipes/trash")
+                    ? "bg-emerald-700 text-white font-semibold"
+                    : "text-gray-700 hover:bg-emerald-50"
+                }`}
+              >
+                <ShieldAlert className="h-4 w-4" />
+                <span>Thùng rác công thức</span>
+              </Link>
+            </div>
+          )}
+
+          {user.role !== "Guest" && (
+            <div className="pt-2 border-t border-gray-100 space-y-1">
+              <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-3 py-1">
+                Tài khoản ({user.role})
+              </div>
+              <Link
+                href="/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-emerald-50"
+              >
+                <Users className="h-4 w-4 text-emerald-700" />
+                <span>Hồ sơ cá nhân ({user.name})</span>
+              </Link>
+              <Link
+                href="/recipes/create"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-emerald-50"
+              >
+                <PlusCircle className="h-4 w-4 text-emerald-700" />
+                <span>Tạo công thức mới</span>
+              </Link>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleLogout();
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 text-left cursor-pointer"
+              >
+                <LogOut className="h-4 w-4 text-red-600" />
+                <span>Đăng xuất</span>
+              </button>
             </div>
           )}
 
           {user.role === "Guest" && (
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setIsAuthModalOpen(true);
-                }}
-                className="w-full text-xs font-medium"
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                data-testid="mobile-login-btn"
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full text-xs font-medium text-center")}
               >
                 Đăng nhập
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setIsAuthModalOpen(true);
-                }}
-                className="w-full text-xs font-semibold"
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => setMobileMenuOpen(false)}
+                data-testid="mobile-register-btn"
+                className={cn(buttonVariants({ variant: "default", size: "sm" }), "w-full text-xs font-semibold text-center")}
               >
                 Đăng ký
-              </Button>
+              </Link>
             </div>
           )}
-
-          <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-            <span className="text-xs text-gray-500 font-medium">
-              Vai trò hiện tại: <strong>{user.role}</strong>
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                setIsAuthModalOpen(true);
-              }}
-              className="text-xs"
-            >
-              Chuyển vai trò
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Role / Authentication Simulation Modal */}
-      {isAuthModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-gray-100">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <h3 className="text-base font-bold text-gray-900">
-                Mô phỏng Trạng thái Authentication
-              </h3>
-              <button
-                onClick={() => setIsAuthModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="mt-3 text-xs text-gray-600 leading-relaxed">
-              Dành cho việc kiểm thử giao diện Header và phân quyền. Chọn vai trò nhanh hoặc dán Access Token thực tế từ backend:
-            </p>
-
-            <div className="mt-4 space-y-3">
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleApplyRole("Guest")}
-                  className={`py-2 px-2 text-xs font-medium rounded-lg border text-center transition-all ${
-                    user.role === "Guest"
-                      ? "border-emerald-700 bg-emerald-50 text-emerald-800 font-bold"
-                      : "border-gray-200 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  Khách (Guest)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleApplyRole("Author")}
-                  className={`py-2 px-2 text-xs font-medium rounded-lg border text-center transition-all ${
-                    user.role === "Author"
-                      ? "border-emerald-700 bg-emerald-50 text-emerald-800 font-bold"
-                      : "border-gray-200 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  Tác giả (Author)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleApplyRole("Admin")}
-                  className={`py-2 px-2 text-xs font-medium rounded-lg border text-center transition-all ${
-                    user.role === "Admin"
-                      ? "border-purple-600 bg-purple-50 text-purple-700 font-bold"
-                      : "border-gray-200 text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  Quản trị (Admin)
-                </button>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Hoặc dán Access Token JWT:
-                </label>
-                <textarea
-                  rows={2}
-                  value={tokenInput}
-                  onChange={(e) => setTokenInput(e.target.value)}
-                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  className="w-full rounded-lg border border-gray-300 p-2 text-xs font-mono focus:border-emerald-700 outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="mt-5 flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleApplyRole("Guest")}
-              >
-                Xóa Token (Khách)
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => handleApplyRole(user.role === "Guest" ? "Author" : user.role, tokenInput)}
-              >
-                Lưu & Áp dụng
-              </Button>
-            </div>
-          </div>
         </div>
       )}
     </header>

@@ -64,12 +64,20 @@ function RecipeManagementPage() {
                     Trạng thái: {String(recipe.status ?? "Draft")}
                   </p>
                 </div>
-                <Link
-                  href={`/recipes/${recipe.slug}`}
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Xem công thức
-                </Link>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={`/recipes/${recipe.slug}`}
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Xem công thức
+                  </Link>
+                  <Link
+                    href={`/recipes/${encodeURIComponent(recipe.slug)}/edit`}
+                    className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-emerald-800"
+                  >
+                    Chỉnh sửa
+                  </Link>
+                </div>
               </div>
             ))}
           </div>

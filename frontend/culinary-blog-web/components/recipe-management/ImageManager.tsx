@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import Image from 'next/image';
 import type { RecipeImage, ImageFormValues, ImageValidationError } from '@/types/image';
 import {
   getRecipeImages,
@@ -52,109 +51,6 @@ function isValidHttpUrl(urlString: string): boolean {
     return false;
   }
 }
-
-const DraftImageManager: React.FC<{
-  images?: RecipeImageDraft[];
-  onImagesChange?: (images: RecipeImageDraft[]) => void;
-  onFilesChange?: (files: File[]) => void;
-}> = ({ images = [], onImagesChange, onFilesChange }) => {
-  const [previews, setPreviews] = useState<{ name: string; url: string }[]>([]);
-
-  useEffect(() => {
-    return () => {
-      previews.forEach((preview) => URL.revokeObjectURL(preview.url));
-    };
-  }, [previews]);
-
-  const selectFiles = (fileList: FileList | null) => {
-    previews.forEach((preview) => URL.revokeObjectURL(preview.url));
-    const files = Array.from(fileList ?? []);
-    onFilesChange?.(files);
-    setPreviews(files.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })));
-  };
-
-  const updateAltText = (index: number, altText: string) => {
-    onImagesChange?.(
-      images.map((image, imageIndex) =>
-        imageIndex === index ? { ...image, altText } : image
-      )
-    );
-  };
-
-  const moveImage = (index: number, offset: -1 | 1) => {
-    const target = index + offset;
-    if (target < 0 || target >= images.length) return;
-    const reordered = [...images];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    onImagesChange?.(reordered);
-  };
-
-  return (
-    <div>
-      <label className="upload-dropzone">
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/avif"
-          multiple
-          onChange={(event) => selectFiles(event.target.files)}
-        />
-        <strong>Chọn ảnh món ăn</strong>
-        <span>JPG, PNG, WebP hoặc AVIF · Tối đa 5 MB/ảnh</span>
-      </label>
-      {images.length > 0 && (
-        <div className="upload-preview-grid">
-          {images.map((image, index) => (
-            <div className="upload-preview" key={`${image.url}-${index}`}>
-              <Image src={image.url} alt={image.altText} width={320} height={320} unoptimized />
-              <label className="field">
-                <span>Mô tả ảnh {index + 1}</span>
-                <input
-                  maxLength={300}
-                  value={image.altText}
-                  onChange={(event) => updateAltText(index, event.target.value)}
-                />
-              </label>
-              <div className="ingredient-row-actions">
-                <button
-                  type="button"
-                  aria-label="Chuyển ảnh lên"
-                  disabled={index === 0}
-                  onClick={() => moveImage(index, -1)}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  aria-label="Chuyển ảnh xuống"
-                  disabled={index === images.length - 1}
-                  onClick={() => moveImage(index, 1)}
-                >
-                  ↓
-                </button>
-              </div>
-            </div>
-          ))}
-          {previews.map((preview) => (
-            <div className="upload-preview" key={preview.url}>
-              <Image src={preview.url} alt={preview.name} width={320} height={320} unoptimized />
-              <span>{preview.name}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {images.length === 0 && previews.length > 0 && (
-        <div className="upload-preview-grid">
-          {previews.map((preview) => (
-            <div className="upload-preview" key={preview.url}>
-              <Image src={preview.url} alt={preview.name} width={320} height={320} unoptimized />
-              <span>{preview.name}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
 const FullImageManager: React.FC<FullImageManagerProps> = ({
   recipeId,
@@ -372,8 +268,8 @@ const FullImageManager: React.FC<FullImageManagerProps> = ({
   };
 
   // Submit form Thêm ảnh
-  const handleAddImage = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddImage = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e && 'preventDefault' in e) e.preventDefault();
     setErrorMessage(null);
 
     if (!validateSubmit()) return;
@@ -401,6 +297,7 @@ const FullImageManager: React.FC<FullImageManagerProps> = ({
         isPrimary: shouldBePrimary,
         orderIndex: nextOrder,
         createdAt: new Date().toISOString(),
+        file: uploadMode === 'file' ? selectedFile : null,
       };
 
       let nextImages = [...images];
@@ -790,7 +687,7 @@ const FullImageManager: React.FC<FullImageManagerProps> = ({
           </div>
         </div>
 
-        <form onSubmit={handleAddImage} className="space-y-4">
+        <div className="space-y-4">
           {/* Upload Mode: File Picker */}
           {uploadMode === 'file' ? (
             <div className="space-y-2">
@@ -986,7 +883,8 @@ const FullImageManager: React.FC<FullImageManagerProps> = ({
             )}
 
             <button
-              type="submit"
+              type="button"
+              onClick={handleAddImage}
               data-testid="btn-submit-image"
               disabled={isActionDisabled}
               className="inline-flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold rounded-xl text-white bg-emerald-700 hover:bg-emerald-800 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
@@ -1009,7 +907,7 @@ const FullImageManager: React.FC<FullImageManagerProps> = ({
               )}
             </button>
           </div>
-        </form>
+        </div>
       </div>
 
       {/* Gallery Section */}
@@ -1116,17 +1014,19 @@ const FullImageManager: React.FC<FullImageManagerProps> = ({
   );
 };
 
-export const ImageManager: React.FC<ImageManagerProps> = (props) => {
-  if (props.onFilesChange) {
-    return (
-      <DraftImageManager
-        images={props.images}
-        onImagesChange={props.onImagesChange as any}
-        onFilesChange={props.onFilesChange}
-      />
-    );
-  }
-  return <FullImageManager {...props} />;
+export const ImageManager: React.FC<ImageManagerProps> = ({
+  images,
+  onImagesChange,
+  onFilesChange: _onFilesChange,
+  ...restProps
+}) => {
+  return (
+    <FullImageManager
+      onImagesChange={onImagesChange as any}
+      initialImages={restProps.initialImages || (images as any)}
+      {...restProps}
+    />
+  );
 };
 
 export default ImageManager;

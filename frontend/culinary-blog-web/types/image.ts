@@ -8,6 +8,7 @@ export interface RecipeImage {
   isPrimary: boolean;
   orderIndex: number;
   createdAt?: string | null;
+  file?: File | null;
 }
 
 export interface AddRecipeImageRequest {

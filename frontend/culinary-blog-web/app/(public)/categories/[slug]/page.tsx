@@ -56,12 +56,21 @@ export default function CategoryDetailPage() {
     }
   }, [routeSlug, currentPage, loadCategoryData]);
 
+  const buildLinkUrl = (p: number) => {
+    const query = new URLSearchParams(searchParams.toString());
+    if (p > 1) {
+      query.set("page", p.toString());
+    } else {
+      query.delete("page");
+    }
+    const qs = query.toString();
+    return qs ? `/categories/${encodeURIComponent(routeSlug)}?${qs}` : `/categories/${encodeURIComponent(routeSlug)}`;
+  };
+
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
     // Update URL query string without reloading page
-    const query = new URLSearchParams(searchParams.toString());
-    query.set("page", newPage.toString());
-    router.replace(`/categories/${encodeURIComponent(routeSlug)}?${query.toString()}`, { scroll: false });
+    router.replace(buildLinkUrl(newPage), { scroll: false });
 
     // Smooth scroll up to recipes grid
     const targetElement = document.getElementById("category-recipes-section");
@@ -236,12 +245,13 @@ export default function CategoryDetailPage() {
             )}
 
             {/* Shared Pagination Component */}
-            {!loading && data.recipes && data.recipes.totalPages > 1 && (
+            {data.recipes && data.recipes.totalPages > 1 && (
               <div className="mt-10 border-t border-gray-100 pt-6">
                 <Pagination
                   page={currentPage}
                   totalPages={data.recipes.totalPages}
                   onPageChange={handlePageChange}
+                  buildLinkUrl={buildLinkUrl}
                 />
               </div>
             )}

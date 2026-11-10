@@ -7,6 +7,7 @@ import DifficultyBadge from './DifficultyBadge';
 import RecipeMeta from './RecipeMeta';
 import RecipeStatusBadge from './RecipeStatusBadge';
 import RecipeTimeInfo from './RecipeTimeInfo';
+import { resolveImageUrl } from '@/lib/image-url';
 
 const nutritionLabels = [
   ['calories', 'Calories', 'kcal'],
@@ -25,11 +26,11 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
   );
   const [activeImage, setActiveImage] = useState(0);
   const selectedImage = images[activeImage];
-  const primaryCoverUrl =
+  const rawCoverUrl =
     selectedImage?.url ??
     selectedImage?.originalUrl ??
-    recipe.coverImageUrl ??
-    '/sample-images/food-01.svg';
+    recipe.coverImageUrl;
+  const primaryCoverUrl = resolveImageUrl(rawCoverUrl) ?? '/sample-images/food-01.svg';
 
   const categoryName =
     typeof recipe.category === 'object' && recipe.category
@@ -164,7 +165,7 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
                             className="mt-3 h-48 w-full max-w-md rounded-xl bg-cover bg-center border border-slate-200"
                             role="img"
                             aria-label={`Ảnh minh họa bước ${step.stepNumber}`}
-                            style={{ backgroundImage: `url("${step.imageUrl}")` }}
+                            style={{ backgroundImage: `url("${resolveImageUrl(step.imageUrl) ?? step.imageUrl}")` }}
                           />
                         )}
                       </div>
@@ -197,6 +198,11 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
             </dl>
           ) : (
             <p className="text-slate-500 text-sm">Chưa có thông tin dinh dưỡng.</p>
+          )}
+          {recipe.nutrition && (
+            <p className="mt-3 text-sm text-slate-600">
+              Thông tin dinh dưỡng do tác giả cung cấp và chỉ mang tính tham khảo.
+            </p>
           )}
         </aside>
       </div>

@@ -27,10 +27,30 @@ export const AUTH_CHANGE_EVENT = 'culinary-auth-change';
 let refreshInFlight: Promise<boolean> | null = null;
 
 export function getApiBaseUrl(): string {
-  if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, '');
+  if (typeof window !== 'undefined') {
+    const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+    if (!envUrl) {
+      return '';
+    }
+    try {
+      const parsed = new URL(envUrl);
+      if (
+        (parsed.hostname === window.location.hostname || parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') &&
+        parsed.port !== window.location.port &&
+        window.location.port !== ''
+      ) {
+        return '';
+      }
+      return envUrl.replace(/\/+$/, '');
+    } catch {
+      return envUrl.replace(/\/+$/, '');
+    }
   }
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const internalUrl = process.env.INTERNAL_API_URL?.trim();
+  if (internalUrl) {
+    return internalUrl.replace(/\/+$/, '');
+  }
+  return (process.env.NEXT_PUBLIC_API_URL || 'http://api:8080').replace(/\/+$/, '');
 }
 
 export function getAuthToken(): string | null {
@@ -88,7 +108,8 @@ async function refreshAuth(): Promise<boolean> {
 
       try {
         const baseUrl = getApiBaseUrl();
-        const response = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/v1/auth/refresh`, {
+        const refreshUrl = baseUrl ? `${baseUrl.replace(/\/+$/, '')}/api/v1/auth/refresh` : '/api/v1/auth/refresh';
+        const response = await fetch(refreshUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken }),
@@ -134,8 +155,13 @@ export async function apiFetchWithResponse<T = unknown>(
     }
   }
 
-  const baseUrl = getApiBaseUrl();
-  const fullUrl = `${baseUrl.replace(/\/+$/, '')}${url.startsWith('/') ? url : `/${url}`}`;
+  const cleanBaseUrl = getApiBaseUrl().replace(/\/+$/, '').replace(/\/api\/v1$/, '').replace(/\/api$/, '');
+  const cleanPath = url.startsWith('/api/v1')
+    ? url
+    : url.startsWith('/api')
+    ? `/api/v1${url.slice(4)}`
+    : `/api/v1${url.startsWith('/') ? url : `/${url}`}`;
+  const fullUrl = cleanBaseUrl ? `${cleanBaseUrl}${cleanPath}` : cleanPath;
 
   const request = () =>
     fetch(fullUrl, {

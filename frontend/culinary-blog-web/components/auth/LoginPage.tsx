@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { SubmitHandler } from "react-hook-form";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -54,8 +54,7 @@ export default function LoginPage() {
         password: values.password,
       });
       console.log("[LoginPage] Login successful, redirecting to home");
-      router.push("/");
-      router.refresh();
+      window.location.href = "/";
     } catch (err) {
       console.error("[LoginPage] Login error:", err);
 
@@ -69,7 +68,10 @@ export default function LoginPage() {
         });
 
         applyFieldErrors(err, setError);
-        const errorMessage = err.title || err.message || "Đăng nhập thất bại";
+        const errorMessage =
+          err.status === 401
+            ? "Tên đăng nhập hoặc mật khẩu không chính xác."
+            : err.message || (err.title && err.title !== "UNAUTHORIZED" ? err.title : "Đăng nhập thất bại");
         setFormError(errorMessage);
         showErrorToast(errorMessage);
       } else if (err instanceof Error) {
@@ -86,18 +88,21 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async (idToken: string) => {
+  const handleGoogleLogin = useCallback(async (idToken: string) => {
     try {
       await googleLogin(idToken);
       router.push("/");
       router.refresh();
     } catch (err) {
-      const message = err instanceof ApiError
-        ? err.title || err.message
-        : "Đăng nhập Google thất bại";
+      const message =
+        err instanceof ApiError
+          ? err.status === 401
+            ? "Xác thực tài khoản Google thất bại hoặc chưa được cấp phép."
+            : err.message || (err.title && err.title !== "UNAUTHORIZED" ? err.title : "Đăng nhập Google thất bại")
+          : "Đăng nhập Google thất bại";
       showErrorToast(message);
     }
-  };
+  }, [googleLogin, router, showErrorToast]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">

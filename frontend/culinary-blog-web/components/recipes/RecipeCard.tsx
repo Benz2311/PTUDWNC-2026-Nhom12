@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { RecipeListItem, RecipeSummary } from '@/types/recipe';
 import DifficultyBadge from './DifficultyBadge';
 import RecipeStatusBadge from './RecipeStatusBadge';
+import { resolveImageUrl } from '@/lib/image-url';
 
 const fallbackImages = [
   '/sample-images/food-01.svg',
@@ -20,11 +21,11 @@ type RecipeCardProps = {
 };
 
 export default function RecipeCard({ recipe, className = '', showStatus = false, actions }: RecipeCardProps) {
-  const imageUrl =
+  const rawImage =
     recipe.primaryImageUrl ||
     recipe.coverImageUrl ||
-    recipe.imageUrl ||
-    fallbackImages[Math.abs(recipe.title.length) % fallbackImages.length];
+    recipe.imageUrl;
+  const imageUrl = resolveImageUrl(rawImage) || fallbackImages[Math.abs(recipe.title.length) % fallbackImages.length];
 
   const categoryName =
     typeof recipe.category === 'object' && recipe.category

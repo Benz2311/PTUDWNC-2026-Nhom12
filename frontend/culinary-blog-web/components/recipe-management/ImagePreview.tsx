@@ -2,6 +2,7 @@
 
 import React from 'react';
 import type { RecipeImage } from '@/types/image';
+import { resolveImageUrl } from '@/lib/image-url';
 
 export interface ImagePreviewProps {
   image: RecipeImage | null;
@@ -77,7 +78,10 @@ export function ImagePreview({
         <div className="relative aspect-video w-full bg-slate-950 flex items-center justify-center overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={image.mediumUrl || image.originalUrl}
+            src={
+              resolveImageUrl(image.mediumUrl || image.originalUrl) ??
+              (image.mediumUrl || image.originalUrl)
+            }
             alt={image.altText || 'Chi tiết hình ảnh công thức'}
             className="max-h-[65vh] w-auto max-w-full object-contain"
           />
