@@ -56,6 +56,7 @@ public sealed class DeleteCategoryCommandHandler
         _categoryRepository.Update(category);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _cache.RemoveAsync(CategoryListCacheKey, cancellationToken);
+        await _cache.RemoveAsync("sitemap:xml", cancellationToken);
 
         return DeleteCategoryResult.Deleted;
     }

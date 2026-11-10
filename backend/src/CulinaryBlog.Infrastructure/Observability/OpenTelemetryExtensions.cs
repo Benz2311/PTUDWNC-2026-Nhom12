@@ -23,8 +23,14 @@ public static class OpenTelemetryExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var otlpEndpoint = configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317";
-        var serviceName = configuration["OpenTelemetry:ServiceName"] ?? CulinaryBlogTelemetry.ServiceName;
+        var otlpEndpoint = configuration["OpenTelemetry:Endpoint"]
+            ?? configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]
+            ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
+            ?? "http://localhost:4317";
+        var serviceName = configuration["OpenTelemetry:ServiceName"]
+            ?? configuration["OTEL_SERVICE_NAME"]
+            ?? Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME")
+            ?? CulinaryBlogTelemetry.ServiceName;
 
         // Đăng ký telemetry singleton service
         services.AddSingleton<ICulinaryBlogTelemetry, CulinaryBlogTelemetry>();
@@ -37,7 +43,16 @@ public static class OpenTelemetryExtensions
             {
                 tracing
                     .AddSource(CulinaryBlogTelemetry.ActivitySourceName)
-                    .AddAspNetCoreInstrumentation()          // Trace API
+                    .AddAspNetCoreInstrumentation(options =>
+                    {
+                        // Không ghi nhận headers nhạy cảm như Authorization, Cookie, Secret
+                        options.Filter = httpContext => true;
+                        options.EnrichWithHttpRequest = (activity, httpRequest) =>
+                        {
+                            activity.SetTag("http.client_ip", httpRequest.HttpContext.Connection.RemoteIpAddress?.ToString());
+                            // Tuyệt đối không lưu header Authorization hoặc Cookie
+                        };
+                    })          // Trace API
                     .AddHttpClientInstrumentation()          // Trace HTTP
                     .AddEntityFrameworkCoreInstrumentation() // Trace DB
                     .AddOtlpExporter(opt =>
@@ -55,13 +70,15 @@ public static class OpenTelemetryExtensions
                     .AddMeter(CulinaryBlogTelemetry.MeterName)
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddOtlpExporter(opt =>
+                    .AddOtlpExporter((opt, metricReaderOptions) =>
                     {
                         if (Uri.TryCreate(otlpEndpoint, UriKind.Absolute, out var uri))
                         {
                             opt.Endpoint = uri;
                             opt.Protocol = OtlpExportProtocol.Grpc;
                         }
+
+                        metricReaderOptions.PeriodicExportingMetricReaderOptions.ExportIntervalMilliseconds = 2000;
                     });
             });
 

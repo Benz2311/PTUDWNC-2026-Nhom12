@@ -79,6 +79,7 @@ public sealed class CreateCategoryCommandHandler
         await _categoryRepository.AddAsync(category, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _cache.RemoveAsync(CategoryListCacheKey, cancellationToken);
+        await _cache.RemoveAsync("sitemap:xml", cancellationToken);
 
         return new CategoryDto(
             category.Id,

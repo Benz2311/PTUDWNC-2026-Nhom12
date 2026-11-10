@@ -2,6 +2,7 @@ using CulinaryBlog.Application.Interfaces;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using MimeKit;
 
 namespace CulinaryBlog.Infrastructure.Email;
@@ -12,9 +13,11 @@ namespace CulinaryBlog.Infrastructure.Email;
 public sealed class MailKitEmailService : IEmailService
 {
     private readonly EmailSettings _settings;
+    private readonly ILogger<MailKitEmailService> _logger;
 
-    public MailKitEmailService(IConfiguration configuration)
+    public MailKitEmailService(IConfiguration configuration, ILogger<MailKitEmailService> logger)
     {
+        _logger = logger;
         _settings = configuration
             .GetSection(EmailSettings.Section)
             .Get<EmailSettings>()
@@ -38,19 +41,36 @@ public sealed class MailKitEmailService : IEmailService
 
         using var client = new SmtpClient();
 
-        await client.ConnectAsync(
-            _settings.Host,
-            _settings.Port,
-            _settings.UseSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.None,
-            ct);
+        var socketOptions = _settings.UseSsl
+            ? (_settings.Port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.Auto)
+            : SecureSocketOptions.None;
 
-        if (!string.IsNullOrWhiteSpace(_settings.UserName))
+        try
         {
-            await client.AuthenticateAsync(_settings.UserName, _settings.Password, ct);
-        }
+            _logger.LogInformation(
+                "Connecting to SMTP server {Host}:{Port} with options {Options} for recipient {To}",
+                _settings.Host,
+                _settings.Port,
+                socketOptions,
+                message.To);
 
-        await client.SendAsync(mime, ct);
-        await client.DisconnectAsync(quit: true, ct);
+            await client.ConnectAsync(_settings.Host, _settings.Port, socketOptions, ct);
+
+            if (!string.IsNullOrWhiteSpace(_settings.UserName))
+            {
+                await client.AuthenticateAsync(_settings.UserName, _settings.Password, ct);
+            }
+
+            await client.SendAsync(mime, ct);
+            await client.DisconnectAsync(quit: true, ct);
+
+            _logger.LogInformation("Email sent successfully to {To}", message.To);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "SMTP delivery failed for {To} via {Host}:{Port}", message.To, _settings.Host, _settings.Port);
+            throw;
+        }
     }
 }
 

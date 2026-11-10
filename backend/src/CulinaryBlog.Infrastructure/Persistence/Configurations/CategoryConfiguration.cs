@@ -34,11 +34,16 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .IsConcurrencyToken()
             .ValueGeneratedNever();
 
-        builder.HasIndex(c => c.Slug)
-            .IsUnique();
+        builder.Property<string>("NormalizedName")
+            .HasComputedColumnSql("""lower(btrim("Name"))""", stored: true);
 
-        builder.HasIndex(c => c.Name)
-            .IsUnique();
+        builder.HasIndex(c => c.Slug)
+            .IsUnique()
+            .HasFilter("NOT \"IsDeleted\"");
+
+        builder.HasIndex("NormalizedName")
+            .IsUnique()
+            .HasFilter("NOT \"IsDeleted\"");
 
         builder.HasIndex(c => c.OrderIndex);
 

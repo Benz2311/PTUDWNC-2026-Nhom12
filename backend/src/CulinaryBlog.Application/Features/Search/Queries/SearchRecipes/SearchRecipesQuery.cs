@@ -2,6 +2,9 @@ using CulinaryBlog.Application.Common.Models;
 using CulinaryBlog.Application.Common.Utilities;
 using CulinaryBlog.Application.Features.Search.Dtos;
 using CulinaryBlog.Application.Interfaces;
+using CulinaryBlog.Application.DTOs;
+using CulinaryBlog.Domain.Entities;
+using System.Linq.Expressions;
 using CulinaryBlog.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +20,8 @@ public record SearchRecipesQuery(
     string? CategorySlug = null,
     DifficultyLevel? Difficulty = null,
     int? MaxCookTimeMinutes = null,
-    string? SortBy = null
+    RecipeSortField? SortBy = null,
+    bool SortDescending = true
 ) : IRequest<PagedResult<RecipeSearchResultDto>>;
 
 public class SearchRecipesHandler : IRequestHandler<SearchRecipesQuery, PagedResult<RecipeSearchResultDto>>
@@ -77,8 +81,6 @@ public class SearchRecipesHandler : IRequestHandler<SearchRecipesQuery, PagedRes
             baseQuery = baseQuery.Where(r => r.CookTimeMinutes <= request.MaxCookTimeMinutes.Value);
         }
 
-        var sortOption = request.SortBy?.Trim().ToLowerInvariant();
-
         // ==========================================
         // GIAI ĐOẠN 1: POSTGRESQL FULL-TEXT SEARCH (FTS)
         // Sử dụng Shadow Property SearchVectorFts, cấu hình 'simple' và hàm unaccent
@@ -91,23 +93,8 @@ public class SearchRecipesHandler : IRequestHandler<SearchRecipesQuery, PagedRes
 
         if (ftsTotalCount > 0)
         {
-            IOrderedQueryable<Domain.Entities.Recipe> orderedFtsQuery;
-            if (sortOption == "newest" || sortOption == "published_desc")
-            {
-                orderedFtsQuery = ftsQuery.OrderByDescending(r => r.PublishedAt);
-            }
-            else if (sortOption == "cooktime" || sortOption == "cook_time_asc")
-            {
-                orderedFtsQuery = ftsQuery.OrderBy(r => r.CookTimeMinutes).ThenByDescending(r => r.PublishedAt);
-            }
-            else
-            {
-                // Sắp xếp theo relevance score (ts_rank) giảm dần, thứ cấp theo PublishedAt giảm dần
-                orderedFtsQuery = ftsQuery
-                    .OrderByDescending(r => EF.Property<NpgsqlTsVector>(r, "SearchVectorFts")
-                        .Rank(EF.Functions.PlainToTsQuery("simple", normalizedKeyword)))
-                    .ThenByDescending(r => r.PublishedAt);
-            }
+            var orderedFtsQuery = ApplySort(ftsQuery, request,
+                recipe => EF.Property<NpgsqlTsVector>(recipe, "SearchVectorFts").Rank(EF.Functions.PlainToTsQuery("simple", normalizedKeyword)));
 
             var items = await orderedFtsQuery
                 .Skip((page - 1) * pageSize)
@@ -151,24 +138,8 @@ public class SearchRecipesHandler : IRequestHandler<SearchRecipesQuery, PagedRes
 
         if (fuzzyTotalCount > 0)
         {
-            IOrderedQueryable<Domain.Entities.Recipe> orderedFuzzyQuery;
-            if (sortOption == "newest" || sortOption == "published_desc")
-            {
-                orderedFuzzyQuery = fuzzyQuery.OrderByDescending(r => r.PublishedAt);
-            }
-            else if (sortOption == "cooktime" || sortOption == "cook_time_asc")
-            {
-                orderedFuzzyQuery = fuzzyQuery.OrderBy(r => r.CookTimeMinutes).ThenByDescending(r => r.PublishedAt);
-            }
-            else
-            {
-                // Sắp xếp theo similarity score giảm dần, thứ cấp theo PublishedAt giảm dần
-                orderedFuzzyQuery = fuzzyQuery
-                    .OrderByDescending(r => EF.Functions.TrigramsSimilarity(
-                        EF.Functions.Unaccent(r.Title).ToLower(),
-                        normalizedKeyword))
-                    .ThenByDescending(r => r.PublishedAt);
-            }
+            var orderedFuzzyQuery = ApplySort(fuzzyQuery, request,
+                recipe => EF.Functions.TrigramsSimilarity(EF.Functions.Unaccent(recipe.Title).ToLower(), normalizedKeyword));
 
             var items = await orderedFuzzyQuery
                 .Skip((page - 1) * pageSize)
@@ -201,4 +172,25 @@ public class SearchRecipesHandler : IRequestHandler<SearchRecipesQuery, PagedRes
         // Không tìm thấy dữ liệu: trả về HTTP 200 với mảng rỗng (theo SRS FR-SRCH-004)
         return new PagedResult<RecipeSearchResultDto>(new List<RecipeSearchResultDto>(), 0, page, pageSize);
     }
+
+    private static IOrderedQueryable<Recipe> ApplySort<TRelevance>(
+        IQueryable<Recipe> recipes, SearchRecipesQuery request, Expression<Func<Recipe, TRelevance>> relevance)
+    {
+        var ordered = request.SortBy switch
+        {
+            RecipeSortField.CreatedAt => OrderBy(recipes, recipe => recipe.CreatedAt, request.SortDescending),
+            RecipeSortField.PublishedAt => OrderBy(recipes, recipe => recipe.PublishedAt, request.SortDescending),
+            RecipeSortField.Title => OrderBy(recipes, recipe => recipe.Title, request.SortDescending),
+            RecipeSortField.PrepTime => OrderBy(recipes, recipe => recipe.PrepTimeMinutes, request.SortDescending),
+            RecipeSortField.CookTime => OrderBy(recipes, recipe => recipe.CookTimeMinutes, request.SortDescending),
+            RecipeSortField.Servings => OrderBy(recipes, recipe => recipe.Servings, request.SortDescending),
+            _ => OrderBy(recipes, relevance, request.SortDescending),
+        };
+
+        return ordered.ThenByDescending(recipe => recipe.PublishedAt).ThenBy(recipe => recipe.Id);
+    }
+
+    private static IOrderedQueryable<Recipe> OrderBy<T>(
+        IQueryable<Recipe> recipes, Expression<Func<Recipe, T>> selector, bool descending) =>
+        descending ? recipes.OrderByDescending(selector) : recipes.OrderBy(selector);
 }

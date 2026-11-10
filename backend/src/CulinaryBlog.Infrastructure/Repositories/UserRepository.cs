@@ -80,8 +80,53 @@ public class UserRepository : IUserRepository
 
     public Task UpdateAsync(ApplicationUser user, CancellationToken cancellationToken = default)
     {
-        _db.Users.Update(user);
+        var entry = _db.Users.Update(user);
+        entry.Property(item => item.AccessFailedCount).IsModified = false;
+        entry.Property(item => item.LockoutEnd).IsModified = false;
         return Task.CompletedTask;
+    }
+
+    public async Task<DateTime?> UpdateLoginFailuresAsync(
+        Guid userId, bool failed, DateTime now, CancellationToken cancellationToken = default)
+    {
+        const int maxFailures = 5;
+        var nextLockout = now.AddMinutes(15);
+        var unlocked = _db.Users.Where(user => user.Id == userId && user.IsActive &&
+            (user.LockoutEnd == null || user.LockoutEnd <= now));
+
+        if (_db.Database.IsRelational())
+        {
+            if (failed)
+            {
+                await unlocked.ExecuteUpdateAsync(set => set
+                    .SetProperty(user => user.LockoutEnd,
+                        user => user.AccessFailedCount >= maxFailures - 1 ? nextLockout : (DateTime?)null)
+                    .SetProperty(user => user.AccessFailedCount,
+                        user => user.AccessFailedCount >= maxFailures - 1 ? 0 : user.AccessFailedCount + 1),
+                    cancellationToken);
+            }
+            else
+            {
+                await unlocked.ExecuteUpdateAsync(set => set
+                    .SetProperty(user => user.AccessFailedCount, 0)
+                    .SetProperty(user => user.LockoutEnd, (DateTime?)null),
+                    cancellationToken);
+            }
+        }
+        else
+        {
+            var user = await unlocked.AsTracking().SingleOrDefaultAsync(cancellationToken);
+            if (user is not null)
+            {
+                var count = failed ? user.AccessFailedCount + 1 : 0;
+                user.LockoutEnd = count >= maxFailures ? nextLockout : null;
+                user.AccessFailedCount = count >= maxFailures ? 0 : count;
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        return await _db.Users.AsNoTracking().Where(user => user.Id == userId)
+            .Select(user => user.LockoutEnd).SingleOrDefaultAsync(cancellationToken);
     }
 
     public async Task<UserProfileDto?> GetProfileAsync(Guid userId, CancellationToken cancellationToken = default)

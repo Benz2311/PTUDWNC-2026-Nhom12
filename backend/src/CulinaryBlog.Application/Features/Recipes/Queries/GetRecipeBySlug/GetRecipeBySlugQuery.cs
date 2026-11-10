@@ -34,13 +34,16 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
         // 1. Kiểm tra tồn tại và quyền truy cập trước khi lấy toàn bộ payload (theo FR-RCP-002)
         var recipeHeader = await _context.Recipes
             .AsNoTracking()
-            .Where(r => r.Slug == normalizedSlug && !r.IsDeleted)
+            .Where(r => !r.IsDeleted && (r.Slug == normalizedSlug ||
+                _context.RecipeSlugHistories.Any(history => history.Slug == normalizedSlug && history.RecipeId == r.Id)))
+            .OrderByDescending(r => r.Slug == normalizedSlug)
             .Select(r => new
             {
                 r.Id,
                 r.AuthorId,
                 r.Status,
-                r.RowVersion
+                r.RowVersion,
+                r.xmin
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -62,8 +65,9 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
         // 2. Query chi tiết với AsNoTracking và Projection tối ưu, triệt tiêu hoàn toàn N+1
         var recipeDto = await _context.Recipes
             .AsNoTracking()
-            .AsSplitQuery()
-            .Where(r => r.Id == recipeHeader.Id)
+            .AsSingleQuery()
+            .Where(r => r.Id == recipeHeader.Id && !r.IsDeleted && r.xmin == recipeHeader.xmin
+                && (r.Status == RecipeStatus.Published || request.IsAdmin || r.AuthorId == request.CurrentUserId))
             .Select(r => new RecipeDetailDto
             {
                 Id = r.Id,
@@ -100,7 +104,8 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
                     Carbohydrates = r.Nutrition.Carbohydrates,
                     Fat = r.Nutrition.Fat,
                     Fiber = r.Nutrition.Fiber,
-                    Sodium = r.Nutrition.Sodium
+                    Sodium = r.Nutrition.Sodium,
+                    Source = r.Nutrition.Source
                 } : null,
                 Steps = r.Steps
                     .Where(s => !s.IsDeleted)
@@ -153,7 +158,7 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
             throw new NotFoundException($"Recipe with slug '{request.Slug}' was not found.");
         }
 
-        recipeDto.Version = (recipeHeader.RowVersion != null ? BitConverter.ToUInt64(recipeHeader.RowVersion, 0) : 0).ToString();
+        recipeDto.Version = (recipeHeader.xmin != 0 ? recipeHeader.xmin.ToString() : (recipeHeader.RowVersion != null ? BitConverter.ToUInt64(recipeHeader.RowVersion, 0) : 0).ToString());
 
         return recipeDto;
     }

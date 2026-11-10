@@ -14,13 +14,15 @@ public sealed class RecipeCacheInvalidator : IRecipeCacheInvalidator
 
     public async Task InvalidateAsync(Guid recipeId, string? slug, Guid categoryId, string? categorySlug, CancellationToken cancellationToken = default)
     {
-        await _cache.SetStringAsync("recipes:cache:generation", Guid.NewGuid().ToString("N"), cancellationToken);
-        await _cache.SetStringAsync("recipes:search:generation", Guid.NewGuid().ToString("N"), cancellationToken);
+        var generation = Guid.NewGuid().ToString("N");
+        await _cache.SetStringAsync("recipes:list:generation:v2", System.Text.Json.JsonSerializer.Serialize(generation), cancellationToken);
+        await _cache.SetStringAsync("recipes:search:generation:v2", System.Text.Json.JsonSerializer.Serialize(Guid.NewGuid().ToString("N")), cancellationToken);
         await _cache.SetStringAsync("categories:cache:generation", Guid.NewGuid().ToString("N"), cancellationToken);
         await _cache.RemoveAsync($"recipes:{recipeId}", cancellationToken);
         if (!string.IsNullOrWhiteSpace(slug))
         {
             await _cache.RemoveAsync($"recipes:slug:{slug}", cancellationToken);
+            await _cache.RemoveAsync($"recipe:{slug.Trim().ToLowerInvariant()}", cancellationToken);
         }
 
         await _cache.RemoveAsync("categories:all", cancellationToken);

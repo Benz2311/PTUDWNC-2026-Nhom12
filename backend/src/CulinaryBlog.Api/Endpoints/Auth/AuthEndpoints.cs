@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using CulinaryBlog.API.Extensions;
 using CulinaryBlog.Application.Common.Models;
 using CulinaryBlog.Application.DTOs.Auth;
@@ -176,11 +176,11 @@ public static class AuthEndpoints
 
             await authService.ResendConfirmationEmailAsync(request);
             logger.LogInformation("Resend confirmation email processed for: {Email}", request.Email);
-            return Results.NoContent();
+            return Results.Accepted(value: ApiResponse.Success(new { message = "Nếu tài khoản cần xác nhận, email sẽ được gửi." }));
         })
         .WithName("ResendConfirmationEmail")
         .WithSummary("Gửi lại email xác nhận")
-        .Produces(StatusCodes.Status204NoContent);
+        .Produces(StatusCodes.Status202Accepted);
 
         // GET /api/v1/auth/me
         group.MapGet("/me", async (
@@ -207,6 +207,7 @@ public static class AuthEndpoints
                 : Results.Ok(ApiResponse.Success(user));
         })
         .RequireAuthorization()
+        .RequireRateLimiting(RateLimitingExtensions.GeneralPolicy)
         .WithName("GetMe")
         .WithSummary("Lấy thông tin người dùng đang đăng nhập")
         .Produces<ApiResponse<UserResponse>>(StatusCodes.Status200OK)
@@ -238,6 +239,7 @@ public static class AuthEndpoints
             return Results.Ok(ApiResponse.Success(result));
         })
         .RequireAuthorization()
+        .RequireRateLimiting(RateLimitingExtensions.GeneralPolicy)
         .WithName("UpdateProfile")
         .WithSummary("Cập nhật thông tin cá nhân")
         .Produces<ApiResponse<UserResponse>>(StatusCodes.Status200OK)

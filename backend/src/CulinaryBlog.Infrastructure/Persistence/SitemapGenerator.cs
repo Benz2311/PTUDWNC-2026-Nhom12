@@ -4,6 +4,7 @@ using CulinaryBlog.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace CulinaryBlog.Infrastructure.Persistence;
 
@@ -13,12 +14,14 @@ public sealed class SitemapGenerator : ISitemapGenerator
     private readonly ApplicationDbContext _db;
     private readonly IDistributedCache _cache;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<SitemapGenerator> _logger;
 
-    public SitemapGenerator(ApplicationDbContext db, IDistributedCache cache, IConfiguration configuration)
+    public SitemapGenerator(ApplicationDbContext db, IDistributedCache cache, IConfiguration configuration, ILogger<SitemapGenerator> logger)
     {
         _db = db;
         _cache = cache;
         _configuration = configuration;
+        _logger = logger;
     }
 
     public async Task<string> GenerateAsync(CancellationToken cancellationToken = default)
@@ -48,17 +51,22 @@ public sealed class SitemapGenerator : ISitemapGenerator
                 LastModified = category.UpdatedAt ?? category.CreatedAt
             }));
 
+        var staticPaths = new[] { "/", "/recipes", "/categories", "/search" };
+        var entries = staticPaths.Select(path => new XElement(SitemapNamespace + "url",
+                new XElement(SitemapNamespace + "loc", $"{baseUrl}{path}")))
+            .Concat(urls.Select(item => new XElement(SitemapNamespace + "url",
+                new XElement(SitemapNamespace + "loc", item.Location),
+                new XElement(SitemapNamespace + "lastmod", item.LastModified.ToString("yyyy-MM-dd")))));
         var document = new XDocument(
             new XDeclaration("1.0", "UTF-8", null),
-            new XElement(SitemapNamespace + "urlset",
-                urls.Select(item => new XElement(SitemapNamespace + "url",
-                    new XElement(SitemapNamespace + "loc", item.Location),
-                    new XElement(SitemapNamespace + "lastmod", item.LastModified.ToString("yyyy-MM-dd"))))));
+            new XElement(SitemapNamespace + "urlset", entries));
         var xml = document.ToString(SaveOptions.DisableFormatting);
         await _cache.SetStringAsync("sitemap:xml", xml, new DistributedCacheEntryOptions
         {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(6)
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(25)
         }, cancellationToken);
+        _logger.LogInformation("Generated sitemap with {UrlCount} public URLs.",
+            recipes.Count + categories.Count + staticPaths.Length);
         return xml;
     }
 }

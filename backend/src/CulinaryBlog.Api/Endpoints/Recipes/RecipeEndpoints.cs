@@ -195,6 +195,7 @@ public static class RecipeEndpoints
         int? maxTotalTimeMinutes,
         string? sortBy,
         string? sortDirection,
+        string? sortOrder,
         string? sort,
         bool? mine,
         Guid? authorId,
@@ -202,6 +203,7 @@ public static class RecipeEndpoints
         ClaimsPrincipal user,
         ISender sender,
         ICacheService cache,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         var validationResult = ValidateListOptions(
@@ -210,7 +212,7 @@ public static class RecipeEndpoints
             maxCookTimeMinutes,
             maxTotalTimeMinutes,
             sortBy,
-            sortDirection,
+            sortOrder ?? sortDirection,
             sort,
             out var options);
 
@@ -305,15 +307,18 @@ public static class RecipeEndpoints
             Status = parsedStatus
         };
 
-        if (isMine || authorId.HasValue)
+        if (user.Identity?.IsAuthenticated == true || isMine || authorId.HasValue)
         {
+            httpContext.Response.Headers.CacheControl = "private, no-store";
             var privateResult = await sender.Send(
                 new GetRecipesQuery(effectivePage, effectivePageSize, listOptions),
                 cancellationToken);
-            return Results.Ok(privateResult);
+            return Results.Ok(ApiResponse.FromPaged(privateResult));
         }
 
+        var generation = await cache.GetAsync<string>("recipes:list:generation:v2", cancellationToken) ?? "0";
         var cacheKey = CreatePublicRecipeListCacheKey(
+            generation,
             effectivePage,
             effectivePageSize,
             listOptions);
@@ -334,17 +339,19 @@ public static class RecipeEndpoints
             TimeSpan.FromMinutes(1),
             cancellationToken);
 
-        return Results.Ok(result);
+        return Results.Ok(ApiResponse.FromPaged(result));
     }
 
     private static string CreatePublicRecipeListCacheKey(
+        string generation,
         int page,
         int pageSize,
         RecipeListOptions options)
     {
         return string.Join(
             ':',
-            "recipes:list",
+            "recipes:list:v2",
+            generation,
             page,
             pageSize,
             Uri.EscapeDataString(options.Search ?? string.Empty),
@@ -402,6 +409,7 @@ public static class RecipeEndpoints
         [FromQuery] string? difficulty,
         [FromQuery] int? maxCookTimeMinutes,
         [FromQuery] string? sortBy,
+        [FromQuery] string? sortOrder,
         ISender sender,
         ICacheService cache,
         CancellationToken ct)
@@ -409,21 +417,65 @@ public static class RecipeEndpoints
         var effectivePage = page is > 0 ? page.Value : 1;
         var effectivePageSize = pageSize is > 0 and <= 100 ? pageSize.Value : 10;
         var rawQuery = q?.Trim() ?? string.Empty;
-        var normalizedQ = rawQuery.ToLowerInvariant();
-
-        DifficultyLevel? parsedDifficulty = null;
-        if (!string.IsNullOrWhiteSpace(difficulty) && Enum.TryParse<DifficultyLevel>(difficulty, true, out var diff))
+        var errors = new Dictionary<string, string[]>();
+        if (rawQuery.Length is < 2 or > 100)
         {
-            parsedDifficulty = diff;
+            errors["q"] = ["Từ khóa phải dài từ 2 đến 100 ký tự."];
         }
 
-        // SRS FR-SRCH-001: Cache Redis 1 phút vary theo query, filter, page, pageSize, sort để tránh cache collision
-        var catKey = categoryId?.ToString() ?? (!string.IsNullOrWhiteSpace(categorySlug) ? categorySlug.Trim().ToLowerInvariant() : "all");
-        var diffKey = parsedDifficulty?.ToString() ?? "all";
-        var cookKey = maxCookTimeMinutes?.ToString() ?? "any";
-        var sortKey = string.IsNullOrWhiteSpace(sortBy) ? "relevance" : sortBy.Trim().ToLowerInvariant();
+        DifficultyLevel? parsedDifficulty = null;
+        if (!string.IsNullOrWhiteSpace(difficulty))
+        {
+            if (Enum.TryParse<DifficultyLevel>(difficulty, true, out var diff) && Enum.IsDefined(diff))
+            {
+                parsedDifficulty = diff;
+            }
+            else
+            {
+                errors["difficulty"] = ["Độ khó không hợp lệ."];
+            }
+        }
 
-        var cacheKey = $"search:{normalizedQ}:cat={catKey}:diff={diffKey}:cook={cookKey}:sort={sortKey}:p={effectivePage}:sz={effectivePageSize}";
+        if (maxCookTimeMinutes is <= 0)
+        {
+            errors["maxCookTimeMinutes"] = ["Thời gian nấu phải lớn hơn 0."];
+        }
+
+        var sort = sortBy?.Trim().ToLowerInvariant();
+        var field = sort switch
+        {
+            "createdat" => RecipeSortField.CreatedAt,
+            "publishedat" or "newest" or "published_desc" => RecipeSortField.PublishedAt,
+            "title" => RecipeSortField.Title,
+            "preptime" => RecipeSortField.PrepTime,
+            "cooktime" or "cook_time_asc" => RecipeSortField.CookTime,
+            "servings" => RecipeSortField.Servings,
+            _ => (RecipeSortField?)null,
+        };
+        if (field is null && sort is not (null or "" or "relevance"))
+        {
+            errors["sortBy"] = ["Tiêu chí sắp xếp không hợp lệ."];
+        }
+
+        var order = sortOrder?.Trim().ToLowerInvariant();
+        if (order is not (null or "" or "asc" or "desc"))
+        {
+            errors["sortOrder"] = ["Thứ tự sắp xếp phải là asc hoặc desc."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors, statusCode: StatusCodes.Status422UnprocessableEntity, type: "VALIDATION_ERROR");
+        }
+
+        var descending = order == "desc" || (string.IsNullOrEmpty(order) && field != RecipeSortField.CookTime);
+        var generation = await cache.GetAsync<string>("recipes:search:generation:v2", ct);
+        var slug = categorySlug?.Trim().ToLowerInvariant();
+        var cacheKey = "search:v2:" + System.Text.Json.JsonSerializer.Serialize(new
+        {
+            generation, query = rawQuery.ToLowerInvariant(), categoryId, slug, parsedDifficulty,
+            maxCookTimeMinutes, field, descending, effectivePage, effectivePageSize,
+        });
         var cachedResult = await cache.GetAsync<PagedResult<RecipeSearchResultDto>>(cacheKey, ct);
         if (cachedResult != null)
         {
@@ -438,7 +490,8 @@ public static class RecipeEndpoints
             categorySlug,
             parsedDifficulty,
             maxCookTimeMinutes,
-            sortKey);
+            field,
+            descending);
 
         var result = await sender.Send(query, ct);
 
@@ -452,12 +505,10 @@ public static class RecipeEndpoints
         string slug,
         ClaimsPrincipal user,
         ISender sender,
-        ICacheService cache,
         HttpContext httpContext,
         CancellationToken ct)
     {
-        var normalizedSlug = slug.Trim().ToLowerInvariant();
-        var cacheKey = $"recipe:{normalizedSlug}";
+        httpContext.Response.Headers.CacheControl = "private, no-store";
 
         Guid? currentUserId = null;
         var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
@@ -468,30 +519,13 @@ public static class RecipeEndpoints
         }
         bool isAdmin = user.IsInRole("Admin");
 
-        // Đọc shared cache
-        var cachedRecipe = await cache.GetAsync<CulinaryBlog.Application.Features.Recipes.Dtos.RecipeDetailDto>(cacheKey, ct);
-        if (cachedRecipe != null)
-        {
-            // BẢO VỆ KÉP (Major-01): Nếu shared cache có chứa recipe, chỉ phục vụ nếu là Published
-            if (cachedRecipe.Status == RecipeStatus.Published)
-            {
-                if (!string.IsNullOrEmpty(cachedRecipe.Version))
-                {
-                    httpContext.Response.Headers.ETag = $"\"{cachedRecipe.Version}\"";
-                }
-                return Results.Ok(cachedRecipe);
-            }
-        }
-
         try
         {
             var query = new GetRecipeBySlugQuery(slug, currentUserId, isAdmin);
             var recipe = await sender.Send(query, ct);
-
-            // Major-01 Fix: CHỈ cache công thức có trạng thái Published
-            if (recipe.Status == RecipeStatus.Published)
+            if (!string.IsNullOrEmpty(recipe.Slug) && !string.Equals(slug.Trim(), recipe.Slug, StringComparison.Ordinal))
             {
-                await cache.SetAsync(cacheKey, recipe, TimeSpan.FromMinutes(5), ct);
+                return Results.Redirect($"/api/v1/recipes/{Uri.EscapeDataString(recipe.Slug)}", permanent: true);
             }
 
             if (!string.IsNullOrEmpty(recipe.Version))
@@ -1104,14 +1138,11 @@ public static class RecipeEndpoints
             ? "publishedat"
             : sortBy.Trim().ToLowerInvariant();
 
-        if (sortByValue is "createdat" or "-createdat")
-        {
-            sortByValue = "publishedat";
-        }
-
         var parsedSortBy = sortByValue switch
         {
             "publishedat" => RecipeSortField.PublishedAt,
+            "createdat" or "-createdat" => RecipeSortField.CreatedAt,
+            "servings" => RecipeSortField.Servings,
             "title" => RecipeSortField.Title,
             "preptime" => RecipeSortField.PrepTime,
             "cooktime" => RecipeSortField.CookTime,
@@ -1124,7 +1155,7 @@ public static class RecipeEndpoints
             return Results.ValidationProblem(
                 new Dictionary<string, string[]>
                 {
-                    ["sortBy"] = ["SortBy phải là publishedAt, createdAt, title, prepTime, cookTime hoặc totalTime."]
+                    ["sortBy"] = ["SortBy phải là publishedAt, createdAt, title, prepTime, cookTime, servings hoặc totalTime."]
                 },
                 statusCode: StatusCodes.Status422UnprocessableEntity,
                 type: "VALIDATION_ERROR");
@@ -1194,11 +1225,11 @@ public static class RecipeEndpoints
             Title = request.Title.Trim(),
             Slug = slug,
             Description = request.Description?.Trim() ?? string.Empty,
-            Content = request.Content.Trim(),
-            PrepTimeMinutes = request.PrepTimeMinutes,
-            CookTimeMinutes = request.CookTimeMinutes,
+            Content = request.Content?.Trim() ?? string.Empty,
+            PrepTimeMinutes = request.ResolvedPrepTime!.Value,
+            CookTimeMinutes = request.ResolvedCookTime!.Value,
             Servings = request.Servings,
-            Difficulty = request.Difficulty,
+            Difficulty = request.Difficulty!.Value,
             Status = RecipeStatus.Draft,
             Nutrition = ToNutrition(request.Nutrition),
             Images = ToImages(request.Images),
@@ -1219,6 +1250,7 @@ public static class RecipeEndpoints
         ApplicationDbContext db,
         CulinaryBlog.Application.Interfaces.IRecipeRepository recipeRepository,
         IRecipeWriteService recipeWriteService,
+        ISender sender,
         CancellationToken cancellationToken)
     {
         var recipe = await recipeRepository.GetForUpdateAsync(id, cancellationToken);
@@ -1253,30 +1285,39 @@ public static class RecipeEndpoints
             return Results.UnprocessableEntity(new { error = "Published or archived recipes cannot change their slug." });
         }
 
-        var slug = recipe.Status is RecipeStatus.Published or RecipeStatus.Archived
+        var keepSlug = recipe.Status is RecipeStatus.Published or RecipeStatus.Archived ||
+            (request.Slug is null && string.Equals(recipe.Title, request.Title.Trim(), StringComparison.Ordinal));
+        var slug = keepSlug
             ? recipe.Slug
             : await GenerateUniqueSlugAsync(request.Slug ?? request.Title, recipeRepository, db, id, cancellationToken);
+
+        if (slug != recipe.Slug && !await db.RecipeSlugHistories.AnyAsync(
+            history => history.Slug == recipe.Slug && history.RecipeId == id, cancellationToken))
+        {
+            db.RecipeSlugHistories.Add(new RecipeSlugHistory { RecipeId = id, Slug = recipe.Slug });
+        }
 
         recipe.CategoryId = request.CategoryId;
         recipe.Title = request.Title.Trim();
         recipe.Slug = slug;
         recipe.Description = request.Description?.Trim() ?? string.Empty;
-        recipe.Content = request.Content.Trim();
-        recipe.PrepTimeMinutes = request.PrepTimeMinutes;
-        recipe.CookTimeMinutes = request.CookTimeMinutes;
+        recipe.Content = request.Content?.Trim() ?? recipe.Content;
+        recipe.PrepTimeMinutes = request.ResolvedPrepTime!.Value;
+        recipe.CookTimeMinutes = request.ResolvedCookTime!.Value;
         recipe.Servings = request.Servings;
-        recipe.Difficulty = request.Difficulty;
+        recipe.Difficulty = request.Difficulty!.Value;
         recipe.UpdatedAt = DateTime.UtcNow;
         recipe.Nutrition = ToNutrition(request.Nutrition, recipe.Nutrition);
         await recipeWriteService.ReplaceContentsAsync(
             recipe,
-            ToIngredients(request.Ingredients),
-            ToSteps(request.Steps),
-            ToImages(request.Images),
+            request.Ingredients is null ? recipe.Ingredients : ToIngredients(request.Ingredients),
+            request.Steps is null ? recipe.Steps : ToSteps(request.Steps),
+            request.Images is null ? recipe.Images : ToImages(request.Images),
             cancellationToken);
 
         SetRecipeEtag(httpContext, recipe);
-        return Results.Ok(ApiResponse.Success(new { recipe.Id, recipe.Slug, version = recipe.xmin.ToString() }));
+        var updated = await sender.Send(new GetRecipeBySlugQuery(recipe.Slug, recipe.AuthorId), cancellationToken);
+        return Results.Ok(ApiResponse.Success(updated));
     }
 
     private static async Task<IResult> DeleteRecipe(
@@ -1341,12 +1382,12 @@ public static class RecipeEndpoints
             if (status == RecipeStatus.Published)
             {
                 var author = await db.Users.AsNoTracking().SingleOrDefaultAsync(user => user.Id == recipe.AuthorId, cancellationToken);
-                if (author is null || !author.EmailConfirmed)
+                if (author is null || (!author.EmailConfirmed && !principal.IsInRole("Admin")))
                 {
                     return Results.UnprocessableEntity(new { error = "The recipe author must have a confirmed email before publishing." });
                 }
 
-                if (!CanPublishRecipe(recipe, author))
+                if (!CanPublishRecipe(recipe))
                 {
                     return Results.UnprocessableEntity(new { error = "Recipe must have valid fields, an active category, at least one ingredient, and at least one step before publishing." });
                 }
@@ -1385,7 +1426,7 @@ public static class RecipeEndpoints
             return Results.Ok(ApiResponse.Success(new { recipe.Id, status = recipe.Status.ToString(), version = recipe.xmin.ToString() }));
         }
 
-        group.MapPost("/{id:guid}/" + action, UpdateStatus).RequireAuthorization();
+        group.MapMethods("/{id:guid}/" + action, [HttpMethods.Patch, HttpMethods.Post], UpdateStatus).RequireAuthorization();
     }
 
     private static async Task<IResult> AddIngredient(
@@ -1533,7 +1574,7 @@ public static class RecipeEndpoints
 
         if (!recipe.IsDeleted)
         {
-            return Results.UnprocessableEntity(new { error = "Recipe is not soft deleted." });
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, type: "RECIPE_NOT_DELETED", detail: "Recipe is not soft deleted.");
         }
 
         var deletedAt = recipe.DeletedAt ?? recipe.UpdatedAt ?? recipe.CreatedAt;
@@ -1560,7 +1601,7 @@ public static class RecipeEndpoints
             .SingleOrDefaultAsync(cancellationToken);
         await invalidator.InvalidateAsync(recipe.Id, recipe.Slug, recipe.CategoryId, categorySlug, cancellationToken);
         SetRecipeEtag(httpContext, recipe);
-        return Results.Ok(new { recipe.Id, status = recipe.Status.ToString() });
+        return Results.Ok(ApiResponse.Success(new { recipe.Id, status = recipe.Status.ToString() }));
     }
 
     private static async Task<IResult> PurgeRecipe(
@@ -1576,10 +1617,10 @@ public static class RecipeEndpoints
         return Results.NoContent();
     }
 
-    private static bool CanPublishRecipe(Recipe recipe, ApplicationUser author)
+    private static bool CanPublishRecipe(Recipe recipe)
     {
-        if (string.IsNullOrWhiteSpace(recipe.Title) || recipe.Title.Trim().Length is < 5 or > 200 ||
-            string.IsNullOrWhiteSpace(recipe.Content) || recipe.PrepTimeMinutes <= 0 ||
+        if (string.IsNullOrWhiteSpace(recipe.Title) || recipe.Title.Trim().Length is < 3 or > 200 ||
+            recipe.PrepTimeMinutes <= 0 ||
             recipe.CookTimeMinutes < 0 || recipe.Servings <= 0 || !Enum.IsDefined(recipe.Difficulty) ||
             recipe.Description.Length > 2000 ||
             recipe.CategoryId == Guid.Empty ||
@@ -1587,12 +1628,7 @@ public static class RecipeEndpoints
             recipe.Ingredients.Count == 0 ||
             recipe.Ingredients.Any(ingredient => string.IsNullOrWhiteSpace(ingredient.Name) || ingredient.Name.Trim().Length > 200) ||
             recipe.Steps.Count == 0 ||
-            recipe.Steps.Any(step => string.IsNullOrWhiteSpace(step.Description) || step.Description.Trim().Length > 2000 || step.Title.Trim().Length > 200))
-        {
-            return false;
-        }
-
-        if (!author.EmailConfirmed)
+            recipe.Steps.Any(step => string.IsNullOrWhiteSpace(step.Description) || step.Description.Trim().Length > 2000 || step.Title?.Trim().Length > 200))
         {
             return false;
         }
@@ -1702,27 +1738,27 @@ public static class RecipeEndpoints
 
     private static async Task<string?> ValidateRequest(RecipeRequest request, ApplicationDbContext db, CancellationToken cancellationToken, Guid? existingId = null)
     {
-        if (!request.AuthorId.HasValue || request.AuthorId.Value == Guid.Empty || request.CategoryId == Guid.Empty || string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Content))
+        if (!request.AuthorId.HasValue || request.AuthorId.Value == Guid.Empty || request.CategoryId == Guid.Empty || string.IsNullOrWhiteSpace(request.Title))
         {
-            return "AuthorId, CategoryId, Title and Content are required.";
+            return "AuthorId, CategoryId and Title are required.";
         }
 
-        if (request.Title.Trim().Length < 5 || request.Title.Trim().Length > 200)
+        if (request.Title.Trim().Length < 3 || request.Title.Trim().Length > 200)
         {
-            return "Title must be between 5 and 200 characters.";
+            return "Title must be between 3 and 200 characters.";
         }
 
-        if (request.Description?.Length > 2000)
+        if (request.Description?.Trim().Length is null or < 10 or > 2000)
         {
-            return "Description must be at most 2000 characters.";
+            return "Description must be between 10 and 2000 characters.";
         }
 
-        if (request.PrepTimeMinutes <= 0 || request.CookTimeMinutes < 0 || request.Servings <= 0)
+        if (request.ResolvedPrepTime is null or <= 0 || request.ResolvedCookTime is null or < 0 || request.Servings <= 0)
         {
-            return "PrepTimeMinutes must be greater than zero, CookTimeMinutes cannot be negative, and Servings must be greater than zero.";
+            return "prepTime must be greater than zero, cookTime must be provided and cannot be negative, and Servings must be greater than zero.";
         }
 
-        if (!Enum.IsDefined(request.Difficulty))
+        if (!request.Difficulty.HasValue || !Enum.IsDefined(request.Difficulty.Value))
         {
             return "Difficulty is invalid.";
         }
@@ -1733,7 +1769,8 @@ public static class RecipeEndpoints
                 request.Nutrition.Protein,
                 request.Nutrition.Carbohydrates,
                 request.Nutrition.Fat,
-                request.Nutrition.Fiber
+                request.Nutrition.Fiber,
+                request.Nutrition.Sodium ?? 0
             }.Any(value => value < 0))
         {
             return "Nutrition values cannot be negative.";
@@ -1797,6 +1834,7 @@ public static class RecipeEndpoints
         nutrition.Carbohydrates = request.Carbohydrates;
         nutrition.Fat = request.Fat;
         nutrition.Fiber = request.Fiber;
+        nutrition.Sodium = request.Sodium ?? nutrition.Sodium;
         return nutrition;
     }
 
@@ -1859,8 +1897,12 @@ public static class RecipeEndpoints
     }
 }
 
-public sealed record RecipeRequest(Guid? AuthorId, Guid CategoryId, string Title, string? Slug, string? Description, string Content, int PrepTimeMinutes, int CookTimeMinutes, int Servings, DifficultyLevel Difficulty, NutritionRequest? Nutrition, IEnumerable<IngredientRequest>? Ingredients, IEnumerable<ImageRequest>? Images, IEnumerable<StepRequest>? Steps = null);
-public sealed record NutritionRequest(decimal Calories, decimal Protein, decimal Carbohydrates, decimal Fat, decimal Fiber);
+public sealed record RecipeRequest(Guid? AuthorId, Guid CategoryId, string Title, string? Slug, string? Description, string? Content, int? PrepTimeMinutes, int? CookTimeMinutes, int Servings, DifficultyLevel? Difficulty, NutritionRequest? Nutrition, IEnumerable<IngredientRequest>? Ingredients, IEnumerable<ImageRequest>? Images, IEnumerable<StepRequest>? Steps = null, int? PrepTime = null, int? CookTime = null)
+{
+    internal int? ResolvedPrepTime => PrepTime ?? PrepTimeMinutes;
+    internal int? ResolvedCookTime => CookTime ?? CookTimeMinutes;
+}
+public sealed record NutritionRequest(decimal Calories, decimal Protein, decimal Carbohydrates, decimal Fat, decimal Fiber, decimal? Sodium = null);
 public sealed record IngredientRequest(string Name, JsonElement Quantity, string? Unit, int SortOrder = 0, string? Notes = null, int? OrderIndex = null);
 public sealed record ImageRequest(string Url, string? AltText);
 public sealed record StepRequest(string? Title, string Description, int? TimerMinutes = null, string? ImageUrl = null);

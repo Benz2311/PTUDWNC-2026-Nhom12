@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using CulinaryBlog.Domain.Enums;
 
 namespace CulinaryBlog.Application.Features.Recipes.Dtos;
@@ -12,6 +13,8 @@ public class RecipeDetailDto
     public string? CoverImageUrl { get; set; }
     public int PrepTimeMinutes { get; set; }
     public int CookTimeMinutes { get; set; }
+    public int PrepTime => PrepTimeMinutes;
+    public int CookTime => CookTimeMinutes;
     public int Servings { get; set; }
     public DifficultyLevel Difficulty { get; set; }
     public RecipeStatus Status { get; set; }
@@ -51,6 +54,8 @@ public class RecipeNutritionDto
     public decimal? Fat { get; set; }
     public decimal? Fiber { get; set; }
     public decimal? Sodium { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter<NutritionSource>))]
+    public NutritionSource Source { get; set; }
 }
 
 public class RecipeStepDto

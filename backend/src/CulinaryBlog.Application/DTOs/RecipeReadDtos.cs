@@ -8,7 +8,9 @@ public enum RecipeSortField
     Title,
     PrepTime,
     CookTime,
-    TotalTime
+    TotalTime,
+    CreatedAt,
+    Servings
 }
 
 public record PaginationMetaDto(

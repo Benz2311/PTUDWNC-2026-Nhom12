@@ -31,6 +31,9 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int>("AccessFailedCount")
+                        .HasColumnType("integer");
+
                     b.Property<string>("AvatarUrl")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -62,6 +65,9 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
+                    b.Property<DateTime?>("LockoutEnd")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -71,6 +77,10 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text[]")
                         .HasColumnName("Roles");
+
+                    b.Property<Guid>("SessionVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
 
                     b.Property<string>("UserName")
                         .IsRequired()
@@ -114,6 +124,11 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("NormalizedName")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasComputedColumnSql("lower(btrim(\"Name\"))", true);
+
                     b.Property<int>("OrderIndex")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -134,13 +149,15 @@ namespace CulinaryBlog.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
-                        .IsUnique();
+                    b.HasIndex("NormalizedName")
+                        .IsUnique()
+                        .HasFilter("NOT \"IsDeleted\"");
 
                     b.HasIndex("OrderIndex");
 
                     b.HasIndex("Slug")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("NOT \"IsDeleted\"");
 
                     b.ToTable("Categories", (string)null);
 
@@ -247,6 +264,7 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasColumnType("bytea");
 
@@ -549,12 +567,18 @@ namespace CulinaryBlog.Infrastructure.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("ReplacedByTokenHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SessionVersion")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("TokenHash")
                         .IsRequired()
@@ -567,6 +591,8 @@ namespace CulinaryBlog.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("FamilyId");
 
                     b.HasIndex("RevokedAt");
 

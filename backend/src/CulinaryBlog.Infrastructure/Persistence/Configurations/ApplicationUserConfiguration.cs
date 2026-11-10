@@ -53,6 +53,8 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
 
         builder.HasIndex(x => x.IsActive);
 
+        builder.Property(x => x.SessionVersion).IsConcurrencyToken();
+
         builder.Property(x => x.CreatedAt)
             .IsRequired();
 
@@ -69,4 +71,4 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
             .HasForeignKey(x => x.UserId)
             .OnDelete(DeleteBehavior.Cascade);
     }
-}
+}

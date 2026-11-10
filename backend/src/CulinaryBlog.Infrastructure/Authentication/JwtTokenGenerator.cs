@@ -38,6 +38,7 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
             new(JwtRegisteredClaimNames.UniqueName, user.UserName),
             new(JwtRegisteredClaimNames.Email, user.Email),
             new("displayName", user.DisplayName),
+            new("session_version", user.SessionVersion.ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
 
@@ -61,8 +62,8 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
 
     public string GenerateRefreshToken()
     {
-        var bytes = RandomNumberGenerator.GetBytes(64);
-        return Convert.ToBase64String(bytes);
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        return Base64UrlEncoder.Encode(bytes);
     }
 
     public string HashToken(string token)
@@ -120,7 +121,9 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
                 return false;
             }
 
-            var subClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub);
+            var subClaim = principal.FindFirst(ClaimTypes.NameIdentifier)
+                ?? principal.FindFirst(JwtRegisteredClaimNames.Sub)
+                ?? principal.FindFirst("sub");
             if (subClaim != null && Guid.TryParse(subClaim.Value, out var parsedUserId))
             {
                 userId = parsedUserId;
@@ -180,9 +183,11 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
                 return false;
             }
 
-            return Guid.TryParse(
-                principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value,
-                out userId);
+            var subClaim = principal.FindFirst(ClaimTypes.NameIdentifier)
+                ?? principal.FindFirst(JwtRegisteredClaimNames.Sub)
+                ?? principal.FindFirst("sub");
+
+            return Guid.TryParse(subClaim?.Value, out userId);
         }
         catch (SecurityTokenException)
         {

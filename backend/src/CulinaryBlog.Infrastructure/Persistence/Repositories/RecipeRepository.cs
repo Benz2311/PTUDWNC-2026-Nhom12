@@ -308,6 +308,12 @@ public class RecipeRepository : IRecipeRepository
 
         IOrderedQueryable<Recipe> ordered = options.SortBy switch
         {
+            RecipeSortField.CreatedAt => options.SortDescending
+                ? query.OrderByDescending(recipe => recipe.CreatedAt)
+                : query.OrderBy(recipe => recipe.CreatedAt),
+            RecipeSortField.Servings => options.SortDescending
+                ? query.OrderByDescending(recipe => recipe.Servings)
+                : query.OrderBy(recipe => recipe.Servings),
             RecipeSortField.Title => options.SortDescending
                 ? query.OrderByDescending(recipe => recipe.Title)
                 : query.OrderBy(recipe => recipe.Title),

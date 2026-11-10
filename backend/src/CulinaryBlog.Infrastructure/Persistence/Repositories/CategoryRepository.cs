@@ -62,10 +62,9 @@ public class CategoryRepository : ICategoryRepository
         CancellationToken cancellationToken = default)
     {
         return await _db.Categories
-            .IgnoreQueryFilters()
             .AnyAsync(
                 c =>
-                    c.Name == name &&
+                    c.Name.Trim().ToLower() == name.Trim().ToLower() &&
                     (!excludeId.HasValue ||
                      c.Id != excludeId.Value),
                 cancellationToken);
@@ -76,7 +75,6 @@ public class CategoryRepository : ICategoryRepository
         CancellationToken cancellationToken = default)
     {
         return _db.Categories
-            .IgnoreQueryFilters()
             .AnyAsync(category => category.Slug == slug, cancellationToken);
     }
 
@@ -89,6 +87,10 @@ public class CategoryRepository : ICategoryRepository
                 r => r.CategoryId == categoryId,
                 cancellationToken);
     }
+
+    public Task<int> CountPublishedRecipesAsync(Guid categoryId, CancellationToken cancellationToken = default) =>
+        _db.Recipes.CountAsync(recipe => recipe.CategoryId == categoryId && recipe.Status == RecipeStatus.Published,
+            cancellationToken);
 
     public async Task<CulinaryBlog.Application.DTOs.CategoryStatisticsDto> GetCategoryStatisticsAsync(
         CancellationToken cancellationToken = default)

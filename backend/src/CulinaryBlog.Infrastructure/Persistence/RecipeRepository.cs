@@ -82,15 +82,26 @@ public class RecipeRepository : IRecipeRepository
 
     public void ReplaceChildren(Recipe recipe, ICollection<RecipeIngredient> ingredients, ICollection<RecipeStep> steps, ICollection<RecipeImage> images)
     {
-        _dbContext.RecipeIngredients.RemoveRange(recipe.Ingredients);
-        _dbContext.RecipeSteps.RemoveRange(recipe.Steps);
-        _dbContext.RecipeImages.RemoveRange(recipe.Images);
-        recipe.Ingredients = ingredients;
-        recipe.Steps = steps;
-        recipe.Images = images;
-        _dbContext.RecipeIngredients.AddRange(ingredients);
-        _dbContext.RecipeSteps.AddRange(steps);
-        _dbContext.RecipeImages.AddRange(images);
+        if (!ReferenceEquals(ingredients, recipe.Ingredients))
+        {
+            _dbContext.RecipeIngredients.RemoveRange(recipe.Ingredients);
+            recipe.Ingredients = ingredients;
+            _dbContext.RecipeIngredients.AddRange(ingredients);
+        }
+
+        if (!ReferenceEquals(steps, recipe.Steps))
+        {
+            _dbContext.RecipeSteps.RemoveRange(recipe.Steps);
+            recipe.Steps = steps;
+            _dbContext.RecipeSteps.AddRange(steps);
+        }
+
+        if (!ReferenceEquals(images, recipe.Images))
+        {
+            _dbContext.RecipeImages.RemoveRange(recipe.Images);
+            recipe.Images = images;
+            _dbContext.RecipeImages.AddRange(images);
+        }
     }
 
     public Task UpdateAsync(Recipe recipe, CancellationToken cancellationToken = default)

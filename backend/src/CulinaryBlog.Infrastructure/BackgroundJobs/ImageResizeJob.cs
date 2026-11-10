@@ -13,8 +13,8 @@ namespace CulinaryBlog.Infrastructure.BackgroundJobs;
 
 /// <summary>
 /// Background Job chạy ngầm thông qua Hangfire để tự động resize ảnh công thức nấu ăn:
-/// - Tạo ảnh Medium (chiều rộng tối đa 800px).
-/// - Tạo ảnh Thumbnail (chiều rộng tối đa 300px).
+/// - Tạo ảnh Medium (800×600).
+/// - Tạo ảnh Thumbnail (300×300).
 /// - Hỗ trợ cả 4 định dạng: JPEG, PNG, WebP, AVIF.
 /// - Lưu trữ tệp sau resize lên Object Storage (MinIO).
 /// - Cập nhật trực tiếp URL vào RecipeImage trong CSDL.
@@ -22,8 +22,8 @@ namespace CulinaryBlog.Infrastructure.BackgroundJobs;
 /// </summary>
 public class ImageResizeJob : IImageResizeJob
 {
-    private const int MediumMaxWidth = 800;
-    private const int ThumbnailMaxWidth = 300;
+    private const int MediumWidth = 800;
+    private const int ThumbnailWidth = 300;
     private const string DefaultBucket = "culinaryblog";
 
     private readonly IApplicationDbContext _dbContext;
@@ -108,19 +108,19 @@ public class ImageResizeJob : IImageResizeJob
             imageSharp.Height,
             detectedFormat.Name);
 
-        // 6. Tạo ảnh Medium (tối đa chiều rộng 800px, giữ nguyên tỷ lệ khung hình aspect ratio)
+        // 6. Tạo ảnh Medium 800×600, cắt giữa để giữ tỷ lệ ảnh
         var mediumOptions = new ResizeOptions
         {
-            Size = new Size(MediumMaxWidth, 0),
-            Mode = ResizeMode.Max,
+            Size = new Size(MediumWidth, 600),
+            Mode = ResizeMode.Crop,
         };
         using var mediumImage = imageSharp.Clone(ctx => ctx.Resize(mediumOptions));
 
-        // 7. Tạo ảnh Thumbnail (tối đa chiều rộng 300px, giữ nguyên tỷ lệ khung hình aspect ratio)
+        // 7. Tạo Thumbnail 300×300, cắt giữa để giữ tỷ lệ ảnh
         var thumbOptions = new ResizeOptions
         {
-            Size = new Size(ThumbnailMaxWidth, 0),
-            Mode = ResizeMode.Max,
+            Size = new Size(ThumbnailWidth, 300),
+            Mode = ResizeMode.Crop,
         };
         using var thumbImage = imageSharp.Clone(ctx => ctx.Resize(thumbOptions));
 

@@ -1,4 +1,5 @@
 using CulinaryBlog.Application.Common.Interfaces;
+using CulinaryBlog.Application.DTOs;
 using CulinaryBlog.Application.Contracts.Persistence;
 using CulinaryBlog.Application.Interfaces;
 using FluentValidation;
@@ -19,12 +20,14 @@ public enum UpdateCategoryResult
     NameAlreadyExists
 }
 
+public sealed record UpdateCategoryOutcome(UpdateCategoryResult Status, CategoryDto? Category = null);
+
 public sealed record UpdateCategoryCommand(
     Guid Id,
     string Name,
     string? Description = null,
     string? ImageUrl = null,
-    int? OrderIndex = null) : IRequest<UpdateCategoryResult>;
+    int? OrderIndex = null) : IRequest<UpdateCategoryOutcome>;
 
 public sealed class UpdateCategoryCommandValidator : AbstractValidator<UpdateCategoryCommand>
 {
@@ -38,7 +41,7 @@ public sealed class UpdateCategoryCommandValidator : AbstractValidator<UpdateCat
 }
 
 public sealed class UpdateCategoryCommandHandler
-    : IRequestHandler<UpdateCategoryCommand, UpdateCategoryResult>
+    : IRequestHandler<UpdateCategoryCommand, UpdateCategoryOutcome>
 {
     private const string CategoryListCacheKey = "categories:all";
 
@@ -56,7 +59,7 @@ public sealed class UpdateCategoryCommandHandler
         _cache = cache;
     }
 
-    public async Task<UpdateCategoryResult> Handle(
+    public async Task<UpdateCategoryOutcome> Handle(
         UpdateCategoryCommand request,
         CancellationToken cancellationToken)
     {
@@ -65,7 +68,7 @@ public sealed class UpdateCategoryCommandHandler
             cancellationToken);
         if (category is null)
         {
-            return UpdateCategoryResult.NotFound;
+            return new UpdateCategoryOutcome(UpdateCategoryResult.NotFound);
         }
 
         var name = request.Name.Trim();
@@ -74,14 +77,18 @@ public sealed class UpdateCategoryCommandHandler
                 request.Id,
                 cancellationToken))
         {
-            return UpdateCategoryResult.NameAlreadyExists;
+            return new UpdateCategoryOutcome(UpdateCategoryResult.NameAlreadyExists);
         }
 
         category.Update(name, request.Description, request.ImageUrl, request.OrderIndex);
         _categoryRepository.Update(category);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await _cache.RemoveAsync(CategoryListCacheKey, cancellationToken);
+        await _cache.RemoveAsync("sitemap:xml", cancellationToken);
 
-        return UpdateCategoryResult.Updated;
+        var count = await _categoryRepository.CountPublishedRecipesAsync(category.Id, cancellationToken);
+        var dto = new CategoryDto(category.Id, category.Name, category.Slug, category.Description,
+            category.ImageUrl, category.OrderIndex, count);
+        return new UpdateCategoryOutcome(UpdateCategoryResult.Updated, dto);
     }
 }

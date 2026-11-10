@@ -96,7 +96,10 @@ public sealed class ExceptionHandlingMiddleware
                     domainException.ErrorCode,
                     domainException.Message,
                     path,
-                    traceId);
+                    traceId,
+                    type: domainException is AccountDisabledException or AccountLockedException or RecipeNotDeletedException or UnauthorizedAuthException
+                        ? domainException.ErrorCode
+                        : null);
 
             // FluentValidation errors (MediatR ValidationBehavior) → 400
             case FluentValidation.ValidationException fluentValidationException:
@@ -230,11 +233,12 @@ public sealed class ExceptionHandlingMiddleware
         string title,
         string detail,
         string instance,
-        string traceId)
+        string traceId,
+        string? type = null)
     {
         var problemDetails = new ProblemDetails
         {
-            Type = $"https://httpstatuses.com/{(int)statusCode}",
+            Type = type ?? $"https://httpstatuses.com/{(int)statusCode}",
             Title = title,
             Status = (int)statusCode,
             Detail = detail,

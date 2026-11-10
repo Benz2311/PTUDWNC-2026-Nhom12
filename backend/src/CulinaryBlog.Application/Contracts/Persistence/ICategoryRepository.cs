@@ -29,6 +29,8 @@ public interface ICategoryRepository
         Guid categoryId,
         CancellationToken cancellationToken = default);
 
+    Task<int> CountPublishedRecipesAsync(Guid categoryId, CancellationToken cancellationToken = default);
+
     Task<CategoryStatisticsDto> GetCategoryStatisticsAsync(
         CancellationToken cancellationToken = default);
 

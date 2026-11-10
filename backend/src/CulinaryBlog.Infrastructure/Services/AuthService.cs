@@ -1,4 +1,6 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using Hangfire;
+using CulinaryBlog.Infrastructure.BackgroundJobs;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -26,9 +28,11 @@ public class AuthService : IAuthService
     private readonly IPasswordHasher<ApplicationUser> _passwordHasher;
     private readonly IEmailService _emailService;
     private readonly JwtSettings _jwtSettings;
+    private readonly string? _publicBaseUrl;
     private readonly GoogleAuthSettings _googleAuthSettings;
     private readonly ILogger<AuthService> _logger;
     private readonly IHostEnvironment _environment;
+    private readonly IBackgroundJobClient? _backgroundJobs;
 
     public AuthService(
         IUserRepository userRepository,
@@ -39,7 +43,8 @@ public class AuthService : IAuthService
         IEmailService emailService,
         IConfiguration configuration,
         ILogger<AuthService> logger,
-        IHostEnvironment environment)
+        IHostEnvironment environment,
+        IBackgroundJobClient? backgroundJobs = null)
     {
         _userRepository = userRepository;
         _refreshTokenRepository = refreshTokenRepository;
@@ -55,8 +60,10 @@ public class AuthService : IAuthService
             .GetSection(GoogleAuthSettings.Section)
             .Get<GoogleAuthSettings>() ?? new GoogleAuthSettings();
 
+        _publicBaseUrl = configuration["Site:PublicBaseUrl"];
         _logger = logger;
         _environment = environment;
+        _backgroundJobs = backgroundJobs;
     }
 
     public async Task<AuthResponse> RegisterAsync(
@@ -64,8 +71,20 @@ public class AuthService : IAuthService
         string? ipAddress = null)
     {
         ValidatePassword(request.Password);
-        var userName = request.UserName.Trim();
-        var email = request.Email.Trim().ToLowerInvariant();
+        var email = request.Email?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (!System.Net.Mail.MailAddress.TryCreate(email, out var address) || address.Address != email)
+        {
+            throw new CulinaryBlog.Application.Exceptions.ValidationException(
+                new Dictionary<string, string[]> { ["email"] = ["Email không hợp lệ."] });
+        }
+
+        var userName = string.IsNullOrWhiteSpace(request.UserName) ? email : request.UserName.Trim();
+        var displayName = string.IsNullOrWhiteSpace(request.DisplayName) ? userName : request.DisplayName.Trim();
+        if (userName.Length > 100 || displayName.Length > 100)
+        {
+            throw new CulinaryBlog.Application.Exceptions.ValidationException(
+                new Dictionary<string, string[]> { ["displayName"] = ["Tên đăng nhập và tên hiển thị tối đa 100 ký tự."] });
+        }
 
         _logger.LogInformation("Registering new user: {UserName} ({Email})", userName, email);
 
@@ -86,9 +105,7 @@ public class AuthService : IAuthService
             Id = Guid.NewGuid(),
             UserName = userName,
             Email = email,
-            DisplayName = string.IsNullOrWhiteSpace(request.DisplayName)
-                ? userName
-                : request.DisplayName.Trim(),
+            DisplayName = displayName,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             Roles = ["Author"],
@@ -102,8 +119,9 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("User registered successfully: {UserId}", user.Id);
 
-        // Send welcome email with confirmation link
-        await SendWelcomeEmailAsync(user);
+        var confirmationToken = _jwtTokenGenerator.GenerateEmailConfirmationToken(user, TimeSpan.FromHours(24));
+        await SendConfirmationEmailAsync(user, confirmationToken);
+        QueueWelcomeEmail(user.Id);
 
         return await CreateAuthResponseAsync(user, ipAddress);
     }
@@ -112,7 +130,7 @@ public class AuthService : IAuthService
         LoginRequest request,
         string? ipAddress = null)
     {
-        var login = request.UserNameOrEmail.Trim();
+        var login = (string.IsNullOrWhiteSpace(request.Email) ? request.UserNameOrEmail : request.Email)?.Trim() ?? string.Empty;
 
         _logger.LogInformation("Login attempt for: {Login}", login);
 
@@ -127,10 +145,36 @@ public class AuthService : IAuthService
         _logger.LogDebug("User found: {UserId}, IsActive: {IsActive}, EmailConfirmed: {EmailConfirmed}", 
             user.Id, user.IsActive, user.EmailConfirmed);
 
+        if (string.IsNullOrWhiteSpace(user.PasswordHash))
+        {
+            _logger.LogWarning("Login failed: User {UserId} has no password set (possibly Google-only account)", user.Id);
+            throw new UnauthorizedAuthException("This account uses social login. Please use Google to sign in.");
+        }
+
+        var now = DateTime.UtcNow;
+        if (user.IsActive && user.LockoutEnd > now)
+        {
+            throw new AccountLockedException(user.LockoutEnd.Value, now);
+        }
+
+        var verifyResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
+
+        if (verifyResult == PasswordVerificationResult.Failed)
+        {
+            var lockout = await _userRepository.UpdateLoginFailuresAsync(user.Id, failed: true, now);
+            if (lockout > now)
+            {
+                throw new AccountLockedException(lockout.Value, now);
+            }
+
+            _logger.LogWarning("Login failed: Invalid password for user {UserId}", user.Id);
+            throw new UnauthorizedAuthException("Invalid username/email or password.");
+        }
+
         if (!user.IsActive)
         {
             _logger.LogWarning("Login failed: Account inactive for user {UserId}", user.Id);
-            throw new UnauthorizedAuthException("Account is inactive.");
+            throw new AccountDisabledException();
         }
 
         // Skip email confirmation check in Development environment for testing
@@ -142,18 +186,10 @@ public class AuthService : IAuthService
             throw new UnauthorizedAuthException("Email not confirmed. Please check your email to confirm your account.");
         }
 
-        if (string.IsNullOrWhiteSpace(user.PasswordHash))
+        var concurrentLockout = await _userRepository.UpdateLoginFailuresAsync(user.Id, failed: false, now);
+        if (concurrentLockout > now)
         {
-            _logger.LogWarning("Login failed: User {UserId} has no password set (possibly Google-only account)", user.Id);
-            throw new UnauthorizedAuthException("This account uses social login. Please use Google to sign in.");
-        }
-
-        var verifyResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
-
-        if (verifyResult == PasswordVerificationResult.Failed)
-        {
-            _logger.LogWarning("Login failed: Invalid password for user {UserId}", user.Id);
-            throw new UnauthorizedAuthException("Invalid username/email or password.");
+            throw new AccountLockedException(concurrentLockout.Value, now);
         }
 
         if (verifyResult == PasswordVerificationResult.SuccessRehashNeeded)
@@ -173,14 +209,40 @@ public class AuthService : IAuthService
         GoogleLoginRequest request,
         string? ipAddress = null)
     {
-        var payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, new GoogleJsonWebSignature.ValidationSettings
+        if (string.IsNullOrWhiteSpace(request?.IdToken))
         {
-            Audience = new[] { _googleAuthSettings.ClientId }
-        });
+            throw new UnauthorizedAuthException("Google ID token is required.", "AUTH_GOOGLE_TOKEN_INVALID");
+        }
 
-        if (payload == null)
+        if (string.IsNullOrWhiteSpace(_googleAuthSettings.ClientId))
         {
-            throw new UnauthorizedAuthException("Invalid Google token.");
+            throw new UnauthorizedAuthException("Google login is not configured.", "AUTH_GOOGLE_TOKEN_INVALID");
+        }
+
+        GoogleJsonWebSignature.Payload payload;
+        try
+        {
+            var settings = new GoogleJsonWebSignature.ValidationSettings
+            {
+                Audience = [_googleAuthSettings.ClientId]
+            };
+            payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);
+        }
+        catch (Exception ex) when (ex is not UnauthorizedAuthException)
+        {
+            _logger.LogWarning("Google token validation failed ({ExceptionType}).", ex.GetType().Name);
+            throw new UnauthorizedAuthException("Invalid Google token.", "AUTH_GOOGLE_TOKEN_INVALID");
+        }
+
+        if (payload is null || !payload.EmailVerified || string.IsNullOrWhiteSpace(payload.Email))
+        {
+            throw new UnauthorizedAuthException("Invalid Google token.", "AUTH_GOOGLE_TOKEN_INVALID");
+        }
+
+        if (!string.IsNullOrEmpty(request.Nonce) && !string.Equals(payload.Nonce, request.Nonce, StringComparison.Ordinal))
+        {
+            _logger.LogWarning("Google token nonce mismatch.");
+            throw new UnauthorizedAuthException("Invalid Google token.", "AUTH_GOOGLE_TOKEN_INVALID");
         }
 
         var email = payload.Email.ToLowerInvariant();
@@ -196,6 +258,7 @@ public class AuthService : IAuthService
                 UserName = generatedUserName,
                 Email = email,
                 DisplayName = payload.Name ?? email.Split('@')[0],
+                AvatarUrl = payload.Picture,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 Roles = ["Author"],
@@ -211,12 +274,34 @@ public class AuthService : IAuthService
 
             if (user.EmailConfirmed)
             {
-                await SendWelcomeEmailAsync(user);
+                QueueWelcomeEmail(user.Id);
             }
         }
-        else if (!user.IsActive)
+        else
         {
-            throw new UnauthorizedAuthException("Account is inactive.");
+            if (!user.IsActive)
+            {
+                throw new AccountDisabledException();
+            }
+
+            var modified = false;
+            if (string.IsNullOrWhiteSpace(user.AvatarUrl) && !string.IsNullOrWhiteSpace(payload.Picture))
+            {
+                user.AvatarUrl = payload.Picture;
+                modified = true;
+            }
+
+            if (!user.EmailConfirmed && payload.EmailVerified)
+            {
+                user.EmailConfirmed = true;
+                modified = true;
+            }
+
+            if (modified)
+            {
+                await _userRepository.UpdateAsync(user);
+                await _unitOfWork.SaveChangesAsync();
+            }
         }
 
         return await CreateAuthResponseAsync(user, ipAddress);
@@ -228,39 +313,57 @@ public class AuthService : IAuthService
     {
         var tokenHash = _jwtTokenGenerator.HashToken(request.RefreshToken);
 
-        var storedToken = await _refreshTokenRepository.GetByTokenHashWithUserAsync(tokenHash);
-
-        if (storedToken is null)
+        var response = await _refreshTokenRepository.WithSessionLockAsync<AuthResponse?>(tokenHash, async storedToken =>
         {
-            throw new UnauthorizedAuthException("Invalid refresh token.");
-        }
+            if (storedToken?.User is not { } user)
+            {
+                throw new UnauthorizedAuthException("Invalid refresh token.");
+            }
 
-        if (storedToken.RevokedAt.HasValue)
-        {
-            // Token reuse detection - revoke all tokens in the family
-            await _refreshTokenRepository.RevokeAllForUserAsync(storedToken.UserId);
-            await _unitOfWork.SaveChangesAsync();
-            throw new UnauthorizedAuthException("Refresh token has been revoked due to reuse detection.");
-        }
+            if (!user.IsActive)
+            {
+                throw new AccountDisabledException();
+            }
 
-        if (storedToken.ExpiresAt <= DateTime.UtcNow)
-        {
-            throw new UnauthorizedAuthException("Refresh token has expired.");
-        }
+            if (storedToken.SessionVersion != user.SessionVersion)
+            {
+                throw new UnauthorizedAuthException("Refresh token belongs to a revoked session.");
+            }
 
-        var response = await CreateAuthResponseAsync(storedToken.User, ipAddress);
+            if (storedToken.RevokedAt.HasValue)
+            {
+                await _refreshTokenRepository.RevokeFamilyAsync(user.Id, storedToken.FamilyId);
+                _logger.LogWarning("Refresh token reuse detected for user {UserId}, family {FamilyId}.",
+                    user.Id, storedToken.FamilyId);
+                return null;
+            }
 
-        await _refreshTokenRepository.RevokeAsync(tokenHash, DateTimeOffset.UtcNow, _jwtTokenGenerator.HashToken(response.RefreshToken));
-        await _unitOfWork.SaveChangesAsync();
+            if (storedToken.ExpiresAt <= DateTime.UtcNow)
+            {
+                throw new UnauthorizedAuthException("Refresh token has expired.");
+            }
 
-        return response;
+            var replacement = await CreateAuthResponseAsync(user, ipAddress, storedToken.FamilyId);
+            await _refreshTokenRepository.RevokeAsync(tokenHash, DateTimeOffset.UtcNow,
+                _jwtTokenGenerator.HashToken(replacement.RefreshToken));
+            return replacement;
+        });
+
+        return response ?? throw new UnauthorizedAuthException("Refresh token has been revoked due to reuse detection.");
     }
 
-    public async Task LogoutAsync(string refreshToken)
+    public Task LogoutAsync(string refreshToken)
     {
         var tokenHash = _jwtTokenGenerator.HashToken(refreshToken);
-        await _refreshTokenRepository.RevokeAsync(tokenHash, DateTimeOffset.UtcNow);
-        await _unitOfWork.SaveChangesAsync();
+        return _refreshTokenRepository.WithSessionLockAsync(tokenHash, async token =>
+        {
+            if (token is not null)
+            {
+                await _refreshTokenRepository.RevokeFamilyAsync(token.UserId, token.FamilyId);
+            }
+
+            return true;
+        });
     }
 
     public async Task<UserResponse?> GetMeAsync(string userId)
@@ -308,9 +411,6 @@ public class AuthService : IAuthService
         user.EmailConfirmed = true;
         await _userRepository.UpdateAsync(user);
         await _unitOfWork.SaveChangesAsync();
-
-        // Send welcome email if not sent before
-        await SendWelcomeEmailAsync(user);
     }
 
     public async Task ResendConfirmationEmailAsync(ResendConfirmationEmailRequest request)
@@ -390,7 +490,7 @@ public class AuthService : IAuthService
         }
 
         var token = _jwtTokenGenerator.GeneratePasswordResetToken(user, TimeSpan.FromHours(1));
-        var resetUrl = $"{_jwtSettings.Issuer.Replace("api", "").TrimEnd('/')}/reset-password?token={Uri.EscapeDataString(token)}";
+        var resetUrl = CreateAccountLink("/reset-password", token);
         try
         {
             await _emailService.SendAsync(new EmailMessage(
@@ -446,8 +546,9 @@ public class AuthService : IAuthService
             return false; // No change
         }
 
-        targetUser.IsActive = isActive;
         await _userRepository.UpdateAsync(targetUser);
+        targetUser.IsActive = isActive;
+        targetUser.SessionVersion = Guid.NewGuid();
 
         // If deactivating, revoke all refresh tokens
         if (!isActive)
@@ -497,45 +598,54 @@ public class AuthService : IAuthService
     }
 
 
-    private async Task SendWelcomeEmailAsync(ApplicationUser user)
+    private void QueueWelcomeEmail(Guid userId)
     {
         try
         {
-            var subject = "ChĂ o má»«ng báº¡n Ä‘áº¿n vá»›i CulinaryBlog!";
-            var htmlBody = $@"
-                <h1>ChĂ o {user.DisplayName},</h1>
-                <p>Cáº£m Æ¡n báº¡n Ä‘Ă£ Ä‘Äƒng kĂ½ tĂ i khoáº£n táº¡i CulinaryBlog.</p>
-                <p>ChĂºc báº¡n cĂ³ nhá»¯ng tráº£i nghiá»‡m náº¥u Äƒn tuyá»‡t vá»i!</p>
-                <hr>
-                <p><small>ÄĂ¢y lĂ  email tá»± Ä‘á»™ng, vui lĂ²ng khĂ´ng tráº£ lá»i.</small></p>";
-
-            await _emailService.SendAsync(new EmailMessage(user.Email, subject, htmlBody));
+            _backgroundJobs?.Enqueue<WelcomeEmailJob>(job => job.RunAsync(userId, CancellationToken.None));
         }
-
-        catch
+        catch (Exception exception)
         {
-            // Log error but don't fail registration
+            _logger.LogError(exception, "Could not queue welcome email for user {UserId}.", userId);
         }
     }
 
     private static void ValidatePassword(string password)
     {
-        if (password.Length < 8
+        if (string.IsNullOrEmpty(password) || password.Length < 8
             || !password.Any(char.IsUpper)
             || !password.Any(char.IsLower)
             || !password.Any(char.IsDigit)
-            || !password.Any(char.IsPunctuation))
+            || !password.Any(character => char.IsPunctuation(character) || char.IsSymbol(character)))
         {
-            throw new BadRequestException(
-                "Password must be at least 8 characters and contain uppercase, lowercase, digit, and special character.");
+            throw new CulinaryBlog.Application.Exceptions.ValidationException(
+                new Dictionary<string, string[]>
+                {
+                    ["password"] = ["Password must be at least 8 characters and contain uppercase, lowercase, digit, and special character."]
+                });
         }
+    }
+
+    private string CreateAccountLink(string path, string token)
+    {
+        if (!Uri.TryCreate(_publicBaseUrl, UriKind.Absolute, out var origin) ||
+            (origin.Scheme != Uri.UriSchemeHttps &&
+                (origin.Scheme != Uri.UriSchemeHttp || _environment.IsProduction())) ||
+            !string.IsNullOrEmpty(origin.UserInfo) ||
+            !string.IsNullOrEmpty(origin.Query) ||
+            !string.IsNullOrEmpty(origin.Fragment))
+        {
+            throw new InvalidOperationException("Configure Site:PublicBaseUrl with the public frontend URL.");
+        }
+
+        return $"{origin.AbsoluteUri.TrimEnd('/')}{path}?token={Uri.EscapeDataString(token)}";
     }
 
     private async Task SendConfirmationEmailAsync(ApplicationUser user, string token)
     {
         try
         {
-            var confirmUrl = $"{_jwtSettings.Issuer.Replace("api", "").TrimEnd('/')}/auth/confirm-email?token={Uri.EscapeDataString(token)}";
+            var confirmUrl = CreateAccountLink("/confirm-email", token);
             
             var subject = "XĂ¡c thá»±c email tĂ i khoáº£n CulinaryBlog";
             var htmlBody = $@"
@@ -555,7 +665,7 @@ public class AuthService : IAuthService
         }
     }
 
-    private async Task<AuthResponse> CreateAuthResponseAsync(ApplicationUser user, string? ipAddress)
+    private async Task<AuthResponse> CreateAuthResponseAsync(ApplicationUser user, string? ipAddress, Guid? familyId = null)
     {
         var accessTokenExpiry = TimeSpan.FromMinutes(_jwtSettings.AccessTokenMinutes);
         var accessToken = _jwtTokenGenerator.GenerateAccessToken(user, user.Roles ?? [], accessTokenExpiry);
@@ -566,6 +676,8 @@ public class AuthService : IAuthService
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
+            FamilyId = familyId ?? Guid.NewGuid(),
+            SessionVersion = user.SessionVersion,
             TokenHash = hashedRefreshToken,
             ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenDays),
             CreatedAt = DateTime.UtcNow,

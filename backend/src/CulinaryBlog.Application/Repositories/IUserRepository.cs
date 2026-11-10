@@ -13,6 +13,7 @@ public interface IUserRepository
     Task<bool> ExistsByUserNameAsync(string userName, CancellationToken cancellationToken = default);
     Task AddAsync(ApplicationUser user, CancellationToken cancellationToken = default);
     Task UpdateAsync(ApplicationUser user, CancellationToken cancellationToken = default);
+    Task<DateTime?> UpdateLoginFailuresAsync(Guid userId, bool failed, DateTime now, CancellationToken cancellationToken = default);
     Task<UserProfileDto?> GetProfileAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<UserProfileDto?> GetProfileAsync(string userId, CancellationToken cancellationToken = default);
     Task<(IReadOnlyList<UserProfileDto> Items, int TotalCount)> GetUsersAsync(

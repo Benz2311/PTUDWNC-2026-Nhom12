@@ -29,6 +29,41 @@ public class RefreshTokenRepository : IRefreshTokenRepository
             .FirstOrDefaultAsync(x => x.TokenHash == tokenHash, cancellationToken);
     }
 
+    public async Task<T> WithSessionLockAsync<T>(string tokenHash, Func<RefreshToken?, Task<T>> action)
+    {
+        if (!_db.Database.IsRelational())
+        {
+            return await action(await GetByTokenHashWithUserAsync(tokenHash));
+        }
+
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+        // All refresh and logout requests for this account lock the same row,
+        // including requests using different generations of a rotated token.
+        await _db.Database.ExecuteSqlInterpolatedAsync($"""
+            SELECT u."Id" FROM "Users" u
+            JOIN "RefreshTokens" t ON t."UserId" = u."Id"
+            WHERE t."TokenHash" = {tokenHash}
+            FOR UPDATE OF u
+            """);
+        var result = await action(await GetByTokenHashWithUserAsync(tokenHash));
+        await transaction.CommitAsync();
+        return result;
+    }
+
+    public async Task RevokeFamilyAsync(Guid userId, Guid familyId)
+    {
+        var tokens = await _db.RefreshTokens
+            .Where(x => x.UserId == userId && x.FamilyId == familyId && x.RevokedAt == null)
+            .ToListAsync();
+        var now = DateTime.UtcNow;
+        foreach (var token in tokens)
+        {
+            token.RevokedAt = now;
+        }
+
+        await _db.SaveChangesAsync();
+    }
+
     public async Task AddAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default)
     {
         await _db.RefreshTokens.AddAsync(refreshToken, cancellationToken);
@@ -77,7 +112,9 @@ public class RefreshTokenRepository : IRefreshTokenRepository
     {
         var nowUtc = DateTime.UtcNow;
         var expiredTokens = await _db.RefreshTokens
-            .Where(x => x.ExpiresAt <= nowUtc)
+            .Where(x => x.ExpiresAt <= nowUtc && !_db.RefreshTokens.Any(active =>
+                active.UserId == x.UserId && active.FamilyId == x.FamilyId &&
+                active.RevokedAt == null && active.ExpiresAt > nowUtc))
             .ToListAsync(cancellationToken);
 
         if (expiredTokens.Count > 0)

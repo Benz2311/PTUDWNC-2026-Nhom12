@@ -21,6 +21,9 @@ public class ApplicationUser
     public string[] Roles { get; set; } = ["Author"];
 
     public bool IsActive { get; set; } = true;
+    public Guid SessionVersion { get; set; }
+    public int AccessFailedCount { get; set; }
+    public DateTime? LockoutEnd { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<RefreshToken> RefreshTokens { get; set; }

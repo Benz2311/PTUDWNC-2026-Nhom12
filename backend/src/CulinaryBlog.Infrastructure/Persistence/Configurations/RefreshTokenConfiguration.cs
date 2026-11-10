@@ -26,6 +26,7 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
             .IsUnique();
 
         builder.HasIndex(x => x.UserId);
+        builder.HasIndex(x => x.FamilyId);
         builder.HasIndex(x => x.ExpiresAt);
         builder.HasIndex(x => x.RevokedAt);
 

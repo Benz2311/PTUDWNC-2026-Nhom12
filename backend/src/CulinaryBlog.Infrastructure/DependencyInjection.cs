@@ -13,6 +13,8 @@ using CulinaryBlog.Infrastructure.Storage;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -69,6 +71,55 @@ public static class DependencyInjection
             })
             .AddJwtBearer(options =>
             {
+                options.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = async context =>
+                    {
+                        var principal = context.Principal!;
+                        if (!Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+                        {
+                            context.Fail("Invalid user ID.");
+                            return;
+                        }
+
+                        var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+                        var user = await db.Users.AsNoTracking()
+                            .Where(user => user.Id == userId)
+                            .Select(user => new { user.IsActive, user.SessionVersion })
+                            .SingleOrDefaultAsync(context.HttpContext.RequestAborted);
+
+                        if (user is { IsActive: false })
+                        {
+                            context.HttpContext.Items[typeof(CulinaryBlog.Domain.Exceptions.AccountDisabledException)] = true;
+                            context.Fail("Account is inactive.");
+                            return;
+                        }
+
+                        var claim = principal.FindFirstValue("session_version");
+                        var validVersion = claim is null
+                            ? user?.SessionVersion == Guid.Empty
+                            : Guid.TryParse(claim, out var version) && user?.SessionVersion == version;
+
+                        if (!validVersion)
+                        {
+                            context.Fail("Session has been revoked.");
+                        }
+                    },
+                    OnChallenge = async context =>
+                    {
+                        if (!context.HttpContext.Items.ContainsKey(typeof(CulinaryBlog.Domain.Exceptions.AccountDisabledException)))
+                        {
+                            return;
+                        }
+
+                        context.HandleResponse();
+                        await Results.Problem(
+                            statusCode: StatusCodes.Status403Forbidden,
+                            type: "AUTH_ACCOUNT_DISABLED",
+                            detail: "Account is inactive.").ExecuteAsync(context.HttpContext);
+                    }
+                };
+
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer           = true,
@@ -123,6 +174,10 @@ public static class DependencyInjection
 
         // ── Object Storage — AWSSDK.S3 → MinIO ───────────────────────────────
         services.AddSingleton<IStorageService, S3StorageService>();
+        if (configuration.GetValue<bool>("Storage:InitializeBucket"))
+        {
+            services.AddHostedService<StorageBucketInitializer>();
+        }
 
         // ── Background Jobs — Hangfire + PostgreSQL ───────────────────────────
         var isTesting = string.Equals(

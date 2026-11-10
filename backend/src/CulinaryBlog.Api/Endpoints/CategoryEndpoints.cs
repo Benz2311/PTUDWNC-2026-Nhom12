@@ -53,8 +53,7 @@ public static class CategoryEndpoints
             .RequireAuthorization(policy => policy.RequireRole("Admin"))
             .WithName("UpdateCategory")
             .WithSummary("Cập nhật danh mục")
-            .Produces(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status204NoContent)
+            .Produces<ApiResponse<CategoryDto>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
@@ -213,9 +212,9 @@ public static class CategoryEndpoints
                 new UpdateCategoryCommand(id, request.Name, request.Description, request.ImageUrl, request.OrderIndex),
                 cancellationToken);
 
-            return result switch
+            return result.Status switch
             {
-                UpdateCategoryResult.Updated => Results.NoContent(),
+                UpdateCategoryResult.Updated => Results.Ok(ApiResponse.Success(result.Category!)),
                 UpdateCategoryResult.NotFound => Results.Problem(
                     title: "Category not found",
                     detail: $"Category with id '{id}' was not found.",
@@ -227,7 +226,7 @@ public static class CategoryEndpoints
                     statusCode: StatusCodes.Status409Conflict,
                     type: "CATEGORY_NAME_EXISTS"),
                 _ => throw new InvalidOperationException(
-                    $"Unsupported category update result: {result}."),
+                    $"Unsupported category update result: {result.Status}."),
             };
         }
         catch (FluentValidation.ValidationException exception)

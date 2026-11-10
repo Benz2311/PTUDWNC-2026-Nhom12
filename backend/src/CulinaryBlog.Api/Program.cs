@@ -1,4 +1,4 @@
-﻿using CulinaryBlog.API.Extensions;
+using CulinaryBlog.API.Extensions;
 using System.Diagnostics;
 using System.Security.Claims;
 using CulinaryBlog.API.Endpoints;
@@ -34,6 +34,71 @@ try
     var builder = WebApplication.CreateBuilder(args);
 
     // DĂ¹ng Serilog thay tháº¿ logging máº·c Ä‘á»‹nh
+    // Tự động tải Docker Secrets từ /run/secrets (SRS NFR-SEC-02, BLK-03)
+    if (Directory.Exists("/run/secrets"))
+    {
+        Log.Information("Loading Docker Secrets from /run/secrets");
+        foreach (var filePath in Directory.GetFiles("/run/secrets"))
+        {
+            var secretName = Path.GetFileName(filePath);
+            if (secretName.StartsWith("sixlabors", StringComparison.OrdinalIgnoreCase)) continue;
+
+            try
+            {
+                var secretVal = File.ReadAllText(filePath).Trim();
+                if (string.IsNullOrEmpty(secretVal)) continue;
+
+                if (secretName.Equals("postgres_password", StringComparison.OrdinalIgnoreCase))
+                {
+                    var currentConn = builder.Configuration.GetConnectionString("DefaultConnection");
+                    if (!string.IsNullOrEmpty(currentConn))
+                    {
+                        builder.Configuration["ConnectionStrings:DefaultConnection"] =
+                            System.Text.RegularExpressions.Regex.Replace(currentConn, @"Password=[^;]*", $"Password={secretVal}");
+                    }
+                }
+                else if (secretName.Equals("redis_password", StringComparison.OrdinalIgnoreCase))
+                {
+                    var currentRedis = builder.Configuration.GetConnectionString("Redis");
+                    if (!string.IsNullOrEmpty(currentRedis))
+                    {
+                        builder.Configuration["ConnectionStrings:Redis"] =
+                            System.Text.RegularExpressions.Regex.Replace(currentRedis, @"password=[^,]*", $"password={secretVal}");
+                    }
+                }
+                else if (secretName.Equals("jwt_secret_key", StringComparison.OrdinalIgnoreCase))
+                {
+                    builder.Configuration["Jwt:SecretKey"] = secretVal;
+                }
+                else if (secretName.Equals("minio_root_password", StringComparison.OrdinalIgnoreCase))
+                {
+                    builder.Configuration["Storage:SecretKey"] = secretVal;
+                }
+                else if (secretName.Equals("minio_root_user", StringComparison.OrdinalIgnoreCase))
+                {
+                    builder.Configuration["Storage:AccessKey"] = secretVal;
+                }
+                else if (secretName.Equals("smtp_password", StringComparison.OrdinalIgnoreCase))
+                {
+                    builder.Configuration["Email:Password"] = secretVal;
+                }
+                else if (secretName.Equals("smtp_username", StringComparison.OrdinalIgnoreCase))
+                {
+                    builder.Configuration["Email:UserName"] = secretVal;
+                }
+                else
+                {
+                    var configKey = secretName.Replace("__", ":");
+                    builder.Configuration[configKey] = secretVal;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to read secret file: {SecretName}", secretName);
+            }
+        }
+    }
+
     builder.Host.UseSerilog();
 
     builder.Services.AddApplication();
@@ -46,7 +111,6 @@ try
 
     // builder.Services.AddControllers() // Minimal APIs architecture (CONS-003)
     builder.Services.AddHostedService<CulinaryBlog.Api.Jobs.RecipePurgeHostedService>();
-    builder.Services.AddHostedService<CulinaryBlog.Api.Jobs.SitemapGenerationHostedService>();
     builder.Services.AddOpenApi(options =>
     {
         options.AddDocumentTransformer(new CulinaryBlog.Api.OpenApi.BearerSecuritySchemeTransformer());
@@ -292,6 +356,21 @@ try
         Predicate = check => check.Tags.Contains("ready"),
         ResponseWriter = CulinaryBlog.Infrastructure.HealthChecks.HealthCheckResponseWriter.WriteResponse
     });
+
+    if (app.Services.GetService<IRecurringJobManager>() is { } recurringJobs)
+    {
+        recurringJobs.AddOrUpdate<CulinaryBlog.Api.Jobs.SitemapGenerationJob>(
+            "generate-sitemap",
+            job => job.RunAsync(CancellationToken.None),
+            "0 2 * * *",
+            new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
+        recurringJobs.AddOrUpdate<CulinaryBlog.Api.Jobs.PurgeSoftDeletedJob>(
+            "purge-soft-deleted",
+            job => job.RunAsync(CancellationToken.None),
+            "0 3 * * *",
+            new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+    }
 
     app.Run();
 }

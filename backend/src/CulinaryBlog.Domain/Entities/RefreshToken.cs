@@ -5,6 +5,8 @@ public class RefreshToken
     public Guid Id { get; set; }
 
     public Guid UserId { get; set; }
+    public Guid FamilyId { get; set; } = Guid.NewGuid();
+    public Guid SessionVersion { get; set; }
 
     public string TokenHash { get; set; } = string.Empty;
 

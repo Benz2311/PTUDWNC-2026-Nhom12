@@ -37,16 +37,14 @@ public sealed class RecipePurgeService : IRecipePurgeService
             return false;
         }
 
-        foreach (var image in recipe.Images)
+        if (!recipe.IsDeleted)
         {
-            var objectName = GetManagedObjectName(image.Url);
-            if (objectName is not null && _storageService is not null)
+            if (actorId == Guid.Empty)
             {
-                await _storageService.DeleteAsync(
-                    _configuration["Minio:BucketName"] ?? "culinary-blog",
-                    objectName,
-                    cancellationToken);
+                return false;
             }
+
+            throw new CulinaryBlog.Domain.Exceptions.RecipeNotDeletedException();
         }
 
         var categorySlug = await _db.Categories
@@ -74,6 +72,20 @@ public sealed class RecipePurgeService : IRecipePurgeService
         _db.Recipes.Remove(recipe);
         await _db.SaveChangesAsync(cancellationToken);
         await _cacheInvalidator.InvalidateAsync(recipeId, slug, recipe.CategoryId, categorySlug, cancellationToken);
+
+        if (_storageService is not null)
+        {
+            var keys = recipe.Images
+                .SelectMany(image => new[] { image.OriginalUrl, image.MediumUrl, image.ThumbnailUrl })
+                .Select(url => GetManagedObjectName(url, recipeId))
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal);
+            foreach (var key in keys)
+            {
+                await _storageService.DeleteAsync(key, cancellationToken);
+            }
+        }
+
         return true;
     }
 
@@ -98,15 +110,15 @@ public sealed class RecipePurgeService : IRecipePurgeService
         return purged;
     }
 
-    private string? GetManagedObjectName(string imageUrl)
+    private string? GetManagedObjectName(string? imageUrl, Guid recipeId)
     {
         if (!Uri.TryCreate(imageUrl, UriKind.Absolute, out var imageUri))
         {
             return null;
         }
 
-        var bucket = _configuration["Minio:BucketName"] ?? "culinary-blog";
-        var configuredEndpoint = _configuration["Minio:PublicEndpoint"] ?? _configuration["Minio:Endpoint"];
+        var bucket = _configuration["Storage:DefaultBucket"] ?? "culinaryblog";
+        var configuredEndpoint = _configuration["Storage:ServiceUrl"];
         if (!Uri.TryCreate(configuredEndpoint, UriKind.Absolute, out var endpointUri) ||
             !string.Equals(imageUri.Authority, endpointUri.Authority, StringComparison.OrdinalIgnoreCase))
         {
@@ -127,7 +139,7 @@ public sealed class RecipePurgeService : IRecipePurgeService
         }
 
         var bucketPrefix = bucket + "/";
-        return path.StartsWith(bucketPrefix, StringComparison.Ordinal)
+        return path.StartsWith($"{bucketPrefix}recipes/{recipeId}/", StringComparison.OrdinalIgnoreCase)
             ? path[bucketPrefix.Length..]
             : null;
     }
