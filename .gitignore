@@ -36,4 +36,23 @@ test-results/
 
 # Local database backups
 backup/
+
+# Private environment variants, licenses, TLS keys and dump archives
+.env.*
+!.env.example
+**/sixlabors.lic
+*.pfx
+*.key
+*.dump
+*.backup
+/docs/docker-safety/*.log
+
+**/privkey.pem
+*.pem
 *.sql
+!infrastructure/postgres/init-extensions.sql
+*.dump
+*.backup
+infrastructure/secrets/
+secrets/
+*.secret

@@ -1,0 +1,3 @@
+-- Bắt buộc theo SRS v1.2.0 Mục 2.4.1 và 6.1
+CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;

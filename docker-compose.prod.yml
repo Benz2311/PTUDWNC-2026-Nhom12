@@ -1,0 +1,172 @@
+# =============================================================================
+# CULINARY BLOG - DOCKER COMPOSE PRODUCTION (SRS v1.2.0 Mục 2.4.1 & 6.5)
+# Production stack: Nginx (SSL/Reverse proxy), API, Web, Postgres, Redis, MinIO
+# Không mở trực tiếp port cơ sở dữ liệu và cache ra Internet; chỉ expose Nginx 80/443
+# Toàn bộ mật khẩu, khóa bí mật được quản lý qua Docker Secrets (/run/secrets)
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: culinaryblog-prod-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-culinaryblog}
+      POSTGRES_USER: ${POSTGRES_USER:-culinaryadmin}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - prod_pgdata:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init-extensions.sql:/docker-entrypoint-initdb.d/init-extensions.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-culinaryadmin} -d ${POSTGRES_DB:-culinaryblog}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - culinary-prod-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: culinaryblog-prod-redis
+    restart: always
+    command: ["sh", "-ec", 'exec redis-server --appendonly yes --requirepass "$$(cat /run/secrets/redis_password)"']
+    secrets:
+      - redis_password
+    volumes:
+      - prod_redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", 'REDISCLI_AUTH="$$(cat /run/secrets/redis_password)" redis-cli ping | grep -qx PONG']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - culinary-prod-network
+
+  minio:
+    image: ${MINIO_IMAGE:-cgr.dev/chainguard/minio:latest}
+    container_name: culinaryblog-prod-minio
+    restart: always
+    command: server /data
+    environment:
+      MINIO_ROOT_USER_FILE: /run/secrets/minio_root_user
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_root_password
+    secrets:
+      - minio_root_user
+      - minio_root_password
+    volumes:
+      - prod_miniodata:/data
+    networks:
+      - culinary-prod-network
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      secrets:
+        - sixlabors_license
+        - sixlabors_key
+    image: culinaryblog-api:${PRODUCTION_IMAGE_TAG:-prod}
+    container_name: culinaryblog-prod-api
+    restart: always
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Database__AutoMigrateAndSeed: "false"
+      Cors__AllowedOrigins__0: ${PUBLIC_ORIGIN:?Set HTTPS PUBLIC_ORIGIN}
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-culinaryblog};Username=${POSTGRES_USER:-culinaryadmin};Password=DOCKER_SECRET"
+      ConnectionStrings__Redis: "redis:6379"
+      Storage__ServiceUrl: "http://minio:9000"
+      Storage__DefaultBucket: ${MINIO_DEFAULT_BUCKET:-culinaryblog}
+      Email__Host: ${SMTP_HOST:-smtp.example.com}
+      Email__Port: ${SMTP_PORT:-587}
+      Email__UseSsl: ${SMTP_USE_SSL:-true}
+      Email__SenderEmail: ${SMTP_SENDER_EMAIL:-noreply@culinaryblog.vn}
+      Email__SenderName: ${SMTP_SENDER_NAME:-Culinary Blog}
+      Site__PublicBaseUrl: ${PUBLIC_ORIGIN:?Set HTTPS PUBLIC_ORIGIN}
+      GoogleAuth__ClientId: ${GOOGLE_CLIENT_ID:-}
+    secrets:
+      - postgres_password
+      - redis_password
+      - jwt_secret_key
+      - minio_root_user
+      - minio_root_password
+      - smtp_password
+      - smtp_username
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - culinary-prod-network
+
+  frontend:
+    build:
+      context: ./frontend/culinary-blog-web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_ORIGIN:?Set HTTPS PUBLIC_ORIGIN}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    image: culinaryblog-web:${PRODUCTION_IMAGE_TAG:-prod}
+    container_name: culinaryblog-prod-web
+    restart: always
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${PUBLIC_ORIGIN:?Set HTTPS PUBLIC_ORIGIN}
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      INTERNAL_API_URL: http://api:8080/api/v1
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set HTTPS PUBLIC_ORIGIN}
+    depends_on:
+      - api
+    networks:
+      - culinary-prod-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: culinaryblog-prod-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ${TLS_CERT_DIR:?Set TLS_CERT_DIR}:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+      - frontend
+    networks:
+      - culinary-prod-network
+
+volumes:
+  prod_pgdata:
+    name: culinaryblog_prod_pgdata
+  prod_redisdata:
+    name: culinaryblog_prod_redisdata
+  prod_miniodata:
+    name: culinaryblog_prod_miniodata
+
+networks:
+  culinary-prod-network:
+    name: culinaryblog_prod_network
+    driver: bridge
+
+secrets:
+  postgres_password:
+    file: ${POSTGRES_PASSWORD_FILE:-./infrastructure/secrets/postgres_password.txt}
+  redis_password:
+    file: ${REDIS_PASSWORD_FILE:-./infrastructure/secrets/redis_password.txt}
+  jwt_secret_key:
+    file: ${JWT_SECRET_KEY_FILE:-./infrastructure/secrets/jwt_secret_key.txt}
+  minio_root_user:
+    file: ${MINIO_ROOT_USER_FILE:-./infrastructure/secrets/minio_root_user.txt}
+  minio_root_password:
+    file: ${MINIO_ROOT_PASSWORD_FILE:-./infrastructure/secrets/minio_root_password.txt}
+  smtp_password:
+    file: ${SMTP_PASSWORD_FILE:-./infrastructure/secrets/smtp_password.txt}
+  smtp_username:
+    file: ${SMTP_USERNAME_FILE:-./infrastructure/secrets/smtp_username.txt}
+  sixlabors_license:
+    file: ${SIXLABORS_LICENSE_FILE:-./infrastructure/secrets/sixlabors.lic}
+  sixlabors_key:
+    file: ${SIXLABORS_KEY_FILE:-./infrastructure/secrets/sixlabors_key.txt}
