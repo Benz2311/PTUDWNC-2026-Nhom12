@@ -217,4 +217,3 @@ export function SaveToCollectionModal({
 }
 
 export default SaveToCollectionModal;
-
