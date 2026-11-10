@@ -9,6 +9,7 @@ export interface SearchRequest {
   difficulty?: string;
   maxCookTimeMinutes?: number;
   sortBy?: string;
+  signal?: AbortSignal;
 }
 
 export interface SearchResult {

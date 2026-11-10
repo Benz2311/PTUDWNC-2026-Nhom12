@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { apiClient, unwrapPaged, ApiError } from './client';
 import type { SearchRequest, SearchResponse, SearchResult } from '@/types/search';
 import type { ApiResponse, PaginationMeta } from '@/types/api';
@@ -70,6 +71,7 @@ export async function searchRecipes(
       '/recipes/search',
       {
         params: queryParams,
+        signal: params.signal,
       }
     );
 
@@ -85,6 +87,17 @@ export async function searchRecipes(
       hasNextPage: paged.hasNextPage,
     };
   } catch (error) {
+    if (axios.isCancel(error) || (error instanceof Error && error.name === 'CanceledError')) {
+      return {
+        items: [],
+        page: params.page ?? 1,
+        pageSize: params.pageSize ?? 10,
+        totalCount: 0,
+        totalPages: 0,
+        hasPreviousPage: false,
+        hasNextPage: false,
+      };
+    }
     if (error instanceof ApiError) {
       throw new SearchApiError(
         error.message || 'Không thể tìm kiếm công thức vào lúc này.',
