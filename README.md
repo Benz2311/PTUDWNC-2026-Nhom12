@@ -437,23 +437,43 @@ flowchart LR
 **Luồng Rating / Comment / Favorite:**
 
 ```mermaid
+
 sequenceDiagram
-    actor M as Thành viên
+    participant M as Thanh vien
     participant UI as Frontend
     participant API as Recipe API
     participant DB as PostgreSQL
     participant MOD as Moderation
-    M->>UI: Chọn sao / gửi comment / lưu yêu thích
-    UI->>API: Request + JWT + Recipe ID
-    API->>API: Xác thực, kiểm tra input và quyền
-    API->>DB: Ghi rating/comment/favorite
-    alt Comment cần kiểm duyệt
-        API->>MOD: Gắn trạng thái Pending
-        MOD->>DB: Moderator approve hoặc reject
+
+    M->>UI: Chon Rating, gui Comment hoac Favorite
+    UI->>API: Gui Request kem JWT va Recipe ID
+    API->>API: Xac thuc JWT va kiem tra input
+
+    alt Xac thuc that bai
+        API-->>UI: 401 Unauthorized
+        UI-->>M: Thong bao loi xac thuc
+    else Xac thuc thanh cong
+        alt La Comment moi
+            API->>DB: Tao Comment voi Status Pending
+            DB-->>API: Comment da duoc luu
+            API->>MOD: Gui thong bao kiem duyet (Async)
+            API-->>UI: Tra ve Comment DTO va Pending status
+            UI-->>M: Thong bao comment dang cho duyet
+
+        else La Rating
+            API->>DB: Luu hoac cap nhat Rating
+            DB-->>API: Rating da cap nhat
+            API-->>UI: Tra ve Rating DTO
+            UI-->>M: Cap nhat giao dien Rating
+
+        else La Favorite
+            API->>DB: Luu hoac xoa Favorite
+            DB-->>API: Favorite da cap nhat
+            API-->>UI: Tra ve Favorite DTO
+            UI-->>M: Cap nhat trang thai yeu thich
+        end
     end
-    DB-->>API: Bản ghi / thống kê đã cập nhật
-    API-->>UI: DTO và trạng thái kết quả
-    UI-->>M: Cập nhật rating, comment hoặc danh sách yêu thích
+
 ```
 
 **Output:** rating summary và trạng thái rating cá nhân; comment/reply kèm trạng thái kiểm duyệt; danh sách Recipe yêu thích; dữ liệu profile. Dữ liệu chưa được duyệt không được trình bày như nội dung công khai đã xác nhận.
@@ -471,6 +491,13 @@ sequenceDiagram
 ### 4.5 Đợt 2 — Lập thực đơn và tiện ích (Meal Planning & Utilities)
 
 **Mục tiêu:** biến danh sách Recipe thành lịch bữa ăn, tạo checklist mua nguyên liệu và hỗ trợ điều chỉnh khẩu phần/xuất bản in.
+
+**Báo cáo chi tiết:** [Meal Planner và các tính năng nâng cao](./docs/MEAL_PLANNER_ADVANCED_FEATURES_REPORT.md) mô tả các đối tượng dữ liệu, quy trình thực thi từng chức năng, giới hạn hiện tại và các hạng mục cần hoàn thiện.
+
+- **Giao diện ứng dụng:** [`frontend/app/meal-planner/page.tsx`](http://localhost:3000/meal-planner) mặc định mở lịch 7 ngày, cho phép chọn khoảng ngày tối đa 14 ngày và có 4 khung bữa: `Breakfast` (Bữa sáng), `Lunch` (Bữa trưa), `Dinner` (Bữa tối), `Snack` (Ăn nhẹ).
+- Chọn Recipe từ danh sách API cung cấp, hỗ trợ đổi món hoặc xóa món khỏi lịch trình.
+- Tự động tổng hợp danh sách nguyên liệu đi chợ (`Shopping List`) dựa trên các món đã lên lịch; giao diện phân nhóm theo từ khóa tên nguyên liệu: *Thịt, cá & hải sản*, *Rau củ & trái cây*, *Gia vị & đồ khô*, và *Khác*.
+- Hỗ trợ đánh dấu tick đã mua (`isChecked`), thanh tiến độ mua sắm theo thời gian thực và nút "Xóa tất cả mục đã mua".
 
 **Vai trò:** thành viên đã đăng nhập quản lý meal plan và shopping list của mình; khách có thể xem/xuất một Recipe công khai nếu endpoint cho phép.
 
@@ -505,6 +532,12 @@ flowchart TD
 - Legacy: `GET/PUT/DELETE /api/v1/me/meal-plan`, `GET/POST /api/v1/me/shopping-list`, `POST /api/v1/me/shopping-list/generate`, và route check/delete theo item.
 - V2: `/api/v1/me/meal-plans` và `/api/v1/me/shopping-lists`, gồm tạo/list/detail/item/generate.
 - Recipe tiện ích: `GET /api/v1/recipes/{slug}/servings`, `POST /api/v1/recipes/{slug}/scale`, `GET /api/v1/recipes/{slug}/export/pdf`.
+
+**Đặc tả xử lý ổn định & khắc phục sự cố hệ thống:**
+
+1. **Lỗi Translation DateOnly trong EF Core:** Trong `MealPlanEndpoints.cs`, chuyển đổi việc format ngày `PlannedDate.ToString("yyyy-MM-dd")` và truy xuất ảnh đại diện chính sang in-memory projection sau khi gọi `ToListAsync()`. Loại bỏ hoàn toàn lỗi translation runtime khiến PostgreSQL trả về HTTP 500.
+2. **Lỗi Npgsql 42703 (Missing Column):** Entity `ShoppingListItem` khai báo thuộc tính tiện ích `public string IngredientName { get => Name; set => Name = value; }` được đánh dấu `[NotMapped]` và cấu hình `builder.Ignore(x => x.IngredientName)` trong EF Core để ngăn PostgreSQL truy vấn cột không tồn tại `s.IngredientName`.
+3. **Bảo vệ Null-safe cho Recipe:** Bổ sung điều kiện kiểm tra `x.Recipe is not null && !x.Recipe.IsDeleted` trong truy vấn tổng hợp nguyên liệu, đảm bảo các mục kế hoạch trỏ đến công thức đã bị xóa mềm không gây ra `NullReferenceException`.
 
 **Lưu ý tương thích:** hệ thống có hai mô hình cùng tồn tại. Trang meal planner hiện gọi endpoint legacy và ghi vào `MealPlanEntries`/`ShoppingListItems`; mô hình v2 có migration `20261104082500_AddPersonalPlanningV2.cs` và route riêng trong `PlanningEndpoints.cs`. Không được coi trang hiện hành là đã chuyển sang v2 chỉ vì API v2 đã tồn tại. Cần quyết định migration UI, đồng bộ dữ liệu hoặc duy trì hai contract trước khi loại bỏ legacy.
 
@@ -567,34 +600,207 @@ flowchart LR
 
 ### 4.7 Đợt 4 — Tính năng nâng cao (Advanced Features)
 
-**Mục tiêu:** mở rộng hệ thống từ recipe catalog sang cộng đồng, trợ lý nhập liệu và theo dõi dinh dưỡng/media.
+**Mục tiêu:** mở rộng hệ thống từ recipe catalog sang cộng đồng, trợ lý nhập liệu và theo dõi dinh dưỡng/media, đồng thời hoàn thiện bộ 3 năng lực nâng cao cho tác giả và người dùng: **Duplicate Recipe**, **Personal Recipe Notes**, và **Recipe Version History**.
 
-| Hạng mục                       | Input                                                                        | Luồng xử lý / output                                                                                                                                                                           | Trạng thái source                                                                                                                                                                                                 |
-| -------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Follow / Activity Feed           | User ID tác giả để follow; pagination cho feed                           | Lưu quan hệ follow; feed lấy hoạt động và Recipe công khai từ các tác giả đang theo dõi; cache feed theo user/page và generation.                                                  | API backend trong `SocialNutritionEndpoints`; cần xác nhận giao diện và E2E.                                                                                                                                 |
-| Gợi ý Recipe từ nguyên liệu | Từ 1 đến 30 nguyên liệu có sẵn                                        | Lọc candidate Recipe public từ database trước; AI chỉ xếp hạng/chọn ID thuộc danh sách cho phép; trả tối đa 5 Recipe, không tự bịa Recipe ID.                                    | API `POST /api/v1/ai/suggest-by-ingredients`, yêu cầu xác thực và rate limiting.                                                                                                                             |
-| OCR Recipe                       | Multipart image field `image`; JPEG/PNG/WebP/AVIF; tối đa 5 MB           | Validate kích thước/định dạng; model tạo JSON draft gồm thông tin Recipe, ingredient, step; server parse/validate và trả bản nháp để user xem lại, không tự lưu thành Recipe. | API `POST /api/v1/ai/ocr-recipe` và provider Gemini có trong source. Model mặc định hiện cấu hình là `gemini-2.5-flash`; không ghi cố định phiên bản 1.5 nếu cấu hình runtime có thể đổi. |
-| Nutrition goals                  | Tuổi, giới tính, chiều cao, cân nặng, mức hoạt động và mục tiêu | Calculator áp dụng Mifflin-St Jeor, hệ số hoạt động, điều chỉnh goal; trả calorie/protein/carbohydrate/fat targets; đánh dấu meal consumed để tổng hợp dinh dưỡng.            | API và calculator backend có; cần xác nhận UI và so sánh kết quả với test cases nghiệp vụ.                                                                                                              |
-| Watermark / image variants       | Ảnh Recipe và ID ảnh                                                      | Background image job tạo medium/thumbnail, đóng watermark `CULINARYBLOG` lên biến thể và lưu qua storage.                                                                               | Job/service có trong source; cần xác nhận Hangfire/storage hoạt động trong deployment và format/quality ảnh theo cấu hình.                                                                               |
+| Hạng mục                                                | Input                                                                        | Luồng xử lý / output                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Trạng thái source                                                                                                                                                                                                 |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Duplicate Recipe (Sao chép công thức)                  | Recipe ID nguồn (yêu cầu quyền sở hữu của tác giả)                  | Kiểm tra quyền tác giả (JWT 403 nếu không sở hữu); nhân bản thông tin nội dung cốt lõi (Title + "(Bản sao)", Description, Content, Category, Times, Servings, Difficulty, Nutrition, Ingredients, Steps) sang một Recipe mới với Id và Slug mới (`{slug}-copy`), trạng thái mặc định `Draft`. **Không** sao chép tương tác (ratings, comments, views). Draft mới được lưu trong **Kho bản nháp**; tác giả mở trình sửa, cập nhật và lưu thành công rồi mới xuất bản. | API `POST /api/v1/recipes/{id}/duplicate`; frontend quản lý và `culinary-blog-web` đưa người dùng về Kho bản nháp sau khi sao chép; danh sách không có nút xuất bản trực tiếp.              |
+| Personal Recipe Notes (Ghi chú cá nhân)                | Recipe ID, User ID (từ JWT) và Content ghi chú (tối đa 5.000 ký tự)   | Lưu trữ sổ tay ghi chú riêng tư của người dùng cho từng công thức trong bảng PostgreSQL `PersonalRecipeNotes` (unique index trên `(RecipeId, UserId)`). Hỗ trợ đọc, tạo/cập nhật (upsert) và xóa ghi chú. Chỉ chủ sở hữu có quyền truy cập.                                                                                                                                                                                                                                                          | Cụm 5 APIs `GET/POST/DELETE /api/v1/recipes/{id}/notes` trong `PersonalRecipeNoteEndpoints.cs`; UI `PersonalNotePanel.tsx` trên trang Recipe Detail; 11 unit tests backend + 5 tests frontend đạt chuẩn. |
+| Recipe Version History (Lịch sử & So sánh phiên bản) | Recipe ID, version number; cặp version `v1` và `v2` để so sánh      | Tự động snapshot nội dung JSON qua `RecipeRevision` khi công thức được cập nhật. Cung cấp API đọc danh sách phiên bản và tính toán sai khác (diff) giữa 2 phiên bản. Bảng diff phân loại trực quan: 🟢 Thêm mới (Added), 🔴 Đã xóa (Deleted), 🟡 Sửa đổi (Modified) đối với tiêu đề, mô tả và nguyên liệu.                                                                                                                                                                              | APIs `/api/v1/recipes/{id}/revisions` và `/compare` trong `RevisionModerationEndpoints.cs`; UI `RecipeVersionHistory.tsx` trên trang Recipe Editor; 4 tests frontend đạt chuẩn.                        |
+| Follow / Activity Feed                                    | User ID tác giả để follow; pagination cho feed                           | Lưu quan hệ follow; feed lấy hoạt động và Recipe công khai từ các tác giả đang theo dõi; cache feed theo user/page và generation.                                                                                                                                                                                                                                                                                                                                                                                         | API backend trong `SocialNutritionEndpoints`; cần xác nhận giao diện và E2E.                                                                                                                                 |
+| Gợi ý Recipe từ nguyên liệu                          | Từ 1 đến 30 nguyên liệu có sẵn                                        | Lọc candidate Recipe public từ database trước; AI chỉ xếp hạng/chọn ID thuộc danh sách cho phép; trả tối đa 5 Recipe, không tự bịa Recipe ID.                                                                                                                                                                                                                                                                                                                                                                           | API `POST /api/v1/ai/suggest-by-ingredients`, yêu cầu xác thực và rate limiting.                                                                                                                             |
+| OCR Recipe                                                | Multipart image field `image`; JPEG/PNG/WebP/AVIF; tối đa 5 MB           | Validate kích thước/định dạng; model tạo JSON draft gồm thông tin Recipe, ingredient, step; server parse/validate và trả bản nháp để user xem lại, không tự lưu thành Recipe.                                                                                                                                                                                                                                                                                                                                        | API `POST /api/v1/ai/ocr-recipe` và provider Gemini có trong source. Model mặc định hiện cấu hình là `gemini-2.5-flash`; không ghi cố định phiên bản 1.5 nếu cấu hình runtime có thể đổi. |
+| Nutrition goals                                           | Tuổi, giới tính, chiều cao, cân nặng, mức hoạt động và mục tiêu | Calculator áp dụng Mifflin-St Jeor, hệ số hoạt động, điều chỉnh goal; trả calorie/protein/carbohydrate/fat targets; đánh dấu meal consumed để tổng hợp dinh dưỡng.                                                                                                                                                                                                                                                                                                                                                   | API và calculator backend có; cần xác nhận UI và so sánh kết quả với test cases nghiệp vụ.                                                                                                              |
+| Watermark / image variants                                | Ảnh Recipe và ID ảnh                                                      | Background image job tạo medium/thumbnail, đóng watermark `CULINARYBLOG` lên biến thể và lưu qua storage.                                                                                                                                                                                                                                                                                                                                                                                                                      | Job/service có trong source; cần xác nhận Hangfire/storage hoạt động trong deployment và format/quality ảnh theo cấu hình.                                                                               |
+
+**Sơ đồ luồng Duplicate Recipe:**
+
+1. Tác giả chọn **Sao chép**; Backend xác thực quyền sở hữu và tạo Recipe mới ở trạng thái `Draft`.
+2. Frontend chuyển đến tab **Kho bản nháp** và tải lại danh sách, kể cả khi tab này đang mở.
+3. Tác giả chọn **Chỉnh sửa**, hiệu chỉnh thông tin, rồi nhấn **Lưu thay đổi**. Lưu thành công cập nhật phiên bản Recipe và giữ người dùng trong trình sửa.
+4. Chỉ sau khi không còn chỉnh sửa chưa lưu, tác giả mới có thể nhấn **Xuất bản**. Backend tiếp tục kiểm tra đầy đủ điều kiện và quyền theo trạng thái.
+5. Recipe xuất bản được hiển thị trong tab **Đã xuất bản**; bản nháp chưa xuất bản vẫn nằm trong Kho bản nháp.
+
+```mermaid
+
+sequenceDiagram
+    participant A as Author
+    participant UI as Recipe UI
+    participant API as Recipe API
+    participant DB as PostgreSQL
+
+    A->>UI: Click Duplicate Recipe
+    UI->>API: POST /api/v1/recipes/{id}/duplicate
+    API->>DB: Find source Recipe by ID
+    DB-->>API: Return Recipe data
+
+    alt Recipe not found or deleted
+        API-->>UI: 404 Not Found
+    else Recipe exists
+        alt User is not the owner
+            API-->>UI: 403 Forbidden
+        else User is the owner
+            API->>API: Generate new ID and unique Slug
+            API->>API: Set Status to Draft
+            API->>API: Set AuthorId to UserId
+            API->>API: Copy Title, Description
+            API->>API: Copy Ingredients and Steps
+            API->>API: Exclude Views, Ratings and Comments
+
+            API->>DB: BEGIN TRANSACTION
+            API->>DB: INSERT duplicated Recipe
+            API->>DB: INSERT initial Revision v1
+
+            alt Duplicate successful
+                API->>DB: COMMIT TRANSACTION
+                DB-->>API: Commit successful
+                API-->>UI: 201 Created (Id, Slug, ETag)
+
+                UI->>UI: Switch to Draft Vault
+                UI->>UI: Refresh Draft list
+                UI-->>A: Display copied Recipe
+
+                A->>UI: Open Edit and modify Recipe
+                UI->>API: PUT /api/v1/recipes/{id} with If-Match
+                API->>DB: Update Recipe and create new Revision
+
+                alt Update successful
+                    DB-->>API: Save successful
+                    API-->>UI: 200 OK (Updated Recipe, ETag)
+                    UI-->>A: Keep editor open
+
+                    A->>UI: Click Publish
+                    UI->>API: POST /api/v1/recipes/{id}/publish
+                    API->>API: Validate publishing conditions
+                    API->>DB: Update Status to Published
+
+                    alt Publish successful
+                        DB-->>API: Publish successful
+                        API-->>UI: 200 OK (Published)
+                        UI->>UI: Refresh Published list
+                        UI-->>A: Display Recipe in Published tab
+                    else Publish failed
+                        API-->>UI: Publish error
+                        UI-->>A: Display publishing error
+                    end
+
+                else Update failed
+                    API-->>UI: Update error
+                    UI-->>A: Display update error
+                end
+
+            else Duplicate failed
+                DB-->>API: Database error
+                API->>DB: ROLLBACK TRANSACTION
+                API-->>UI: 500 Internal Server Error
+                UI-->>A: Display duplication error
+            end
+        end
+    end
+
+```
+
+**Sơ đồ luồng Personal Recipe Notes & Version History:**
+
+```mermaid
+
+flowchart TD
+
+    subgraph PersonalNotes["PERSONAL RECIPE NOTES - RECIPE DETAIL"]
+        N1["Nguoi dung xem cong thuc"]
+        N2{"Da dang nhap?"}
+        N3["An PersonalNotePanel"]
+        N4["GET /api/v1/recipes/{id}/notes/me"]
+        N5["Hien thi noi dung ghi chu rieng tu"]
+        N6["Chinh sua ghi chu toi da 5000 ky tu"]
+        N7["POST /api/v1/recipes/{id}/notes - Upsert"]
+        N8[("PostgreSQL - Unique RecipeId va UserId")]
+
+        N1 --> N2
+        N2 -->|Chua| N3
+        N2 -->|Roi| N4
+        N4 --> N5
+        N5 --> N6
+        N6 --> N7
+        N7 --> N8
+    end
+
+    subgraph VersionHistory["RECIPE VERSION HISTORY - RECIPE EDITOR"]
+        V1["Tac gia chinh sua cong thuc"]
+        V2["PUT /api/v1/recipes/{id} - If-Match"]
+        V3["Luu Recipe moi va cap nhat xmin"]
+        V4["Tu dong tao RecipeRevision snapshot JSON"]
+        V5["GET /api/v1/recipes/{id}/revisions"]
+        V6["Chon hai phien ban v1 va v2"]
+        V7["GET /revisions/compare?v1=&v2="]
+        V8["Hien thi bang Diff truc quan"]
+
+        V9["Them moi"]
+        V10["Da xoa"]
+        V11["Thay doi"]
+
+        V1 --> V2
+        V2 --> V3
+        V3 --> V4
+        V4 --> V5
+        V5 --> V6
+        V6 --> V7
+        V7 --> V8
+        V8 --> V9
+        V8 --> V10
+        V8 --> V11
+    end
+
+```
 
 **Sơ đồ luồng OCR có kiểm soát:**
 
 ```mermaid
+
 sequenceDiagram
-    actor U as Tác giả
+    participant U as Tac gia
     participant UI as Frontend
     participant API as AI API
-    participant V as Image/DTO Validator
-    participant AI as Gemini provider
-    U->>UI: Chọn ảnh ghi chú công thức
-    UI->>API: POST multipart image + JWT
-    API->>V: Kiểm MIME, kích thước, ảnh hợp lệ
-    V-->>API: Ảnh hợp lệ (tối đa 5 MB)
-    API->>AI: Yêu cầu OCR và JSON có cấu trúc
-    AI-->>API: Bản nháp OCR
-    API->>V: Parse, kiểm tra và chuẩn hóa draft
-    API-->>UI: Recipe draft; không ghi database
-    UI-->>U: Tác giả rà soát/chỉnh sửa rồi chủ động lưu
+    participant V as Image DTO Validator
+    participant AI as Gemini Provider
+
+    U->>UI: Chon anh ghi chu cong thuc
+    UI->>API: POST multipart image va JWT
+
+    API->>V: Kiem tra MIME, kich thuoc va tinh hop le
+
+    alt Anh khong hop le
+        V-->>API: Validation error
+        API-->>UI: 400 Bad Request
+        UI-->>U: Thong bao loi anh
+    else Anh hop le
+        V-->>API: Anh hop le (toi da 5 MB)
+
+        API->>AI: Gui yeu cau OCR va JSON co cau truc
+
+        alt AI xu ly that bai
+            AI-->>API: AI Provider Error
+            API-->>UI: 502 Bad Gateway
+            UI-->>U: Thong bao khong the xu ly anh
+        else AI xu ly thanh cong
+            AI-->>API: Tra ve ban nhap OCR
+
+            API->>V: Parse va chuan hoa Recipe Draft
+
+            alt Draft khong hop le
+                V-->>API: Validation error
+                API-->>UI: 422 Unprocessable Entity
+                UI-->>U: Yeu cau kiem tra lai noi dung
+            else Draft hop le
+                V-->>API: Recipe Draft hop le
+                API-->>UI: Tra ve Recipe Draft
+                Note over API,UI: Khong ghi du lieu vao Database
+                UI-->>U: Hien thi ban nhap de ra soat va chinh sua
+                U->>UI: Chu dong xac nhan va luu cong thuc
+            end
+        end
+    end
+
 ```
 
 **Nutrition Goal** nhận các input cá nhân nhạy cảm ở mức sức khỏe cơ bản; chỉ user sở hữu được đọc/cập nhật mục tiêu của mình. Kết quả là ước tính phục vụ tham khảo, không phải chẩn đoán hay chỉ định y tế. API ghi nhận bữa đã dùng để tính tổng Calories và macros theo servings/portion, nhưng cần verify chính xác dữ liệu dinh dưỡng cho Recipe thiếu field hoặc servings bất thường.
@@ -616,23 +822,23 @@ sequenceDiagram
 
 Bảng này so sánh phạm vi nền tảng Recipe ban đầu với năng lực được bổ sung qua cả bốn đợt. Các đợt là phần mở rộng theo lớp: chức năng mới dùng lại Recipe, người dùng, database và các luồng API hiện có, không thay thế nền tảng ban đầu. “Có trong source” mô tả implementation trong repository; không tự xác nhận đã triển khai production hoặc nghiệm thu end-to-end.
 
-| Khía cạnh | Trước 4 đợt cải tiến | Sau 4 đợt cải tiến |
-|---|---|---|
-| Mục đích sử dụng | Tập trung vào hệ thống Recipe: quản lý và khám phá công thức cùng dữ liệu liên quan. | Trở thành nền tảng Recipe có thêm tương tác cộng đồng, lập kế hoạch bữa ăn, tìm kiếm/quản trị nội dung và hỗ trợ AI/dinh dưỡng/media. |
-| Nội dung Recipe | Recipe, Category, Ingredient, Step, Nutrition, Image và thông tin tác giả là dữ liệu cốt lõi. | Giữ nguyên mô hình cốt lõi; bổ sung rating/comment/favorite, trạng thái và quy trình duyệt, revision history, tìm kiếm/filter nâng cao và dữ liệu dùng cho feed, AI, nutrition. |
-| Trải nghiệm cá nhân | Người dùng chủ yếu đăng nhập và thao tác trong các luồng tài khoản/Recipe sẵn có. | Người dùng có thêm danh sách yêu thích, meal plan, shopping list, mục tiêu và tổng hợp dinh dưỡng, theo dõi tác giả và feed cá nhân. |
-| Tìm kiếm và quản trị | Khả năng khám phá/quản lý cơ bản theo các luồng Recipe hiện hữu. | Có full-text search/filter, lịch sử phiên bản và rollback, moderation queue, trạng thái duyệt và cache/invalidation ở các luồng hỗ trợ. |
-| Hỗ trợ nâng cao | Chưa có các luồng cộng đồng/AI/dinh dưỡng/media của Đợt 4 trong baseline mô tả. | Có follow/feed, gợi ý món từ nguyên liệu, OCR trả draft để người dùng xem lại, tính mục tiêu dinh dưỡng và job xử lý ảnh/watermark trong source. |
-| Thành phần kỹ thuật | Domain/API Recipe, xác thực, persistence PostgreSQL, giao diện và hạ tầng ảnh là nền tảng chung. | Mở rộng Domain entities/enums, API endpoints, EF configurations/migrations, infrastructure services/jobs/cache, frontend routes/components/API clients và test tương ứng cho các năng lực mới. |
+| Khía cạnh               | Trước 4 đợt cải tiến                                                                                 | Sau 4 đợt cải tiến                                                                                                                                                                                   |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mục đích sử dụng     | Tập trung vào hệ thống Recipe: quản lý và khám phá công thức cùng dữ liệu liên quan.        | Trở thành nền tảng Recipe có thêm tương tác cộng đồng, lập kế hoạch bữa ăn, tìm kiếm/quản trị nội dung và hỗ trợ AI/dinh dưỡng/media.                                         |
+| Nội dung Recipe          | Recipe, Category, Ingredient, Step, Nutrition, Image và thông tin tác giả là dữ liệu cốt lõi.     | Giữ nguyên mô hình cốt lõi; bổ sung rating/comment/favorite, trạng thái và quy trình duyệt, revision history, tìm kiếm/filter nâng cao và dữ liệu dùng cho feed, AI, nutrition.       |
+| Trải nghiệm cá nhân   | Người dùng chủ yếu đăng nhập và thao tác trong các luồng tài khoản/Recipe sẵn có.          | Người dùng có thêm danh sách yêu thích, meal plan, shopping list, mục tiêu và tổng hợp dinh dưỡng, theo dõi tác giả và feed cá nhân.                                                |
+| Tìm kiếm và quản trị | Khả năng khám phá/quản lý cơ bản theo các luồng Recipe hiện hữu.                               | Có full-text search/filter, lịch sử phiên bản và rollback, moderation queue, trạng thái duyệt và cache/invalidation ở các luồng hỗ trợ.                                                   |
+| Hỗ trợ nâng cao        | Chưa có các luồng cộng đồng/AI/dinh dưỡng/media của Đợt 4 trong baseline mô tả.              | Có follow/feed, gợi ý món từ nguyên liệu, OCR trả draft để người dùng xem lại, tính mục tiêu dinh dưỡng và job xử lý ảnh/watermark trong source.                                  |
+| Thành phần kỹ thuật   | Domain/API Recipe, xác thực, persistence PostgreSQL, giao diện và hạ tầng ảnh là nền tảng chung. | Mở rộng Domain entities/enums, API endpoints, EF configurations/migrations, infrastructure services/jobs/cache, frontend routes/components/API clients và test tương ứng cho các năng lực mới. |
 
 #### Thành phần được bổ sung theo từng đợt
 
-| Đợt | Cải tiến so với baseline | Thành phần mã nguồn tiêu biểu |
-|---|---|---|
-| 1 — Tương tác người dùng | Rating 1–5 sao, comment/reply, favorite/bookmark, profile và kiểm soát nội dung tương tác. | `RecipeRating`, `RecipeComment`, `RecipeFavorite`; recipe interaction endpoints và UI panel; quy tắc ownership, unique constraint và trạng thái moderation. |
-| 2 — Lập thực đơn và tiện ích | Meal plan theo ngày/bữa, shopping list/checklist, scale theo servings, export/print. | `MealPlanEntry`/`ShoppingListItem` legacy và `MealPlan`/`MealPlanItem` v2; `MealPlanEndpoints.cs`, `PlanningEndpoints.cs`; migration và giao diện planner. Lưu ý: trang planner hiện dùng contract legacy, chưa mặc định chuyển sang v2. |
-| 3 — Tìm kiếm và quản trị | Full-text search và filter, revision/rollback, moderation, Redis caching/invalidation. | `SearchEndpoints.cs`, `RevisionModerationEndpoints.cs`; `RecipeRevision`, `ModerationLog`; migrations search/revision; cache services và tests. Báo cáo trạng thái hiện tại: cần verify backend/integration trước nghiệm thu. |
-| 4 — Tính năng nâng cao | Follow/feed, AI suggestions/OCR, nutrition goals/tracking, xử lý ảnh và watermark. | `SocialNutritionEndpoints.cs`, `AISuggestionsEndpoints.cs`; `UserFollow`, `ActivityLog`, `UserNutritionGoal`; Gemini service, `NutritionGoalCalculator`, `ImageResizeJob`; frontend routes/components cho feed, suggestions, nutrition, follow và OCR import. Có thành phần chính trong source; cần xác minh cấu hình provider, database, cache, storage/job runner và E2E trước khi chốt deployment. |
+| Đợt                                | Cải tiến so với baseline                                                                        | Thành phần mã nguồn tiêu biểu                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — Tương tác người dùng      | Rating 1–5 sao, comment/reply, favorite/bookmark, profile và kiểm soát nội dung tương tác. | `RecipeRating`, `RecipeComment`, `RecipeFavorite`; recipe interaction endpoints và UI panel; quy tắc ownership, unique constraint và trạng thái moderation.                                                                                                                                                                                                                                                           |
+| 2 — Lập thực đơn và tiện ích | Meal plan theo ngày/bữa, shopping list/checklist, scale theo servings, export/print.             | `MealPlanEntry`/`ShoppingListItem` legacy và `MealPlan`/`MealPlanItem` v2; `MealPlanEndpoints.cs`, `PlanningEndpoints.cs`; migration và giao diện planner. Lưu ý: trang planner hiện dùng contract legacy, chưa mặc định chuyển sang v2.                                                                                                                                                                 |
+| 3 — Tìm kiếm và quản trị       | Full-text search và filter, revision/rollback, moderation, Redis caching/invalidation.            | `SearchEndpoints.cs`, `RevisionModerationEndpoints.cs`; `RecipeRevision`, `ModerationLog`; migrations search/revision; cache services và tests. Báo cáo trạng thái hiện tại: cần verify backend/integration trước nghiệm thu.                                                                                                                                                                                 |
+| 4 — Tính năng nâng cao           | Follow/feed, AI suggestions/OCR, nutrition goals/tracking, xử lý ảnh và watermark.             | `SocialNutritionEndpoints.cs`, `AISuggestionsEndpoints.cs`; `UserFollow`, `ActivityLog`, `UserNutritionGoal`; Gemini service, `NutritionGoalCalculator`, `ImageResizeJob`; frontend routes/components cho feed, suggestions, nutrition, follow và OCR import. Có thành phần chính trong source; cần xác minh cấu hình provider, database, cache, storage/job runner và E2E trước khi chốt deployment. |
 
 **Thay đổi dữ liệu và luồng tổng thể:** các migration theo từng đợt bổ sung bảng/index/configuration cho tương tác, planning, revision/moderation/search và social/nutrition. Các API mới gắn dữ liệu cá nhân với user đã xác thực; nội dung công khai cần tuân theo trạng thái xuất bản/duyệt. OCR chỉ tạo draft cho người dùng rà soát, AI suggestions phải chọn từ Recipe hợp lệ, nutrition tổng hợp dựa trên mục tiêu/bữa ăn, còn xử lý ảnh chạy qua background job. Tất cả đều bổ sung vào các luồng Recipe hiện hữu.
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getRecipeBySlug } from '@/lib/api/recipes';
 import RecipeForm, { InitialRecipe } from './RecipeForm';
+import RecipeVersionHistory from './RecipeVersionHistory';
 
 export default function RecipeEditor({ slug }: { slug: string }) {
   const [recipe, setRecipe] = useState<InitialRecipe | null>(null);
@@ -57,11 +58,14 @@ export default function RecipeEditor({ slug }: { slug: string }) {
   }
 
   return (
-    <RecipeForm
-      recipeId={recipe.id}
-      initialRecipe={recipe}
-      initialEtag={etag}
-      onReload={loadRecipe}
-    />
+    <>
+      <RecipeForm
+        recipeId={recipe.id}
+        initialRecipe={recipe}
+        initialEtag={etag}
+        onReload={loadRecipe}
+      />
+      <RecipeVersionHistory recipeId={recipe.id} />
+    </>
   );
 }

@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   ShieldAlert,
   ChevronDown,
+  ChefHat,
 } from "lucide-react";
 import { getStoredToken, removeStoredToken, setStoredToken } from "@/lib/api/client";
 import { Button } from "@/components/ui/Button";
@@ -247,6 +248,12 @@ export function Header() {
                     <PlusCircle className="h-4 w-4 text-emerald-700" />
                     <span>Tạo công thức mới</span>
                   </DropdownMenuItem>
+                  {user.role === "Author" && (
+                    <DropdownMenuItem onClick={() => router.push("/my-recipes?tab=vault")}>
+                      <ChefHat className="h-4 w-4 text-emerald-700" />
+                      <span>Kho lưu trữ</span>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => router.push("/dashboard/categories")}>
                     <LayoutDashboard className="h-4 w-4 text-gray-600" />
                     <span>Quản lý danh mục</span>
@@ -347,6 +354,16 @@ export function Header() {
               );
             })}
           </nav>
+
+          {user.role === "Author" && (
+            <Link
+              href="/my-recipes?tab=vault"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-800"
+            >
+              <ChefHat className="h-4 w-4" /> Kho lưu trữ
+            </Link>
+          )}
 
           {user.role === "Guest" && (
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">

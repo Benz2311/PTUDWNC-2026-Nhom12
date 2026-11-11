@@ -107,6 +107,7 @@
     <Compile Include="Persistence\Migrations\20261104090000_AddRevisionsAndModeration.cs" />
     <Compile Include="Persistence\Migrations\20261104100000_ExpandRecipeSearchVector.cs" />
     <Compile Include="Persistence\Migrations\20261104120000_AddPhaseFourSocialNutrition.cs" />
+    <Compile Include="Persistence\Migrations\20261111100000_AddPersonalRecipeNotes.cs" />
     <Compile Include="Migrations\ApplicationDbContextModelSnapshot.cs" />
   </ItemGroup>
 

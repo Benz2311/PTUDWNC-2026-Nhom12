@@ -82,6 +82,7 @@ export default function RecipeForm({
   const [is409Conflict, setIs409Conflict] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Sync ETag whenever prop updates
   useEffect(() => {
@@ -146,6 +147,7 @@ export default function RecipeForm({
 
     setTitle(initialRecipe.title);
     setStatus(initialRecipe.status);
+    setHasUnsavedChanges(initialRecipe.status === 'Draft');
     setDescription(initialRecipe.description ?? '');
     setContent(initialRecipe.content);
     setCategoryId(initialRecipe.categoryId);
@@ -199,6 +201,9 @@ export default function RecipeForm({
 
   // Compute publish eligibility condition
   const publishBlocker = useMemo(() => {
+    if (hasUnsavedChanges) {
+      return 'Hãy rà soát và lưu bản nháp trước khi xuất bản công thức.';
+    }
     if (!title.trim() || title.trim().length < 5 || title.trim().length > 200) {
       return 'Tiêu đề công thức phải từ 5 đến 200 ký tự.';
     }
@@ -242,6 +247,7 @@ export default function RecipeForm({
     ingredients,
     steps,
     currentUser,
+    hasUnsavedChanges,
   ]);
 
   // Handle reload on 409 Conflict
@@ -340,12 +346,14 @@ export default function RecipeForm({
 
       const newEtag = response.headers.get('ETag') ?? etag;
       setEtag(newEtag);
+      setHasUnsavedChanges(false);
       setSuccessMessage(
         recipeId ? 'Đã lưu thay đổi công thức thành công!' : 'Đã tạo bản nháp công thức thành công!',
       );
 
-      // Redirect to recipe detail view
-      router.push(`/recipes/${response.data.slug}`);
+      if (!recipeId) {
+        router.push('/recipes?tab=vault');
+      }
     } catch (error: unknown) {
       const apiErr = error as ApiError;
       if (apiErr.status === 409 || apiErr.message?.includes('409') || apiErr.message?.includes('thay đổi bởi một yêu cầu khác')) {
@@ -434,7 +442,7 @@ export default function RecipeForm({
   }
 
   return (
-    <form className="recipe-form" onSubmit={submit}>
+    <form className="recipe-form" onSubmit={submit} onChange={() => setHasUnsavedChanges(true)}>
       <RecipeFormLayout status={status}>
         {/* 409 Conflict Alert Banner */}
         {is409Conflict && (

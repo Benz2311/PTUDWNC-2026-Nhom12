@@ -40,8 +40,10 @@ public static class RevisionModerationEndpoints
 
     private static async Task<IResult> GetRevisions(Guid id, ClaimsPrincipal principal, ApplicationDbContext db, CancellationToken ct)
     {
-        var allowed = await CanManage(id, principal, db, ct);
-        if (!allowed) return Results.Forbid();
+        var (notFound, forbidden) = await CheckAccess(id, principal, db, ct);
+        if (notFound) return Results.NotFound(new { error = "Không tìm thấy công thức." });
+        if (forbidden) return Results.Forbid();
+
         var revisions = await db.RecipeRevisions.AsNoTracking().Where(x => x.RecipeId == id)
             .OrderByDescending(x => x.Version)
             .Select(x => new { x.Id, x.Version, x.Title, x.Description, x.ChangeSummary, x.EditorId, x.CreatedAt })
@@ -51,21 +53,27 @@ public static class RevisionModerationEndpoints
 
     private static async Task<IResult> GetRevision(Guid id, int version, ClaimsPrincipal principal, ApplicationDbContext db, CancellationToken ct)
     {
-        if (!await CanManage(id, principal, db, ct)) return Results.Forbid();
+        var (notFound, forbidden) = await CheckAccess(id, principal, db, ct);
+        if (notFound) return Results.NotFound(new { error = "Không tìm thấy công thức." });
+        if (forbidden) return Results.Forbid();
+
         var revision = await db.RecipeRevisions.AsNoTracking()
             .SingleOrDefaultAsync(x => x.RecipeId == id && x.Version == version, ct);
-        return revision is null ? Results.NotFound() : Results.Ok(new { data = revision });
+        return revision is null ? Results.NotFound(new { error = "Không tìm thấy phiên bản này." }) : Results.Ok(new { data = revision });
     }
 
     private static async Task<IResult> CompareRevisions(
         Guid id, int v1, int v2, ClaimsPrincipal principal, ApplicationDbContext db, CancellationToken ct)
     {
-        if (!await CanManage(id, principal, db, ct)) return Results.Forbid();
+        var (notFound, forbidden) = await CheckAccess(id, principal, db, ct);
+        if (notFound) return Results.NotFound(new { error = "Không tìm thấy công thức." });
+        if (forbidden) return Results.Forbid();
+
         var revisions = await db.RecipeRevisions.AsNoTracking()
             .Where(x => x.RecipeId == id && (x.Version == v1 || x.Version == v2))
             .ToDictionaryAsync(x => x.Version, ct);
         if (!revisions.TryGetValue(v1, out var first) || !revisions.TryGetValue(v2, out var second))
-            return Results.NotFound();
+            return Results.NotFound(new { error = "Không tìm thấy một trong hai phiên bản cần so sánh." });
         return Results.Ok(new
         {
             data = new
@@ -217,6 +225,16 @@ public static class RevisionModerationEndpoints
         await db.SaveChangesAsync(ct);
         await invalidator.InvalidateAsync(recipe.Id, recipe.Slug, recipe.CategoryId, null, ct);
         return Results.Accepted($"/api/v1/recipes/{id}/revisions", new { data = new { recipe.Id, status = recipe.Status } });
+    }
+
+    private static async Task<(bool NotFound, bool Forbidden)> CheckAccess(Guid recipeId, ClaimsPrincipal principal, ApplicationDbContext db, CancellationToken ct)
+    {
+        var recipe = await db.Recipes.AsNoTracking().SingleOrDefaultAsync(x => x.Id == recipeId && !x.IsDeleted, ct);
+        if (recipe is null) return (true, false);
+        if (principal.IsInRole("Admin") || principal.IsInRole("Moderator")) return (false, false);
+        var userId = GetUserId(principal);
+        if (recipe.AuthorId != userId) return (false, true);
+        return (false, false);
     }
 
     private static async Task<bool> CanManage(Guid recipeId, ClaimsPrincipal principal, ApplicationDbContext db, CancellationToken ct)

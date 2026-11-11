@@ -33,7 +33,7 @@ public sealed class RecipePurgeService : IRecipePurgeService
             .Include(item => item.Ingredients)
             .Include(item => item.Steps)
             .SingleOrDefaultAsync(item => item.Id == recipeId, cancellationToken);
-    if (recipe is null || !recipe.IsDeleted)
+        if (recipe is null || !recipe.IsDeleted)
         {
             return false;
         }
@@ -55,6 +55,48 @@ public sealed class RecipePurgeService : IRecipePurgeService
             .Select(category => category.Slug)
             .SingleOrDefaultAsync(cancellationToken);
         var slug = recipe.Slug;
+
+        var favorites = await _db.RecipeFavorites
+            .IgnoreQueryFilters()
+            .Where(item => item.RecipeId == recipeId)
+            .ToListAsync(cancellationToken);
+        var ratings = await _db.RecipeRatings
+            .IgnoreQueryFilters()
+            .Where(item => item.RecipeId == recipeId)
+            .ToListAsync(cancellationToken);
+        var comments = await _db.RecipeComments
+            .IgnoreQueryFilters()
+            .Where(item => item.RecipeId == recipeId)
+            .ToListAsync(cancellationToken);
+        var legacyMealPlanEntries = await _db.MealPlanEntries
+            .IgnoreQueryFilters()
+            .Where(item => item.RecipeId == recipeId)
+            .ToListAsync(cancellationToken);
+        var mealPlanItems = await _db.MealPlanItems
+            .Where(item => item.RecipeId == recipeId)
+            .ToListAsync(cancellationToken);
+        var revisions = await _db.RecipeRevisions
+            .Where(item => item.RecipeId == recipeId)
+            .ToListAsync(cancellationToken);
+        var personalNotes = await _db.PersonalRecipeNotes
+            .Where(item => item.RecipeId == recipeId)
+            .ToListAsync(cancellationToken);
+        var shoppingListItems = await _db.ShoppingListItems
+            .IgnoreQueryFilters()
+            .Where(item => item.RecipeId == recipeId)
+            .ToListAsync(cancellationToken);
+
+        _db.RecipeFavorites.RemoveRange(favorites);
+        _db.RecipeRatings.RemoveRange(ratings);
+        _db.RecipeComments.RemoveRange(comments);
+        _db.MealPlanEntries.RemoveRange(legacyMealPlanEntries);
+        _db.MealPlanItems.RemoveRange(mealPlanItems);
+        _db.RecipeRevisions.RemoveRange(revisions);
+        _db.PersonalRecipeNotes.RemoveRange(personalNotes);
+        foreach (var item in shoppingListItems)
+        {
+            item.RecipeId = null;
+        }
 
         _db.RecipeIngredients.RemoveRange(recipe.Ingredients);
         _db.RecipeSteps.RemoveRange(recipe.Steps);

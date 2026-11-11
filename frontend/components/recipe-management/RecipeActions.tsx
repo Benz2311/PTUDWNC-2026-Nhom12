@@ -47,7 +47,7 @@ export default function RecipeActions({
         </div>
 
         <div className="form-actions-buttons">
-          {status === 'Draft' && (
+          {(status === 'Draft' || status === 'Archived') && (
             <>
               <button
                 className="primary-button action-btn-publish"
@@ -92,12 +92,12 @@ export default function RecipeActions({
 
           {status === 'Archived' && (
             <button
-              className="primary-button action-btn-unarchive"
+              className="outline-button action-btn-unarchive"
               disabled={disabled}
               onClick={() => setActiveDialog('unarchive')}
               type="button"
             >
-              🔓 Mở lưu trữ về Nháp (Unarchive)
+              🔓 Mở lưu trữ (Unarchive)
             </button>
           )}
 
@@ -111,7 +111,7 @@ export default function RecipeActions({
           </button>
         </div>
 
-        {publishBlocker && status === 'Draft' && (
+        {publishBlocker && (status === 'Draft' || status === 'Archived') && (
           <div className="publish-blocker-note" role="alert">
             <span>⚠️ Chưa đủ điều kiện xuất bản: {publishBlocker}</span>
           </div>

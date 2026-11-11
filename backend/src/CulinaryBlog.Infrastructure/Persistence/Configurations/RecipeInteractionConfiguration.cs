@@ -73,6 +73,7 @@ public class ShoppingListItemConfiguration : IEntityTypeConfiguration<ShoppingLi
     {
         builder.ToTable("ShoppingListItems");
         builder.HasKey(x => x.Id);
+        builder.Ignore(x => x.IngredientName);
         builder.Property(x => x.Name).IsRequired().HasMaxLength(200);
         builder.Property(x => x.Quantity).HasPrecision(10, 3);
         builder.Property(x => x.Unit).HasMaxLength(50);

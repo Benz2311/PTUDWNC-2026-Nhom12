@@ -20,6 +20,7 @@ public sealed class ShoppingListItemConfigurationV2 : IEntityTypeConfiguration<S
 {
     public void Configure(EntityTypeBuilder<ShoppingListItem> builder)
     {
+        builder.Ignore(x => x.IngredientName);
         builder.Property(x => x.ShoppingListId);
         builder.Property(x => x.Category).HasMaxLength(80);
         builder.Property(x => x.SortOrder).IsRequired();

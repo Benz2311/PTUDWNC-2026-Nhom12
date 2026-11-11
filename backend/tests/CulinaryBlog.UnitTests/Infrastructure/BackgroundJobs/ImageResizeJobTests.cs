@@ -61,6 +61,7 @@ public class ImageResizeJobTests : IDisposable
         public DbSet<ApplicationUser> Users => Set<ApplicationUser>();
         public DbSet<RecipeAuditLog> RecipeAuditLogs => Set<RecipeAuditLog>();
         public DbSet<RecipeSlugHistory> RecipeSlugHistories => Set<RecipeSlugHistory>();
+        public DbSet<PersonalRecipeNote> PersonalRecipeNotes => Set<PersonalRecipeNote>();
 
         public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction>(null!);

@@ -1,10 +1,14 @@
 using System;
+using CulinaryBlog.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace CulinaryBlog.Infrastructure.Persistence.Migrations;
 
+[DbContext(typeof(ApplicationDbContext))]
+[Migration("20261104090000_AddRevisionsAndModeration")]
 public partial class AddRevisionsAndModeration : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)

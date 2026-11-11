@@ -97,6 +97,7 @@ const recipeDetailOutputSchema = z.object({
   categoryId: z.string().uuid(),
   category: z.string().nullish(),
   author: z.string().nullish(),
+  authorId: z.string().uuid().nullish(),
   prepTimeMinutes: z.number().int(),
   cookTimeMinutes: z.number().int(),
   servings: z.number().int(),
@@ -140,6 +141,8 @@ export const recipeDetailSchema = z.preprocess((value) => {
     author: author && typeof author === 'object' && 'displayName' in author
       ? author.displayName ?? null
       : author,
+    authorId: recipe.authorId ??
+      (author && typeof author === 'object' && 'id' in author ? author.id : undefined),
     images,
   };
 }, recipeDetailOutputSchema);
@@ -185,6 +188,7 @@ export interface RecipeCommentReply {
   createdAt: string;
   updatedAt: string;
   canManage: boolean;
+  status?: 'Pending' | 'Approved' | 'Rejected' | 'Flagged';
 }
 
 export interface RecipeComment {
@@ -195,6 +199,7 @@ export interface RecipeComment {
   updatedAt: string;
   canManage: boolean;
   replies: RecipeCommentReply[];
+  status?: 'Pending' | 'Approved' | 'Rejected' | 'Flagged';
 }
 
 export const recipeDraftRequestSchema = z.object({

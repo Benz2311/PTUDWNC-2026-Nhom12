@@ -161,6 +161,7 @@ app.MapAuthEndpoints();
 app.MapCategoryEndpoints();
 CulinaryBlog.Api.Endpoints.Dashboard.DashboardEndpoints.MapDashboardEndpoints(app);
 CulinaryBlog.API.Endpoints.RecipeEndpoints.MapRecipeEndpoints(app);
+app.MapPersonalRecipeNoteEndpoints();
 app.MapMealPlanEndpoints();
 app.MapPlanningEndpoints();
 app.MapSearchEndpoints();

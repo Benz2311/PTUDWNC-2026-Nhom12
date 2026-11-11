@@ -29,7 +29,7 @@ export type RecipeQuery = {
   pageSize?: number;
   search?: string;
   categoryId?: string;
-  status?: RecipeStatus;
+  status?: RecipeStatus | 'Vault';
   sort?: RecipeSort;
   mine?: boolean;
   allStatuses?: boolean;
@@ -129,6 +129,28 @@ export async function getDeletedRecipes(page = 1, pageSize = 12): Promise<Recipe
     `/api/v1/admin/recipes/trash?page=${page}&pageSize=${pageSize}`,
   );
   return recipeTrashPageSchema.parse(result);
+}
+
+export async function getRecipeEtag(recipeId: string, slug?: string): Promise<string> {
+  try {
+    const res = await apiFetchWithResponse<{ id: string; slug: string; status: string; version?: string }>(
+      `${recipeBasePath}/${encodeURIComponent(recipeId)}/etag`,
+      {},
+      true,
+    );
+    const etag = res.headers.get('ETag') || (res.data?.version ? `"${res.data.version}"` : null);
+    if (etag) return etag;
+  } catch {
+    // Fallback qua getRecipeBySlug nếu có slug
+  }
+
+  if (slug) {
+    const detailRes = await getRecipeBySlug(slug);
+    const etag = detailRes.headers.get('ETag');
+    if (etag) return etag;
+  }
+
+  throw new Error('Không nhận được phiên bản (ETag) của công thức. Hãy tải lại trang.');
 }
 
 export async function getRecipeBySlug(
@@ -321,7 +343,7 @@ export async function getRecipeComments(recipeId: string, page = 1, pageSize = 2
   const result = await apiFetch<unknown>(
     `${recipeBasePath}/${encodeURIComponent(recipeId)}/comments?page=${page}&pageSize=${pageSize}`,
     {},
-    false,
+    true,
   );
 
   if (result && typeof result === 'object' && !Array.isArray(result)) {
@@ -346,17 +368,132 @@ export async function getRecipeComments(recipeId: string, page = 1, pageSize = 2
   return { items: [], page, pageSize, totalCount: 0 };
 }
 
+export type RecipeCommentSubmission = {
+  id: string;
+  content: string;
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Flagged';
+  createdAt: string;
+};
+
 export async function createRecipeComment(
   recipeId: string,
   content: string,
   parentCommentId?: string,
-): Promise<RecipeComment> {
-  return apiFetch<RecipeComment>(
+): Promise<RecipeCommentSubmission> {
+  return apiFetch<RecipeCommentSubmission>(
     `${recipeBasePath}/${encodeURIComponent(recipeId)}/comments`,
     {
       method: 'POST',
       headers: jsonHeaders(),
       body: JSON.stringify({ content, parentCommentId: parentCommentId ?? null }),
     },
+  );
+}
+
+export async function duplicateRecipe(recipeId: string): Promise<{ id: string; slug: string; title: string; status: string; version?: string }> {
+  return apiFetch<{ id: string; slug: string; title: string; status: string; version?: string }>(
+    `${recipeBasePath}/${encodeURIComponent(recipeId)}/duplicate`,
+    {
+      method: 'POST',
+      headers: jsonHeaders(),
+    },
+    true,
+  );
+}
+
+export type PersonalRecipeNote = {
+  id: string;
+  recipeId: string;
+  userId: string;
+  content: string;
+  createdAt: string;
+  updatedAt?: string | null;
+};
+
+export async function getPersonalRecipeNote(recipeId: string): Promise<PersonalRecipeNote | null> {
+  return apiFetch<PersonalRecipeNote | null>(
+    `${recipeBasePath}/${encodeURIComponent(recipeId)}/notes/me`,
+    {},
+    true,
+  );
+}
+
+export async function upsertPersonalRecipeNote(recipeId: string, content: string): Promise<PersonalRecipeNote> {
+  return apiFetch<PersonalRecipeNote>(
+    `${recipeBasePath}/${encodeURIComponent(recipeId)}/notes`,
+    {
+      method: 'POST',
+      headers: jsonHeaders(),
+      body: JSON.stringify({ content }),
+    },
+    true,
+  );
+}
+
+export async function deletePersonalRecipeNote(recipeId: string, noteId?: string): Promise<void> {
+  const path = noteId
+    ? `${recipeBasePath}/${encodeURIComponent(recipeId)}/notes/${encodeURIComponent(noteId)}`
+    : `${recipeBasePath}/${encodeURIComponent(recipeId)}/notes/me`;
+  return apiFetch<void>(
+    path,
+    {
+      method: 'DELETE',
+    },
+    true,
+  );
+}
+
+export type RecipeRevisionSummary = {
+  id: string;
+  version: number;
+  title: string;
+  description: string;
+  changeSummary: string;
+  editorId: string;
+  createdAt: string;
+};
+
+export type RecipeRevisionDetail = RecipeRevisionSummary & {
+  recipeId: string;
+  contentJson: string;
+};
+
+export type RevisionDifference = {
+  field: string;
+  changeType: 'Added' | 'Deleted' | 'Modified';
+  oldValue: string | null;
+  newValue: string | null;
+};
+
+export type RevisionComparison = {
+  recipeId: string;
+  versionA: number;
+  versionB: number;
+  from: { version: number; title: string; description: string; contentJson: string };
+  to: { version: number; title: string; description: string; contentJson: string };
+  differences: RevisionDifference[];
+};
+
+export async function getRecipeRevisions(recipeId: string): Promise<RecipeRevisionSummary[]> {
+  return apiFetch<RecipeRevisionSummary[]>(
+    `${recipeBasePath}/${encodeURIComponent(recipeId)}/revisions`,
+    {},
+    true,
+  );
+}
+
+export async function getRecipeRevision(recipeId: string, version: number): Promise<RecipeRevisionDetail> {
+  return apiFetch<RecipeRevisionDetail>(
+    `${recipeBasePath}/${encodeURIComponent(recipeId)}/revisions/${version}`,
+    {},
+    true,
+  );
+}
+
+export async function compareRecipeRevisions(recipeId: string, v1: number, v2: number): Promise<RevisionComparison> {
+  return apiFetch<RevisionComparison>(
+    `${recipeBasePath}/${encodeURIComponent(recipeId)}/revisions/compare?v1=${v1}&v2=${v2}`,
+    {},
+    true,
   );
 }

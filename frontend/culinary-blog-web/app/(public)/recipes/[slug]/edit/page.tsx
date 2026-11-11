@@ -23,6 +23,8 @@ export default function EditRecipePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [categoryId, setCategoryId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -41,6 +43,7 @@ export default function EditRecipePage() {
       const [data, categoryList] = await Promise.all([getRecipeBySlug(slug), getCategories()]);
       if (!data) throw new Error('Không tìm thấy công thức.');
       setRecipe(data);
+      setHasUnsavedChanges(data.status === 'Draft');
       setCategories(categoryList);
       setCategoryId(data.category?.id || data.categoryId || '');
       setTitle(data.title);
@@ -73,6 +76,7 @@ export default function EditRecipePage() {
     if (!recipe) return;
     setSaving(true);
     setError('');
+    setSuccess('');
     try {
       const result = await updateRecipe(recipe.id, {
         categoryId,
@@ -101,8 +105,27 @@ export default function EditRecipePage() {
         })),
         images: recipe.images.map((image, index) => ({ url: image.url ?? image.originalUrl, altText: image.altText, isPrimary: image.isPrimary, orderIndex: index })),
       }, recipe.version);
-      setError('');
-      router.push(`/recipes/${result.slug}`);
+      setHasUnsavedChanges(false);
+      setSuccess(recipe.status === 'Published'
+        ? 'Đã lưu thay đổi công thức.'
+        : 'Đã lưu thay đổi. Công thức vẫn nằm trong Kho lưu trữ cho đến khi bạn chọn xuất bản.');
+      setRecipe((current) => current ? {
+        ...current,
+        categoryId,
+        category: { ...current.category, id: categoryId },
+        title: title.trim(),
+        description: description.trim(),
+        content: content.trim(),
+        prepTimeMinutes: prepTime,
+        cookTimeMinutes: cookTime,
+        servings,
+        difficulty,
+        nutrition,
+        ingredients: ingredients.filter((item) => item.name.trim()),
+        slug: result.slug,
+        version: result.version ?? current.version,
+      } : current);
+      router.replace(`/recipes/${encodeURIComponent(result.slug)}/edit`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setError('409 Conflict: công thức đã được cập nhật ở phiên bản khác. Tải lại dữ liệu trước khi lưu.');
@@ -116,13 +139,19 @@ export default function EditRecipePage() {
 
   const lifecycle = async (action: 'publish' | 'unpublish' | 'archive' | 'unarchive') => {
     if (!recipe) return;
+    if (action === 'publish' && hasUnsavedChanges) {
+      setError('Hãy rà soát và lưu bản nháp trước khi xuất bản công thức.');
+      return;
+    }
     const labels = { publish: 'xuất bản', unpublish: 'hủy xuất bản', archive: 'lưu trữ', unarchive: 'mở lưu trữ' };
     if (!window.confirm(`Xác nhận ${labels[action]} công thức này?`)) return;
     setSaving(true);
     setError('');
+    setSuccess('');
     try {
       await changeRecipeStatus(recipe.id, action, recipe.version);
       await load();
+      setSuccess(action === 'publish' ? 'Đã xuất bản công thức lên cộng đồng.' : 'Đã cập nhật trạng thái công thức.');
       router.refresh();
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) setError('409 Conflict: phiên bản công thức đã thay đổi.');
@@ -151,13 +180,19 @@ export default function EditRecipePage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <Link href={`/recipes/${recipe.slug}`} className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700"><ArrowLeft className="h-4 w-4" />Xem công thức</Link>
-      <form onSubmit={save} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-8">
+      <Link href="/my-recipes?tab=vault" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700"><ArrowLeft className="h-4 w-4" />Kho công thức của tôi</Link>
+      <form onSubmit={save} onChange={() => setHasUnsavedChanges(true)} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div><p className="text-sm text-slate-500">Chỉnh sửa công thức</p><h1 className="text-2xl font-bold">{recipe.title}</h1></div>
           <RecipeStatusBadge status={recipe.status as RecipeStatus} />
         </div>
         {error && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+        {success && <div role="status" className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{success}</div>}
+        {(recipe.status === 'Draft' || recipe.status === 'Archived') && hasUnsavedChanges && (
+          <p role="status" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Hãy rà soát nội dung và lưu bản nháp trước khi xuất bản.
+          </p>
+        )}
         <div className="grid gap-4 md:grid-cols-2">
           <label className="md:col-span-2">Tiêu đề<input required maxLength={200} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" value={title} onChange={(e) => setTitle(e.target.value)} /></label>
           <label className="md:col-span-2">Mô tả<textarea className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" value={description} onChange={(e) => setDescription(e.target.value)} /></label>
@@ -198,7 +233,7 @@ export default function EditRecipePage() {
         <section className="mt-8"><h2 className="mb-3 text-xl font-bold">Thư viện ảnh</h2><ImageManager recipeId={recipe.id} initialImages={recipe.images} /></section>
 
         <div className="mt-8 flex flex-wrap justify-end gap-2">
-          {recipe.status === 'Draft' && <button type="button" disabled={saving} onClick={() => lifecycle('publish')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white"><Globe2 className="h-4 w-4" />Xuất bản</button>}
+          {(recipe.status === 'Draft' || recipe.status === 'Archived') && <button type="button" disabled={saving || hasUnsavedChanges} onClick={() => lifecycle('publish')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><Globe2 className="h-4 w-4" />{hasUnsavedChanges ? 'Lưu trước khi xuất bản' : 'Xuất bản'}</button>}
           {recipe.status === 'Published' && <><button type="button" disabled={saving} onClick={() => lifecycle('unpublish')} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold">Hủy xuất bản</button><button type="button" disabled={saving} onClick={() => lifecycle('archive')} className="inline-flex items-center gap-2 rounded-xl border border-amber-300 px-4 py-2.5 text-sm font-semibold text-amber-800"><Archive className="h-4 w-4" />Lưu trữ</button></>}
           {recipe.status === 'Archived' && <button type="button" disabled={saving} onClick={() => lifecycle('unarchive')} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold">Mở lưu trữ</button>}
           <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"><Save className="h-4 w-4" />Lưu thay đổi</button>

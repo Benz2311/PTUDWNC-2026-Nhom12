@@ -7,6 +7,7 @@ import RecipeStatusBadge from './RecipeStatusBadge';
 import RecipeTimeInfo from './RecipeTimeInfo';
 import RecipeSteps from '@/components/recipe-management/RecipeSteps';
 import RecipeInteractionPanel from './RecipeInteractionPanel';
+import PersonalNotePanel from './PersonalNotePanel';
 import {
   formatNutritionValue,
   formatScaledQuantity,
@@ -259,6 +260,8 @@ export default function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
           )}
         </aside>
       </div>
+
+      <PersonalNotePanel recipeId={recipe.id} />
 
       <RecipeInteractionPanel recipeId={recipe.id} />
 

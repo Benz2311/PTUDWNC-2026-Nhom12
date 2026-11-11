@@ -18,4 +18,8 @@ describe('Recipe API query serialization', () => {
   it('omits unset filters and trims blank search text', () => {
     expect(buildRecipeQuery({ search: '  ' })).toBe('');
   });
+
+  it('supports the combined author vault status filter', () => {
+    expect(buildRecipeQuery({ mine: true, status: 'Vault' })).toBe('?status=Vault&mine=true');
+  });
 });

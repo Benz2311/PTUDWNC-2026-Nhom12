@@ -149,4 +149,5 @@ public record RecipeListOptions(
     int? MaxCookTimeMinutes = null,
     Guid? AuthorId = null,
     RecipeStatus? Status = null,
-    bool IncludeAllStatuses = false);
+    bool IncludeAllStatuses = false,
+    bool IncludeDraftAndArchived = false);

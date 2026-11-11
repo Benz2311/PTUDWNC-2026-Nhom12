@@ -76,6 +76,12 @@ public class RecipeRepository : IRecipeRepository
             {
                 query = query.Where(recipe => recipe.Status == options.Status.Value);
             }
+            else if (options.IncludeDraftAndArchived)
+            {
+                query = query.Where(recipe =>
+                    recipe.Status == RecipeStatus.Draft ||
+                    recipe.Status == RecipeStatus.Archived);
+            }
         }
         else if (options.AuthorId.HasValue)
         {
@@ -83,6 +89,12 @@ public class RecipeRepository : IRecipeRepository
             if (options.Status.HasValue)
             {
                 query = query.Where(recipe => recipe.Status == options.Status.Value);
+            }
+            else if (options.IncludeDraftAndArchived)
+            {
+                query = query.Where(recipe =>
+                    recipe.Status == RecipeStatus.Draft ||
+                    recipe.Status == RecipeStatus.Archived);
             }
         }
         else

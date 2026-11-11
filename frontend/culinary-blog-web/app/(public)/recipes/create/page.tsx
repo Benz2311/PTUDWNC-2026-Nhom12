@@ -119,7 +119,7 @@ export default function CreateRecipePage() {
 
     setSaving(true);
     try {
-      const result = await createRecipe({
+      await createRecipe({
         categoryId,
         title: title.trim(),
         description: description.trim() || null,
@@ -145,7 +145,7 @@ export default function CreateRecipePage() {
         })),
         images: [],
       });
-      router.push(`/recipes/${result.slug}`);
+      router.push('/my-recipes?tab=vault');
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setError('409 Conflict: dữ liệu công thức đã thay đổi. Vui lòng tải lại và thử lại.');
@@ -159,8 +159,8 @@ export default function CreateRecipePage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
-      <Link href="/recipes" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">
-        <ArrowLeft className="h-4 w-4" /> Danh sách công thức
+      <Link href="/my-recipes?tab=vault" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">
+        <ArrowLeft className="h-4 w-4" /> Kho lưu trữ
       </Link>
       <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">

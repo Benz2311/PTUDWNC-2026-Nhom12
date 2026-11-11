@@ -76,6 +76,16 @@ export async function createRecipe(data: Record<string, unknown>): Promise<{ id:
   return unwrapData(response);
 }
 
+export async function duplicateRecipe(
+  recipeId: string
+): Promise<{ id: string; slug: string; title: string; status: string }> {
+  const response = await apiPost<ApiResponse<{ id: string; slug: string; title: string; status: string }>>(
+    `/recipes/${encodeURIComponent(recipeId)}/duplicate`,
+    {}
+  );
+  return unwrapData(response);
+}
+
 export async function updateRecipe(
   id: string,
   data: Record<string, unknown>,

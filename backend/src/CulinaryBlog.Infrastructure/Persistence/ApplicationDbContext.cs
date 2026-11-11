@@ -41,6 +41,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<UserFollow> UserFollows => Set<UserFollow>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
     public DbSet<UserNutritionGoal> UserNutritionGoals => Set<UserNutritionGoal>();
+    public DbSet<PersonalRecipeNote> PersonalRecipeNotes => Set<PersonalRecipeNote>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -59,7 +60,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     private void RecordActivities()
     {
         ChangeTracker.DetectChanges();
-        foreach (var entry in ChangeTracker.Entries<Recipe>())
+        foreach (var entry in ChangeTracker.Entries<Recipe>().ToList())
         {
             if (entry.State == EntityState.Added &&
                 entry.Entity.Status is RecipeStatus.Published or RecipeStatus.Approved)
@@ -84,7 +85,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 AddActivity(entry.Entity.AuthorId, ActivityType.UpdatedRecipe, entry.Entity.Id);
         }
 
-        foreach (var entry in ChangeTracker.Entries<RecipeRating>())
+        foreach (var entry in ChangeTracker.Entries<RecipeRating>().ToList())
         {
             if (entry.State == EntityState.Added ||
                 entry.State == EntityState.Modified && entry.Property(x => x.Score).IsModified)
@@ -93,7 +94,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             }
         }
 
-        foreach (var entry in ChangeTracker.Entries<RecipeComment>())
+        foreach (var entry in ChangeTracker.Entries<RecipeComment>().ToList())
         {
             var approved = entry.Entity.Status == ModerationStatus.Approved;
             var newlyApproved = entry.State == EntityState.Added && approved ||

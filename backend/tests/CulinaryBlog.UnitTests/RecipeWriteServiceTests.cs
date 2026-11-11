@@ -10,7 +10,7 @@ public sealed class RecipeWriteServiceTests
     public async Task CreateAsync_AddsRecipe_AndSavesOnce()
     {
         var (service, repository, unitOfWork) = CreateService();
-        var recipe = new Recipe();
+        var recipe = new Recipe { Slug = "test-recipe" };
 
         await service.CreateAsync(recipe);
 
@@ -23,7 +23,7 @@ public sealed class RecipeWriteServiceTests
     public async Task UpdateAsync_UpdatesRecipe_AndSavesOnce()
     {
         var (service, repository, unitOfWork) = CreateService();
-        var recipe = new Recipe();
+        var recipe = new Recipe { Slug = "test-recipe" };
 
         await service.UpdateAsync(recipe);
 
@@ -36,8 +36,8 @@ public sealed class RecipeWriteServiceTests
     public async Task ReplaceContentsAsync_ReplacesAllChildren_AndSavesOnce()
     {
         var (service, repository, unitOfWork) = CreateService();
-        var recipe = new Recipe();
-        ICollection<RecipeIngredient> ingredients = [new()];
+        var recipe = new Recipe { Slug = "test-recipe" };
+        ICollection<RecipeIngredient> ingredients = [new() { Name = "Flour" }];
         ICollection<RecipeStep> steps = [new()];
         ICollection<RecipeImage> images = [new()];
 

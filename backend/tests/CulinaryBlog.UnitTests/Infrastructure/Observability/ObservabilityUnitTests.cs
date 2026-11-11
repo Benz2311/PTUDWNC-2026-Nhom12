@@ -316,7 +316,7 @@ public sealed class ObservabilityUnitTests
         var telemetryMock = new Mock<ICulinaryBlogTelemetry>();
 
         var service = new RecipeWriteService(repoMock.Object, uowMock.Object, telemetryMock.Object);
-        var recipe = new Recipe { CategoryId = Guid.NewGuid(), Status = RecipeStatus.Draft };
+        var recipe = new Recipe { CategoryId = Guid.NewGuid(), Status = RecipeStatus.Draft, Slug = "draft-recipe" };
 
         // Act
         await service.CreateAsync(recipe);
@@ -337,7 +337,7 @@ public sealed class ObservabilityUnitTests
         var telemetryMock = new Mock<ICulinaryBlogTelemetry>();
 
         var service = new RecipeWriteService(repoMock.Object, uowMock.Object, telemetryMock.Object);
-        var recipe = new Recipe { CategoryId = Guid.NewGuid(), Status = RecipeStatus.Published };
+        var recipe = new Recipe { CategoryId = Guid.NewGuid(), Status = RecipeStatus.Published, Slug = "published-recipe" };
 
         // Act
         await service.CreateAsync(recipe);
@@ -359,7 +359,7 @@ public sealed class ObservabilityUnitTests
             .ThrowsAsync(new InvalidOperationException("DB Failure"));
 
         var service = new RecipeWriteService(repoMock.Object, uowMock.Object, telemetryMock.Object);
-        var recipe = new Recipe { CategoryId = Guid.NewGuid(), Status = RecipeStatus.Draft };
+        var recipe = new Recipe { CategoryId = Guid.NewGuid(), Status = RecipeStatus.Draft, Slug = "failure-recipe" };
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(recipe));

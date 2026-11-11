@@ -42,11 +42,16 @@ public static class MealPlanEndpoints
         var start = from ?? DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7));
         var end = to ?? start.AddDays(14);
 
-        var entries = await db.MealPlanEntries
+        var rawEntries = await db.MealPlanEntries
             .AsNoTracking()
             .Include(x => x.Recipe)
+                .ThenInclude(r => r.Images)
             .Where(x => x.UserId == userId && x.PlannedDate >= start && x.PlannedDate <= end)
             .OrderBy(x => x.PlannedDate).ThenBy(x => x.MealType)
+            .ToListAsync();
+
+        var entries = rawEntries
+            .Where(x => x.Recipe is not null && !x.Recipe.IsDeleted)
             .Select(x => new
             {
                 x.Id,
@@ -55,9 +60,11 @@ public static class MealPlanEndpoints
                 x.RecipeId,
                 recipeTitle = x.Recipe.Title,
                 recipeSlug = x.Recipe.Slug,
-                primaryImageUrl = x.Recipe.Images.Where(i => i.IsPrimary).Select(i => i.Url).FirstOrDefault()
+                primaryImageUrl = x.Recipe.Images?.FirstOrDefault(i => i.IsPrimary)?.Url
+                    ?? x.Recipe.Images?.FirstOrDefault()?.Url
+                    ?? x.Recipe.CoverImageUrl
             })
-            .ToListAsync();
+            .ToList();
 
         return Results.Ok(new { data = entries });
     }
@@ -130,11 +137,16 @@ public static class MealPlanEndpoints
             return Results.UnprocessableEntity(new { title = "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu" });
 
         var userId = GetUserId(http.User);
-        var recipes = await db.MealPlanEntries.AsNoTracking()
-            .Include(x => x.Recipe).ThenInclude(r => r.Ingredients)
+        var entries = await db.MealPlanEntries.AsNoTracking()
+            .Include(x => x.Recipe)
+                .ThenInclude(r => r.Ingredients)
             .Where(x => x.UserId == userId && x.PlannedDate >= request.From && x.PlannedDate <= request.To)
-            .Select(x => x.Recipe)
             .ToListAsync();
+
+        var recipes = entries
+            .Where(x => x.Recipe is not null && !x.Recipe.IsDeleted)
+            .Select(x => x.Recipe)
+            .ToList();
 
         var existing = await db.ShoppingListItems
             .Where(x => x.UserId == userId && x.ShoppingListId == null && x.RecipeId != null)

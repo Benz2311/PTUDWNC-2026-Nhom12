@@ -182,11 +182,27 @@ public static class RecipeEndpoints
             .WithName("CreateRecipe")
             .WithSummary("Tạo công thức mới (bản nháp)");
 
+        // Sao chép công thức (Duplicate Recipe)
+        group.MapPost("/{id:guid}/duplicate", DuplicateRecipe)
+            .RequireAuthorization()
+            .WithName("DuplicateRecipe")
+            .WithSummary("Sao chép công thức (chỉ dành cho tác giả)")
+            .Produces(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
+
         // Phước: Cập nhật công thức
         group.MapPut("/{id:guid}", UpdateRecipe)
             .RequireAuthorization()
             .WithName("UpdateRecipe")
             .WithSummary("Cập nhật công thức");
+
+        // Phước: Lấy ETag của công thức (cho Author / Admin) – phục vụ delete/lifecycle trên Draft/Archived
+        group.MapGet("/{id:guid}/etag", GetRecipeEtagById)
+            .RequireAuthorization()
+            .WithName("GetRecipeEtagById")
+            .WithSummary("Lấy phiên bản (ETag) của công thức theo ID");
 
         // Phước: Xóa mềm công thức
         group.MapDelete("/{id:guid}", DeleteRecipe)
@@ -337,35 +353,55 @@ public static class RecipeEndpoints
         }
 
         RecipeStatus? parsedStatus = null;
+        var includeDraftAndArchived = string.Equals(
+            status?.Trim(),
+            "Vault",
+            StringComparison.OrdinalIgnoreCase);
         if (!string.IsNullOrWhiteSpace(status))
         {
-            var statusName = Enum.GetNames<RecipeStatus>()
-                .FirstOrDefault(name => string.Equals(
-                    name,
-                    status.Trim(),
-                    StringComparison.OrdinalIgnoreCase));
-            if (statusName is null ||
-                !Enum.TryParse<RecipeStatus>(statusName, true, out var matchedStatus))
+            if (includeDraftAndArchived)
             {
-                return Results.ValidationProblem(
-                    new Dictionary<string, string[]>
-                    {
-                        ["status"] = ["Status phải là Draft, Published hoặc Archived."]
-                    },
-                    statusCode: StatusCodes.Status422UnprocessableEntity,
-                    type: "VALIDATION_ERROR");
+                if (!isMine)
+                {
+                    return Results.ValidationProblem(
+                        new Dictionary<string, string[]>
+                        {
+                            ["status"] = ["Status Vault chỉ được dùng cùng mine=true."]
+                        },
+                        statusCode: StatusCodes.Status422UnprocessableEntity,
+                        type: "VALIDATION_ERROR");
+                }
             }
-
-            parsedStatus = matchedStatus;
-            if (!isMine && !authorId.HasValue)
+            else
             {
-                return Results.ValidationProblem(
-                    new Dictionary<string, string[]>
-                    {
-                        ["status"] = ["Status chỉ được dùng cùng mine=true hoặc authorId của Admin."]
-                    },
-                    statusCode: StatusCodes.Status422UnprocessableEntity,
-                    type: "VALIDATION_ERROR");
+                var statusName = Enum.GetNames<RecipeStatus>()
+                    .FirstOrDefault(name => string.Equals(
+                        name,
+                        status.Trim(),
+                        StringComparison.OrdinalIgnoreCase));
+                if (statusName is null ||
+                    !Enum.TryParse<RecipeStatus>(statusName, true, out var matchedStatus))
+                {
+                    return Results.ValidationProblem(
+                        new Dictionary<string, string[]>
+                        {
+                            ["status"] = ["Status phải là Draft, Published, Archived hoặc Vault."]
+                        },
+                        statusCode: StatusCodes.Status422UnprocessableEntity,
+                        type: "VALIDATION_ERROR");
+                }
+
+                parsedStatus = matchedStatus;
+                if (!isMine && !authorId.HasValue)
+                {
+                    return Results.ValidationProblem(
+                        new Dictionary<string, string[]>
+                        {
+                            ["status"] = ["Status chỉ được dùng cùng mine=true hoặc authorId của Admin."]
+                        },
+                        statusCode: StatusCodes.Status422UnprocessableEntity,
+                        type: "VALIDATION_ERROR");
+                }
             }
         }
 
@@ -380,7 +416,8 @@ public static class RecipeEndpoints
                 : categorySlug.Trim(),
             CategoryId = categoryId,
             AuthorId = isMine ? currentUserId : authorId,
-            Status = parsedStatus
+            Status = parsedStatus,
+            IncludeDraftAndArchived = includeDraftAndArchived
         };
 
         if (isMine || authorId.HasValue)
@@ -1507,6 +1544,119 @@ public static class RecipeEndpoints
         return Results.Created($"/api/v1/recipes/{recipe.Slug}", ApiResponse.Success(new { recipe.Id, recipe.Slug, version = recipe.xmin.ToString() }));
     }
 
+    private static async Task<IResult> DuplicateRecipe(
+        Guid id,
+        ClaimsPrincipal principal,
+        HttpContext httpContext,
+        ApplicationDbContext db,
+        CulinaryBlog.Application.Interfaces.IRecipeRepository recipeRepository,
+        IRecipeWriteService recipeWriteService,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = GetUserId(principal);
+        if (currentUserId == Guid.Empty)
+        {
+            return Results.Unauthorized();
+        }
+
+        var source = await db.Recipes
+            .Include(r => r.Ingredients)
+            .Include(r => r.Steps)
+            .Include(r => r.Images)
+            .SingleOrDefaultAsync(r => r.Id == id && !r.IsDeleted, cancellationToken);
+
+        if (source is null)
+        {
+            return Results.NotFound(new { error = "Không tìm thấy công thức nguồn hoặc công thức đã bị xóa." });
+        }
+
+        if (source.AuthorId != currentUserId)
+        {
+            return Results.Forbid();
+        }
+
+        var copyTitle = $"{source.Title} (Bản sao)";
+        if (copyTitle.Length > 200)
+        {
+            copyTitle = copyTitle[..200];
+        }
+
+        var baseSlug = $"{source.Slug}-copy";
+        var uniqueSlug = await GenerateUniqueSlugAsync(baseSlug, recipeRepository, db, cancellationToken: cancellationToken);
+
+        var duplicatedRecipe = new Recipe
+        {
+            AuthorId = currentUserId,
+            CategoryId = source.CategoryId,
+            Title = copyTitle,
+            Slug = uniqueSlug,
+            Description = source.Description,
+            Content = source.Content,
+            PrepTimeMinutes = source.PrepTimeMinutes,
+            CookTimeMinutes = source.CookTimeMinutes,
+            Servings = source.Servings,
+            Difficulty = source.Difficulty,
+            Status = RecipeStatus.Draft,
+            CoverImageUrl = source.CoverImageUrl,
+            Nutrition = source.Nutrition is null ? new RecipeNutrition() : new RecipeNutrition
+            {
+                Calories = source.Nutrition.Calories,
+                Protein = source.Nutrition.Protein,
+                Carbohydrates = source.Nutrition.Carbohydrates,
+                Fat = source.Nutrition.Fat,
+                Fiber = source.Nutrition.Fiber,
+                Sodium = source.Nutrition.Sodium,
+                Source = source.Nutrition.Source
+            },
+            Ingredients = source.Ingredients
+                .OrderBy(i => i.SortOrder)
+                .Select(i => new RecipeIngredient
+                {
+                    Name = i.Name,
+                    Quantity = i.Quantity,
+                    Unit = i.Unit,
+                    Notes = i.Notes,
+                    SortOrder = i.SortOrder
+                }).ToList(),
+            Steps = source.Steps
+                .OrderBy(s => s.StepNumber)
+                .Select(s => new RecipeStep
+                {
+                    StepNumber = s.StepNumber,
+                    Title = s.Title,
+                    Description = s.Description,
+                    TimerMinutes = s.TimerMinutes,
+                    ImageUrl = s.ImageUrl
+                }).ToList(),
+            Images = source.Images
+                .OrderBy(img => img.SortOrder)
+                .Select(img => new RecipeImage
+                {
+                    OriginalUrl = img.OriginalUrl,
+                    MediumUrl = img.MediumUrl,
+                    ThumbnailUrl = img.ThumbnailUrl,
+                    AltText = img.AltText,
+                    IsPrimary = img.IsPrimary,
+                    SortOrder = img.SortOrder
+                }).ToList()
+        };
+
+        await recipeWriteService.CreateAsync(duplicatedRecipe, cancellationToken);
+        db.RecipeRevisions.Add(CulinaryBlog.Api.Endpoints.RevisionModerationEndpoints.CreateRevision(
+            duplicatedRecipe, currentUserId, 1, $"Sao chép từ công thức: {source.Title}"));
+        await db.SaveChangesAsync(cancellationToken);
+
+        SetRecipeEtag(httpContext, duplicatedRecipe);
+        return Results.Created($"/api/v1/recipes/{duplicatedRecipe.Slug}", ApiResponse.Success(new
+        {
+            id = duplicatedRecipe.Id,
+            slug = duplicatedRecipe.Slug,
+            title = duplicatedRecipe.Title,
+            status = duplicatedRecipe.Status.ToString(),
+            version = duplicatedRecipe.xmin.ToString()
+        }));
+    }
+
     private static async Task<IResult> UpdateRecipe(
         Guid id,
         RecipeRequest request,
@@ -1600,6 +1750,39 @@ public static class RecipeEndpoints
 
         SetRecipeEtag(httpContext, recipe);
         return Results.Ok(ApiResponse.Success(new { recipe.Id, recipe.Slug, version = recipe.xmin.ToString() }));
+    }
+
+    /// <summary>
+    /// Trả về ETag (xmin) của công thức theo ID, chỉ cho phép tác giả hoặc Admin truy cập.
+    /// Dùng để lấy phiên bản mới nhất trước khi thực hiện Delete / status change trên Draft / Archived.
+    /// </summary>
+    private static async Task<IResult> GetRecipeEtagById(
+        Guid id,
+        ClaimsPrincipal principal,
+        HttpContext httpContext,
+        CulinaryBlog.Application.Interfaces.IRecipeRepository recipeRepository,
+        CancellationToken cancellationToken)
+    {
+        var recipe = await recipeRepository.GetByIdAsync(id, includeDetails: false, cancellationToken);
+        if (recipe is null || recipe.IsDeleted)
+        {
+            return Results.NotFound(new { error = "Không tìm thấy công thức." });
+        }
+
+        if (!IsOwnerOrAdmin(principal, recipe.AuthorId))
+        {
+            return Results.Forbid();
+        }
+
+        SetRecipeEtag(httpContext, recipe);
+
+        return Results.Ok(new
+        {
+            id = recipe.Id,
+            slug = recipe.Slug,
+            status = recipe.Status.ToString(),
+            version = recipe.xmin.ToString(),
+        });
     }
 
     private static async Task<IResult> DeleteRecipe(
@@ -2364,6 +2547,7 @@ public static class RecipeEndpoints
 
     private static async Task<IResult> GetRecipeComments(
         Guid id,
+        ClaimsPrincipal principal,
         ApplicationDbContext db,
         int page = 1,
         int pageSize = 20,
@@ -2371,11 +2555,15 @@ public static class RecipeEndpoints
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 50);
+        var currentUserId = GetUserId(principal);
         var query = db.RecipeComments
             .AsNoTracking()
             .Where(comment => comment.RecipeId == id &&
                               comment.ParentCommentId == null &&
-                              comment.Status == CulinaryBlog.Domain.Enums.ModerationStatus.Approved);
+                              (comment.Status == CulinaryBlog.Domain.Enums.ModerationStatus.Approved ||
+                               (currentUserId != Guid.Empty &&
+                                comment.UserId == currentUserId &&
+                                comment.Status == CulinaryBlog.Domain.Enums.ModerationStatus.Pending)));
         var total = await query.CountAsync(cancellationToken);
         var comments = await query
             .OrderByDescending(comment => comment.CreatedAt)
@@ -2387,11 +2575,15 @@ public static class RecipeEndpoints
                 comment.Content,
                 comment.CreatedAt,
                 comment.UpdatedAt,
-                Author = comment.User.DisplayName,
+                AuthorName = comment.User.DisplayName,
                 UserId = comment.UserId,
+                Status = comment.Status,
                 Replies = comment.Replies
                     .Where(reply => !reply.IsDeleted &&
-                                    reply.Status == CulinaryBlog.Domain.Enums.ModerationStatus.Approved)
+                                    (reply.Status == CulinaryBlog.Domain.Enums.ModerationStatus.Approved ||
+                                     (currentUserId != Guid.Empty &&
+                                      reply.UserId == currentUserId &&
+                                      reply.Status == CulinaryBlog.Domain.Enums.ModerationStatus.Pending)))
                     .OrderBy(reply => reply.CreatedAt)
                     .Select(reply => new
                     {
@@ -2399,8 +2591,9 @@ public static class RecipeEndpoints
                         reply.Content,
                         reply.CreatedAt,
                         reply.UpdatedAt,
-                        Author = reply.User.DisplayName,
+                        AuthorName = reply.User.DisplayName,
                         UserId = reply.UserId,
+                        Status = reply.Status,
                     })
                     .ToList()
             })
