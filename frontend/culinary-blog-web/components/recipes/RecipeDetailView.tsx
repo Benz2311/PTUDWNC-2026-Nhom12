@@ -8,6 +8,8 @@ import RecipeMeta from './RecipeMeta';
 import RecipeStatusBadge from './RecipeStatusBadge';
 import RecipeTimeInfo from './RecipeTimeInfo';
 import { resolveImageUrl } from '@/lib/image-url';
+import StarRating from '@/components/ratings/StarRating';
+import CommentSection from '@/components/comments/CommentSection';
 
 const nutritionLabels = [
   ['calories', 'Calories', 'kcal'],
@@ -67,6 +69,12 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
           prepTimeMinutes={recipe.prepTimeMinutes ?? recipe.prepTime}
           cookTimeMinutes={recipe.cookTimeMinutes ?? recipe.cookTime}
           servings={recipe.servings}
+        />
+        <StarRating
+          recipeId={recipe.id}
+          initialAverage={recipe.averageRating ?? 0}
+          initialCount={recipe.ratingCount ?? 0}
+          initialUserRating={recipe.userRating}
         />
       </header>
 
@@ -206,6 +214,8 @@ export function RecipeDetailView({ recipe }: { recipe: RecipeDetail }) {
           )}
         </aside>
       </div>
+
+      <CommentSection recipeId={recipe.id} recipeStatus={String(recipe.status)} />
 
       <div className="mt-8">
         <Link

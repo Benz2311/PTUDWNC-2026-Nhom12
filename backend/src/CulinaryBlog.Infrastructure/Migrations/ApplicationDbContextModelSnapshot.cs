@@ -219,6 +219,66 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CulinaryBlog.Domain.Entities.CommentReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CommentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(1000)
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("ReporterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ResolutionNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ResolvedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReporterId");
+
+                    b.HasIndex("ResolvedByUserId");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.HasIndex("CommentId", "ReporterId", "Status");
+
+                    b.ToTable("CommentReports", (string)null);
+                });
+
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.Recipe", b =>
                 {
                     b.Property<Guid>("Id")
@@ -358,6 +418,61 @@ namespace CulinaryBlog.Infrastructure.Migrations
                     b.ToTable("RecipeAuditLogs");
                 });
 
+            modelBuilder.Entity("CulinaryBlog.Domain.Entities.RecipeComment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("HiddenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("HiddenByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsHidden")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<Guid?>("ParentCommentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RecipeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentCommentId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("RecipeId", "ParentCommentId", "IsDeleted", "CreatedAt");
+
+                    b.ToTable("RecipeComments", (string)null);
+                });
+
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.RecipeImage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -467,6 +582,44 @@ namespace CulinaryBlog.Infrastructure.Migrations
                     b.HasIndex("RecipeId");
 
                     b.ToTable("RecipeIngredients", (string)null);
+                });
+
+            modelBuilder.Entity("CulinaryBlog.Domain.Entities.RecipeRating", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("RecipeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("RecipeId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("RecipeRatings", (string)null);
                 });
 
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.RecipeSlugHistory", b =>
@@ -604,6 +757,32 @@ namespace CulinaryBlog.Infrastructure.Migrations
                     b.ToTable("RefreshTokens", (string)null);
                 });
 
+            modelBuilder.Entity("CulinaryBlog.Domain.Entities.CommentReport", b =>
+                {
+                    b.HasOne("CulinaryBlog.Domain.Entities.RecipeComment", "Comment")
+                        .WithMany("Reports")
+                        .HasForeignKey("CommentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CulinaryBlog.Domain.Entities.ApplicationUser", "Reporter")
+                        .WithMany("ReportsSubmitted")
+                        .HasForeignKey("ReporterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CulinaryBlog.Domain.Entities.ApplicationUser", "ResolvedByUser")
+                        .WithMany()
+                        .HasForeignKey("ResolvedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Comment");
+
+                    b.Navigation("Reporter");
+
+                    b.Navigation("ResolvedByUser");
+                });
+
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.Recipe", b =>
                 {
                     b.HasOne("CulinaryBlog.Domain.Entities.ApplicationUser", "Author")
@@ -672,6 +851,32 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("CulinaryBlog.Domain.Entities.RecipeComment", b =>
+                {
+                    b.HasOne("CulinaryBlog.Domain.Entities.RecipeComment", "ParentComment")
+                        .WithMany("Replies")
+                        .HasForeignKey("ParentCommentId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("CulinaryBlog.Domain.Entities.Recipe", "Recipe")
+                        .WithMany("Comments")
+                        .HasForeignKey("RecipeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CulinaryBlog.Domain.Entities.ApplicationUser", "User")
+                        .WithMany("Comments")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ParentComment");
+
+                    b.Navigation("Recipe");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.RecipeImage", b =>
                 {
                     b.HasOne("CulinaryBlog.Domain.Entities.Recipe", "Recipe")
@@ -692,6 +897,25 @@ namespace CulinaryBlog.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Recipe");
+                });
+
+            modelBuilder.Entity("CulinaryBlog.Domain.Entities.RecipeRating", b =>
+                {
+                    b.HasOne("CulinaryBlog.Domain.Entities.Recipe", "Recipe")
+                        .WithMany("Ratings")
+                        .HasForeignKey("RecipeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CulinaryBlog.Domain.Entities.ApplicationUser", "User")
+                        .WithMany("Ratings")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Recipe");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.RecipeSlugHistory", b =>
@@ -727,9 +951,15 @@ namespace CulinaryBlog.Infrastructure.Migrations
 
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.ApplicationUser", b =>
                 {
+                    b.Navigation("Comments");
+
+                    b.Navigation("Ratings");
+
                     b.Navigation("Recipes");
 
                     b.Navigation("RefreshTokens");
+
+                    b.Navigation("ReportsSubmitted");
                 });
 
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.Category", b =>
@@ -739,11 +969,22 @@ namespace CulinaryBlog.Infrastructure.Migrations
 
             modelBuilder.Entity("CulinaryBlog.Domain.Entities.Recipe", b =>
                 {
+                    b.Navigation("Comments");
+
                     b.Navigation("Images");
 
                     b.Navigation("Ingredients");
 
+                    b.Navigation("Ratings");
+
                     b.Navigation("Steps");
+                });
+
+            modelBuilder.Entity("CulinaryBlog.Domain.Entities.RecipeComment", b =>
+                {
+                    b.Navigation("Replies");
+
+                    b.Navigation("Reports");
                 });
 #pragma warning restore 612, 618
         }

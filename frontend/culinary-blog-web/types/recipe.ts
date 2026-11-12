@@ -184,6 +184,9 @@ export interface RecipeDetail {
   ingredients: RecipeIngredient[];
   steps: RecipeStep[];
   images: RecipeImage[];
+  averageRating?: number;
+  ratingCount?: number;
+  userRating?: number | null;
 }
 
 export type Recipe = RecipeDetail;

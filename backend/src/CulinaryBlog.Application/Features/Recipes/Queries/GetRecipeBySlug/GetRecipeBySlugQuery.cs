@@ -85,6 +85,13 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
                 PublishedAt = r.PublishedAt,
                 CreatedAt = r.CreatedAt,
                 UpdatedAt = r.UpdatedAt,
+                AverageRating = r.Ratings.Where(rt => !rt.IsDeleted).Any()
+                    ? Math.Round(r.Ratings.Where(rt => !rt.IsDeleted).Average(rt => (double)rt.Score), 1)
+                    : 0,
+                RatingCount = r.Ratings.Count(rt => !rt.IsDeleted),
+                UserRating = request.CurrentUserId.HasValue
+                    ? r.Ratings.Where(rt => !rt.IsDeleted && rt.UserId == request.CurrentUserId.Value).Select(rt => (int?)rt.Score).FirstOrDefault()
+                    : null,
                 Author = new AuthorSummaryDto
                 {
                     Id = r.Author.Id,

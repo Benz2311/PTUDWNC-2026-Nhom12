@@ -23,6 +23,10 @@ public class RecipeDetailDto
     public DateTime? UpdatedAt { get; set; }
     public string Version { get; set; } = string.Empty;
 
+    public double AverageRating { get; set; }
+    public int RatingCount { get; set; }
+    public int? UserRating { get; set; }
+
     public AuthorSummaryDto Author { get; set; } = null!;
     public CategorySummaryDto Category { get; set; } = null!;
     public RecipeNutritionDto? Nutrition { get; set; }

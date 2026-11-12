@@ -31,4 +31,13 @@ public class ApplicationUser
 
     public ICollection<Recipe> Recipes { get; set; }
         = new List<Recipe>();
+
+    public ICollection<RecipeRating> Ratings { get; set; }
+        = new List<RecipeRating>();
+
+    public ICollection<RecipeComment> Comments { get; set; }
+        = new List<RecipeComment>();
+
+    public ICollection<CommentReport> ReportsSubmitted { get; set; }
+        = new List<CommentReport>();
 }

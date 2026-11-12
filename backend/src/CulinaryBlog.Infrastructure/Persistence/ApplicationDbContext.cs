@@ -30,6 +30,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<RecipeImage> RecipeImages => Set<RecipeImage>();
     public DbSet<RecipeAuditLog> RecipeAuditLogs => Set<RecipeAuditLog>();
     public DbSet<RecipeSlugHistory> RecipeSlugHistories => Set<RecipeSlugHistory>();
+    public DbSet<RecipeRating> RecipeRatings => Set<RecipeRating>();
+    public DbSet<RecipeComment> RecipeComments => Set<RecipeComment>();
+    public DbSet<CommentReport> CommentReports => Set<CommentReport>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

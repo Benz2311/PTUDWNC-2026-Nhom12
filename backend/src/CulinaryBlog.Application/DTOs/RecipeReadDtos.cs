@@ -124,7 +124,10 @@ public record RecipeDetailDto(
     IReadOnlyList<RecipeStepDto> Steps,
     IReadOnlyList<RecipeImageDto> Images,
     RecipeNutritionDto Nutrition,
-    RecipeAuthorDto? Author = null);
+    RecipeAuthorDto? Author = null,
+    double AverageRating = 0,
+    int RatingCount = 0,
+    int? UserRating = null);
 
 public record CategoryRecipesDataDto(
     RecipeCategoryDto Category,

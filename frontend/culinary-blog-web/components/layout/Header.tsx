@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Layers,
   Users,
+  Flag,
 } from "lucide-react";
 import { getStoredToken, removeStoredToken } from "@/lib/api/client";
 import { buttonVariants } from "@/components/ui/Button";
@@ -230,6 +231,10 @@ export function Header() {
                         <ShieldAlert className="h-4 w-4 text-purple-600" />
                         <span>Thùng rác công thức</span>
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push("/admin/comment-reports")}>
+                        <Flag className="h-4 w-4 text-rose-600" />
+                        <span>Báo cáo bình luận</span>
+                      </DropdownMenuItem>
                     </>
                   )}
                   <DropdownMenuSeparator />
@@ -361,6 +366,18 @@ export function Header() {
               >
                 <ShieldAlert className="h-4 w-4" />
                 <span>Thùng rác công thức</span>
+              </Link>
+              <Link
+                href="/admin/comment-reports"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${
+                  pathname.startsWith("/admin/comment-reports")
+                    ? "bg-emerald-700 text-white font-semibold"
+                    : "text-gray-700 hover:bg-emerald-50"
+                }`}
+              >
+                <Flag className="h-4 w-4" />
+                <span>Báo cáo bình luận</span>
               </Link>
             </div>
           )}

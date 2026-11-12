@@ -804,22 +804,19 @@ PTUDWNC-2026-Nhom12/
 # Chức năng mới - Phát triển chức năng mở rộng và nâng cao trải nghiệm người dùng
 
 **Mục tiêu:** Bổ sung các chức năng tương tác cộng đồng, cá nhân hóa công thức, thống kê quản trị, quản lý nội dung nâng cao và hỗ trợ quá trình nấu ăn; tận dụng hệ thống API, PostgreSQL, Redis và các thành phần Front-end đã xây dựng từ Bữa 1 đến Bữa 8.
-
-## Nguyễn Văn Quốc - Rating / Comment / Comment Report
-
-- Xây dựng chức năng đánh giá công thức theo thang điểm từ 1 đến 5 sao cho người dùng đã đăng nhập.
-- Thiết lập dữ liệu đánh giá liên kết với `ApplicationUser` và `Recipe`, bảo đảm mỗi người dùng chỉ có một đánh giá cho mỗi công thức.
-- Xây dựng API thêm, cập nhật và xóa đánh giá; kiểm tra JWT và quyền sở hữu trước khi thực hiện thao tác.
-- Tính toán và hiển thị điểm đánh giá trung bình cùng tổng số lượt đánh giá trên trang chi tiết công thức.
-- Xây dựng chức năng bình luận dưới công thức Published, hiển thị nội dung, tác giả và thời gian tạo bình luận.
-- Hoàn thiện API thêm, sửa, xóa bình luận và cho phép trả lời bình luận theo cấu trúc một cấp.
-- Xây dựng giao diện danh sách bình luận có phân trang, Loading, Empty State và thông báo lỗi phù hợp.
-- Xây dựng chức năng báo cáo bình luận vi phạm, cho phép người dùng lựa chọn lý do báo cáo và gửi yêu cầu đến hệ thống.
-- Thiết lập cơ chế hạn chế báo cáo trùng lặp và lưu trạng thái xử lý của từng báo cáo trong PostgreSQL.
-- Xây dựng giao diện Admin quản lý báo cáo bình luận, cho phép xem lý do, giữ lại hoặc ẩn bình luận vi phạm.
-- Bảo đảm chỉ Admin có quyền xử lý báo cáo và người dùng thông thường không thể chỉnh sửa bình luận của tài khoản khác.
-- Kiểm thử Rating, Comment CRUD, Reply, Comment Report, phân quyền và các trường hợp dữ liệu không hợp lệ.
-
+## Nguyễn Văn Quốc - Đánh giá/Bình luận/Báo cáo bình luận
+Xây dựng chức năng đánh giá công thức theo thang điểm từ 1 đến 5 sao cho người dùng đã đăng nhập.
+Thiết lập liên kết giá trị dữ liệu với ApplicationUservà Recipeđảm bảo mỗi người dùng chỉ có một giá trị đánh giá cho mỗi công thức.
+Xây dựng API bổ sung, cập nhật và xóa giá đánh giá; kiểm tra JWT và quyền sở hữu trước khi thực hiện thao tác.
+Tính toán và hiển thị điểm đánh giá trung bình tổng số lần đánh giá trên trang công thức chi tiết.
+Xây dựng chức năng bình luận dưới công thức được xuất bản, hiển thị nội dung, tác giả và thời gian tạo bình luận.
+Hoàn thiện API bổ sung, sửa, xóa bình luận và cho phép trả lời bình luận theo cấu trúc một cấp.
+Xây dựng giao diện danh sách bình luận có phân trang, Đang tải, Trạng thái trống và thông báo lỗi phù hợp.
+Xây dựng chức năng báo cáo bình luận vi phạm, cho phép người dùng lựa chọn lý do báo cáo và gửi yêu cầu đến hệ thống.
+Thiết lập cơ chế hạn chế lặp lại báo cáo và lưu trạng thái xử lý của từng báo cáo trong PostgreSQL.
+Xây dựng giao diện Quản trị viên quản lý báo cáo bình luận, cho phép xem lý do, giữ lại hoặc ẩn bình luận vi phạm.
+Bảo đảm quản trị viên có quyền xử lý báo cáo và người dùng thông thường không thể chỉnh sửa bình luận của các tài khoản khác.
+Kiểm tra Xếp hạng, CRUD nhận xét, Trả lời, Báo cáo nhận xét, phân quyền và dữ liệu hợp lệ các trường không hợp lệ.
 ## Lê Thị Ánh Nhung - Personalized Recommendations / Collections / Trending Recipes / Admin Activity Analytics / Category Performance Analytics
 
 - Rà soát các chức năng Trang chủ, Category, Recipe Read, Dashboard và Statistics đã triển khai từ Bữa 1 đến Bữa 8 để xác định những thành phần có thể tái sử dụng, không xây dựng lại chức năng thống kê tổng quan đã có.
