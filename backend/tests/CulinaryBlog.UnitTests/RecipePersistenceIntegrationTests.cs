@@ -103,6 +103,8 @@ public sealed class RecipePersistenceIntegrationTests
         Assert.NotNull(updatedRecipe);
         updatedRecipe!.Title = "Updated integration recipe";
         updatedRecipe.Nutrition.Calories = 210m;
+        await db.SaveChangesAsync();
+
         var replacementIngredient = new RecipeIngredient
         {
             Name = "Replacement ingredient",

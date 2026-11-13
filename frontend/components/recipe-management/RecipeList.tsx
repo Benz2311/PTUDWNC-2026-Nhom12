@@ -170,8 +170,9 @@ export default function RecipeList({ admin = false }: { admin?: boolean }) {
         },
         unpublish: {
           title: 'Xác nhận hủy xuất bản',
-          message: `Chuyển công thức "${pendingAction.recipe.title}" về Bản nháp (Draft)? Công thức sẽ không hiển thị công khai.`,
-          confirmText: 'Hủy xuất bản',
+          message: `Bạn có muốn hủy xuất bản công thức "${pendingAction.recipe.title}" và đưa vào Kho lưu trữ không?`,
+          confirmText: 'Có',
+          cancelText: 'Không',
           variant: 'warning' as const,
         },
         archive: {
@@ -340,10 +341,11 @@ export default function RecipeList({ admin = false }: { admin?: boolean }) {
                   <button
                     className="card-action card-action-published"
                     type="button"
-                    disabled
-                    aria-label="Công thức đã xuất bản"
+                    disabled={isBusy}
+                    onClick={() => setPendingAction({ type: 'unpublish', recipe })}
+                    title="Nhấn để hủy xuất bản và đưa công thức vào Kho lưu trữ"
                   >
-                    ✓ Đã xuất bản
+                    {isBusy ? '⏳ Đang xử lý...' : '✓ Đã xuất bản'}
                   </button>
                 ) : (
                   <button
@@ -356,12 +358,15 @@ export default function RecipeList({ admin = false }: { admin?: boolean }) {
                     {isBusy ? '⏳ Đang xử lý...' : '🚀 Xuất bản'}
                   </button>
                 )}
-                <a
-                  className="card-action card-action-edit"
-                  href={`/recipes/${encodeURIComponent(recipe.slug)}/edit`}
-                >
-                  ✏️ Chỉnh sửa
-                </a>
+                {/* Nút chỉnh sửa chỉ được phép hiển thị trong Kho lưu trữ (Draft / Archived) */}
+                {(statusTab === 'Vault' || (recipe.status === 'Draft' || recipe.status === 'Archived')) && (
+                  <a
+                    className="card-action card-action-edit"
+                    href={`/recipes/${encodeURIComponent(recipe.slug)}/edit`}
+                  >
+                    ✏️ Chỉnh sửa
+                  </a>
+                )}
 
                 {/* Duplicate button – only shown in author's own recipe list */}
                 {!admin && (
@@ -392,53 +397,7 @@ export default function RecipeList({ admin = false }: { admin?: boolean }) {
                   </button>
                 )}
 
-                {/* Status-specific lifecycle actions */}
-                {recipe.status === 'Draft' && (
-                  <button
-                    className="card-action card-action-archive"
-                    type="button"
-                    disabled={isBusy}
-                    onClick={() => setPendingAction({ type: 'archive', recipe })}
-                    title="Lưu trữ công thức"
-                  >
-                    📦 Lưu trữ
-                  </button>
-                )}
 
-                {recipe.status === 'Published' && (
-                  <>
-                    <button
-                      className="card-action card-action-unpublish"
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => setPendingAction({ type: 'unpublish', recipe })}
-                      title="Hủy xuất bản về bản nháp"
-                    >
-                      ↩ Hủy xuất bản
-                    </button>
-                    <button
-                      className="card-action card-action-archive"
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => setPendingAction({ type: 'archive', recipe })}
-                      title="Lưu trữ công thức"
-                    >
-                      📦 Lưu trữ
-                    </button>
-                  </>
-                )}
-
-                {recipe.status === 'Archived' && (
-                  <button
-                    className="card-action card-action-unarchive"
-                    type="button"
-                    disabled={isBusy}
-                    onClick={() => setPendingAction({ type: 'unarchive', recipe })}
-                    title="Mở lưu trữ về Kho lưu trữ"
-                  >
-                    🔓 Mở lưu trữ
-                  </button>
-                )}
 
                 <button
                   className="delete-action"
@@ -482,6 +441,7 @@ export default function RecipeList({ admin = false }: { admin?: boolean }) {
           title={dialogConfig.title}
           message={dialogConfig.message}
           confirmText={dialogConfig.confirmText}
+          cancelText={'cancelText' in dialogConfig ? (dialogConfig as { cancelText?: string }).cancelText : 'Hủy bỏ'}
           variant={dialogConfig.variant}
           isLoading={isActionLoading}
           onConfirm={executeAction}

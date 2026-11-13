@@ -48,46 +48,26 @@ export default function RecipeActions({
 
         <div className="form-actions-buttons">
           {(status === 'Draft' || status === 'Archived') && (
-            <>
-              <button
-                className="primary-button action-btn-publish"
-                disabled={disabled || Boolean(publishBlocker)}
-                onClick={() => setActiveDialog('publish')}
-                type="button"
-                title={publishBlocker || 'Xuất bản công thức để người khác có thể xem'}
-              >
-                🚀 Xuất bản (Publish)
-              </button>
-              <button
-                className="outline-button action-btn-archive"
-                disabled={disabled}
-                onClick={() => setActiveDialog('archive')}
-                type="button"
-              >
-                📦 Lưu trữ (Archive)
-              </button>
-            </>
+            <button
+              className="primary-button action-btn-publish"
+              disabled={disabled || Boolean(publishBlocker)}
+              onClick={() => setActiveDialog('publish')}
+              type="button"
+              title={publishBlocker || 'Xuất bản công thức để người khác có thể xem'}
+            >
+              🚀 Xuất bản (Publish)
+            </button>
           )}
 
           {status === 'Published' && (
-            <>
-              <button
-                className="outline-button action-btn-unpublish"
-                disabled={disabled}
-                onClick={() => setActiveDialog('unpublish')}
-                type="button"
-              >
-                ↩ Hủy xuất bản (Unpublish)
-              </button>
-              <button
-                className="outline-button action-btn-archive"
-                disabled={disabled}
-                onClick={() => setActiveDialog('archive')}
-                type="button"
-              >
-                📦 Lưu trữ (Archive)
-              </button>
-            </>
+            <button
+              className="outline-button action-btn-unpublish"
+              disabled={disabled}
+              onClick={() => setActiveDialog('unpublish')}
+              type="button"
+            >
+              ↩ Hủy xuất bản (Unpublish)
+            </button>
           )}
 
           {status === 'Archived' && (

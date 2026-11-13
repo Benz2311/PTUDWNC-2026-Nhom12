@@ -330,11 +330,16 @@ public static class RecipeSeedData
             .Include(item => item.Images)
             .Where(item => item.AuthorId == targetUser.Id && item.Slug.StartsWith("ngocphuoc-mau-"))
             .ToDictionaryAsync(item => item.Slug, cancellationToken);
+        var existingSlugs = await db.Recipes
+            .IgnoreQueryFilters()
+            .Where(item => item.Slug.StartsWith("ngocphuoc-mau-"))
+            .Select(item => item.Slug)
+            .ToHashSetAsync(cancellationToken);
 
         for (var i = 1; i <= 100; i++)
         {
             var slug = $"ngocphuoc-mau-{i:000}";
-            if (!existingRecipes.ContainsKey(slug))
+            if (existingSlugs.Add(slug))
             {
                 var baseName = RecipeBases[(i - 1) % RecipeBases.Length];
                 existingRecipes[slug] = CreateNgocPhuocRecipe(

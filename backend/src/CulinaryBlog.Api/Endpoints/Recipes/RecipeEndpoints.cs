@@ -1511,7 +1511,7 @@ public static class RecipeEndpoints
         if (validation is not null)
         {
             return validation == "Recipe slug already exists."
-                ? Results.Conflict(new { error = validation })
+                ? Results.Conflict(new { error = validation, code = "RECIPE_SLUG_CONFLICT" })
                 : Results.UnprocessableEntity(new { error = validation });
         }
 
@@ -1678,9 +1678,18 @@ public static class RecipeEndpoints
             return Results.Forbid();
         }
 
+        if (recipe.Status == RecipeStatus.Published)
+        {
+            return Results.UnprocessableEntity(new { error = "Công thức đã xuất bản không được phép chỉnh sửa trực tiếp. Vui lòng hủy xuất bản về Kho lưu trữ trước khi chỉnh sửa." });
+        }
+
         if (!MatchesIfMatchHeader(recipe, httpContext.Request.Headers.IfMatch.ToString()))
         {
-            return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
+            return Results.Conflict(new
+            {
+                error = "Recipe version is stale. Reload the recipe and retry.",
+                code = "RECIPE_VERSION_CONFLICT"
+            });
         }
 
         request = request with { AuthorId = recipe.AuthorId };
@@ -1688,7 +1697,7 @@ public static class RecipeEndpoints
         if (validation is not null)
         {
             return validation == "Recipe slug already exists."
-                ? Results.Conflict(new { error = validation })
+                ? Results.Conflict(new { error = validation, code = "RECIPE_SLUG_CONFLICT" })
                 : Results.UnprocessableEntity(new { error = validation });
         }
 
@@ -1731,6 +1740,11 @@ public static class RecipeEndpoints
                 });
             }
         }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await recipeRepository.UpdateAsync(recipe, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+
         await recipeWriteService.ReplaceContentsAsync(
             recipe,
             ToIngredients(request.Ingredients),
@@ -1747,7 +1761,13 @@ public static class RecipeEndpoints
             nextRevision + 1,
             "Cập nhật công thức"));
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
+        recipe.xmin = await db.Recipes
+            .AsNoTracking()
+            .Where(item => item.Id == recipe.Id)
+            .Select(item => item.xmin)
+            .SingleAsync(cancellationToken);
         SetRecipeEtag(httpContext, recipe);
         return Results.Ok(ApiResponse.Success(new { recipe.Id, recipe.Slug, version = recipe.xmin.ToString() }));
     }
@@ -1806,7 +1826,11 @@ public static class RecipeEndpoints
 
         if (!MatchesIfMatchHeader(recipe, httpContext.Request.Headers.IfMatch.ToString()))
         {
-            return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
+            return Results.Conflict(new
+            {
+                error = "Recipe version is stale. Reload the recipe and retry.",
+                code = "RECIPE_VERSION_CONFLICT"
+            });
         }
 
         await recipeWriteService.DeleteAsync(recipe, cancellationToken);
@@ -1841,7 +1865,11 @@ public static class RecipeEndpoints
 
             if (!MatchesIfMatchHeader(recipe, httpContext.Request.Headers.IfMatch.ToString()))
             {
-                return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
+                return Results.Conflict(new
+                {
+                    error = "Recipe version is stale. Reload the recipe and retry.",
+                    code = "RECIPE_VERSION_CONFLICT"
+                });
             }
 
             if (status == RecipeStatus.Published)
@@ -1922,7 +1950,11 @@ public static class RecipeEndpoints
 
         if (!MatchesIfMatchHeader(recipe, httpContext.Request.Headers.IfMatch.ToString()))
         {
-            return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
+            return Results.Conflict(new
+            {
+                error = "Recipe version is stale. Reload the recipe and retry.",
+                code = "RECIPE_VERSION_CONFLICT"
+            });
         }
 
         var ingredient = new RecipeIngredient
@@ -1968,7 +2000,11 @@ public static class RecipeEndpoints
 
         if (!MatchesIfMatchHeader(recipe, httpContext.Request.Headers.IfMatch.ToString()))
         {
-            return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
+            return Results.Conflict(new
+            {
+                error = "Recipe version is stale. Reload the recipe and retry.",
+                code = "RECIPE_VERSION_CONFLICT"
+            });
         }
 
         var ingredient = await db.RecipeIngredients.SingleOrDefaultAsync(item => item.Id == ingredientId && item.RecipeId == recipeId, cancellationToken);
@@ -2009,7 +2045,11 @@ public static class RecipeEndpoints
 
         if (!MatchesIfMatchHeader(recipe, httpContext.Request.Headers.IfMatch.ToString()))
         {
-            return Results.Conflict(new { error = "Recipe version is stale. Reload the recipe and retry." });
+            return Results.Conflict(new
+            {
+                error = "Recipe version is stale. Reload the recipe and retry.",
+                code = "RECIPE_VERSION_CONFLICT"
+            });
         }
 
         var ingredient = await db.RecipeIngredients.SingleOrDefaultAsync(item => item.Id == ingredientId && item.RecipeId == recipeId, cancellationToken);
@@ -2120,7 +2160,23 @@ public static class RecipeEndpoints
         }
 
         candidate = candidate.Trim('"');
-        return uint.TryParse(candidate, out var version) && version == recipe.xmin;
+        if (candidate == "*")
+        {
+            return true;
+        }
+
+        if (uint.TryParse(candidate, out var version) && version == recipe.xmin)
+        {
+            return true;
+        }
+
+        if (recipe.RowVersion != null && recipe.RowVersion.Length > 0 &&
+            string.Equals(candidate, Convert.ToBase64String(recipe.RowVersion), StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private static void SetRecipeEtag(HttpContext httpContext, Recipe recipe) =>

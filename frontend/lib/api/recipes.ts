@@ -48,10 +48,18 @@ export type RecipeStepInput = {
   description: string;
 };
 
-export type RecipeReference = Pick<RecipeSummary, 'id' | 'slug'>;
+export type RecipeReference = Pick<RecipeSummary, 'id' | 'slug'> & { version?: string };
 export type RecipeStatusResult = Pick<RecipeSummary, 'id'> & { status: RecipeStatus };
 
 const recipeBasePath = '/api/v1/recipes';
+
+export function getRecipeEtagFromResponse(
+  headers: Headers,
+  version?: string | null,
+  fallback = '',
+): string {
+  return headers.get('ETag') ?? (version ? `"${version}"` : fallback);
+}
 
 export function buildRecipeQuery(query: RecipeQuery = {}): string {
   const params = new URLSearchParams();

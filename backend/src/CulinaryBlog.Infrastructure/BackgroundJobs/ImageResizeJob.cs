@@ -161,11 +161,33 @@ public class ImageResizeJob : IImageResizeJob
         var thumbUrl = await _storageService.UploadAsync(DefaultBucket, thumbKey, thumbMs, outputMime, ct);
 
         // 10. Cập nhật Database chỉ khi đã upload thành công cả 2 ảnh
-        image.MediumUrl = mediumUrl;
-        image.ThumbnailUrl = thumbUrl;
-        image.UpdatedAt = DateTime.UtcNow;
+        var updatedAt = DateTime.UtcNow;
+        if (_dbContext.Database.IsRelational())
+        {
+            var updatedImages = await _dbContext.RecipeImages
+                .Where(candidate => candidate.Id == recipeImageId && !candidate.IsDeleted)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(candidate => candidate.MediumUrl, mediumUrl)
+                        .SetProperty(candidate => candidate.ThumbnailUrl, thumbUrl)
+                        .SetProperty(candidate => candidate.UpdatedAt, updatedAt),
+                    ct);
 
-        await _dbContext.SaveChangesAsync(ct);
+            if (updatedImages == 0)
+            {
+                _logger.LogInformation(
+                    "RecipeImage {RecipeImageId} was removed while resizing; skipping derived image update.",
+                    recipeImageId);
+                return;
+            }
+        }
+        else
+        {
+            image.MediumUrl = mediumUrl;
+            image.ThumbnailUrl = thumbUrl;
+            image.UpdatedAt = updatedAt;
+            await _dbContext.SaveChangesAsync(ct);
+        }
 
         _logger.LogInformation(
             "Hoàn thành tạo Medium và Thumbnail cho RecipeImage {RecipeImageId}: Medium={MediumUrl}, Thumbnail={ThumbnailUrl}.",

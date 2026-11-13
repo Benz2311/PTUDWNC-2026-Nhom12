@@ -39,4 +39,20 @@ describe('API authentication refresh', () => {
     expect(dispatchEvent).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
+
+  it('preserves API error codes on conflict responses', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: 'Recipe version is stale.',
+      code: 'RECIPE_VERSION_CONFLICT',
+    }), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+
+    await expect(apiFetch('/api/v1/recipes/test', {}, false)).rejects.toMatchObject({
+      status: 409,
+      code: 'RECIPE_VERSION_CONFLICT',
+      message: 'Recipe version is stale.',
+    });
+  });
 });

@@ -109,6 +109,7 @@ const recipeDetailOutputSchema = z.object({
   steps: z.array(recipeStepSchema).default([]),
   nutrition: recipeNutritionSchema.nullish(),
   images: z.array(recipeImageSchema).default([]),
+  version: z.string().nullish(),
 });
 
 export const recipeDetailSchema = z.preprocess((value) => {

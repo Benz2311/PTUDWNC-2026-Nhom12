@@ -5,6 +5,7 @@ import {
   changeRecipeStatus,
   createRecipe,
   deleteRecipe,
+  getRecipeEtagFromResponse,
   updateRecipe,
   updateRecipeIngredient,
 } from './recipes';
@@ -60,6 +61,16 @@ const sampleDraftPayload: RecipeDraftRequest = {
     },
   ],
 };
+
+describe('Recipe ETag response handling', () => {
+  it('uses the response body version when the ETag header is unavailable', () => {
+    expect(getRecipeEtagFromResponse(new Headers(), '10002', '"10001"')).toBe('"10002"');
+  });
+
+  it('prefers the ETag header over the response body version', () => {
+    expect(getRecipeEtagFromResponse(new Headers({ ETag: '"10003"' }), '10002')).toBe('"10003"');
+  });
+});
 
 describe('Recipe Create, Update and Lifecycle Actions', () => {
   beforeEach(() => {

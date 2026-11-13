@@ -163,12 +163,14 @@ export default function MyRecipesPage() {
                 showStatus
                 actions={
                   <div className="flex w-full flex-wrap gap-2">
-                    <Link
-                      href={`/recipes/${encodeURIComponent(recipe.slug)}/edit`}
-                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800"
-                    >
-                      <Pencil className="h-3.5 w-3.5" /> Chỉnh sửa
-                    </Link>
+                    {(status === "Vault" || recipe.status === "Draft" || recipe.status === "Archived") && (
+                      <Link
+                        href={`/recipes/${encodeURIComponent(recipe.slug)}/edit`}
+                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800"
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> Chỉnh sửa
+                      </Link>
+                    )}
                     <button
                       type="button"
                       disabled={duplicatingId !== null}

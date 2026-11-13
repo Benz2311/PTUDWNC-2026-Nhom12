@@ -22,9 +22,15 @@ public class ApplicationUnitOfWork : IUnitOfWork
         }
         catch (DbUpdateConcurrencyException exception)
         {
+            var entry = exception.Entries.FirstOrDefault();
+            var keyProperty = entry?.Metadata.FindPrimaryKey()?.Properties.FirstOrDefault();
+            var entityId = keyProperty is null
+                ? "unknown"
+                : entry!.Property(keyProperty.Name).CurrentValue ?? "unknown";
+
             throw new ConcurrencyConflictException(
-                "Recipe",
-                "the requested record",
+                entry?.Metadata.ClrType.Name ?? "Record",
+                entityId,
                 exception);
         }
         catch (DbUpdateException exception) when (

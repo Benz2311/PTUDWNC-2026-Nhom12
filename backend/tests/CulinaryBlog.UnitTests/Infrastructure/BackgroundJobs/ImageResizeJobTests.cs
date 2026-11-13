@@ -95,6 +95,13 @@ public class ImageResizeJobTests : IDisposable
         return ms.ToArray();
     }
 
+    private async Task AddRecipeImageAsync(RecipeImage recipeImage, DateTime? recipeUpdatedAt = null)
+    {
+        _dbContext.Recipes.Add(new Recipe { Id = recipeImage.RecipeId, UpdatedAt = recipeUpdatedAt });
+        _dbContext.RecipeImages.Add(recipeImage);
+        await _dbContext.SaveChangesAsync();
+    }
+
     [Fact]
     public async Task ProcessAsync_WithValidJpegImage_ConvertsToWatermarkedWebpAndUpdatesDatabase()
     {
@@ -103,6 +110,7 @@ public class ImageResizeJobTests : IDisposable
         var imageId = Guid.NewGuid();
         var rawKey = $"recipes/{recipeId}/images/{imageId}.jpg";
         var originalUrl = $"http://localhost:9000/culinaryblog/{rawKey}";
+        var originalRecipeUpdatedAt = DateTime.UtcNow.AddDays(-1);
 
         var recipeImage = new RecipeImage
         {
@@ -114,8 +122,7 @@ public class ImageResizeJobTests : IDisposable
             IsDeleted = false,
         };
 
-        _dbContext.RecipeImages.Add(recipeImage);
-        await _dbContext.SaveChangesAsync();
+        await AddRecipeImageAsync(recipeImage, originalRecipeUpdatedAt);
 
         var jpegBytes = CreateTestImageBytes(1200, 900, JpegFormat.Instance);
         _storageServiceMock
@@ -153,6 +160,7 @@ public class ImageResizeJobTests : IDisposable
         updatedImage.MediumUrl.Should().Be(expectedMediumUrl);
         updatedImage.ThumbnailUrl.Should().Be(expectedThumbUrl);
         updatedImage.UpdatedAt.Should().NotBeNull();
+        (await _dbContext.Recipes.FindAsync(recipeId))!.UpdatedAt.Should().Be(originalRecipeUpdatedAt);
 
         _storageServiceMock.Verify(x => x.UploadAsync(
             "culinaryblog",
@@ -188,8 +196,7 @@ public class ImageResizeJobTests : IDisposable
             IsDeleted = false,
         };
 
-        _dbContext.RecipeImages.Add(recipeImage);
-        await _dbContext.SaveChangesAsync();
+        await AddRecipeImageAsync(recipeImage);
 
         var pngBytes = CreateTestImageBytes(1000, 500, PngFormat.Instance);
         _storageServiceMock
@@ -243,8 +250,7 @@ public class ImageResizeJobTests : IDisposable
             IsDeleted = false,
         };
 
-        _dbContext.RecipeImages.Add(recipeImage);
-        await _dbContext.SaveChangesAsync();
+        await AddRecipeImageAsync(recipeImage);
 
         var webpBytes = CreateTestImageBytes(1600, 1200, WebpFormat.Instance);
         _storageServiceMock
@@ -297,8 +303,7 @@ public class ImageResizeJobTests : IDisposable
             IsDeleted = false,
         };
 
-        _dbContext.RecipeImages.Add(recipeImage);
-        await _dbContext.SaveChangesAsync();
+        await AddRecipeImageAsync(recipeImage);
 
         var corruptBytes = new byte[] { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55 };
         _storageServiceMock
@@ -341,8 +346,7 @@ public class ImageResizeJobTests : IDisposable
             IsDeleted = false,
         };
 
-        _dbContext.RecipeImages.Add(recipeImage);
-        await _dbContext.SaveChangesAsync();
+        await AddRecipeImageAsync(recipeImage);
 
         var jpegBytes = CreateTestImageBytes(400, 300, JpegFormat.Instance);
         _storageServiceMock
@@ -399,8 +403,7 @@ public class ImageResizeJobTests : IDisposable
             IsDeleted = true, // Đã xóa mềm
         };
 
-        _dbContext.RecipeImages.Add(recipeImage);
-        await _dbContext.SaveChangesAsync();
+        await AddRecipeImageAsync(recipeImage);
 
         // Act
         await _job.ProcessAsync(imageId);
@@ -426,8 +429,7 @@ public class ImageResizeJobTests : IDisposable
             IsDeleted = false,
         };
 
-        _dbContext.RecipeImages.Add(recipeImage);
-        await _dbContext.SaveChangesAsync();
+        await AddRecipeImageAsync(recipeImage);
 
         // Act
         await _job.ProcessAsync(imageId);
@@ -492,8 +494,7 @@ public class ImageResizeJobTests : IDisposable
             IsDeleted = false,
         };
 
-        _dbContext.RecipeImages.Add(recipeImage);
-        await _dbContext.SaveChangesAsync();
+        await AddRecipeImageAsync(recipeImage);
 
         _storageServiceMock
             .Setup(x => x.DownloadAsync("culinaryblog", rawKey, It.IsAny<CancellationToken>()))

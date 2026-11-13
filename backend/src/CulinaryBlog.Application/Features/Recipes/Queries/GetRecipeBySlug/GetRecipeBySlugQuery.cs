@@ -40,7 +40,8 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
                 r.Id,
                 r.AuthorId,
                 r.Status,
-                r.RowVersion
+                r.RowVersion,
+                r.xmin
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -164,7 +165,9 @@ public class GetRecipeBySlugHandler : IRequestHandler<GetRecipeBySlugQuery, Reci
             throw new NotFoundException($"Recipe with slug '{request.Slug}' was not found.");
         }
 
-    recipeDto.Version = Convert.ToBase64String(recipeHeader.RowVersion);
+        recipeDto.Version = recipeHeader.xmin > 0
+            ? recipeHeader.xmin.ToString()
+            : Convert.ToBase64String(recipeHeader.RowVersion);
 
         return recipeDto;
     }

@@ -7,12 +7,14 @@ import {
   changeRecipeStatus,
   createRecipe,
   deleteRecipe as deleteRecipeRequest,
+  getRecipeEtag,
+  getRecipeEtagFromResponse,
   updateRecipe,
 } from '@/lib/api/recipes';
 import ImageManager, { RecipeImageDraft } from './ImageManager';
 import IngredientEditor, { IngredientDraft } from './IngredientEditor';
 import NutritionEditor, { NutritionData } from './NutritionEditor';
-import RecipeActions, { RecipeLifecycleAction } from './RecipeActions';
+import type { RecipeLifecycleAction } from './RecipeActions';
 import StepEditor, { StepDraft } from './StepEditor';
 import {
   difficultyLevelSchema,
@@ -33,7 +35,8 @@ type RecipeFormProps = {
   recipeId?: string;
   initialRecipe?: InitialRecipe;
   initialEtag?: string;
-  onReload?: () => Promise<void> | void;
+  onReload?: () => Promise<boolean | void> | boolean | void;
+  onSuccess?: () => void;
 };
 
 export default function RecipeForm({
@@ -41,6 +44,7 @@ export default function RecipeForm({
   initialRecipe,
   initialEtag = '',
   onReload,
+  onSuccess,
 }: RecipeFormProps) {
   const router = useRouter();
 
@@ -257,9 +261,13 @@ export default function RecipeForm({
     setIs409Conflict(false);
     try {
       if (onReload) {
-        await onReload();
-        setSuccessMessage('Đã tải lại dữ liệu mới nhất từ máy chủ.');
+        if (await onReload() === false) {
+          throw new Error('Không thể tải lại dữ liệu công thức.');
+        }
+      } else if (recipeId) {
+        setEtag(await getRecipeEtag(recipeId, initialRecipe?.slug));
       }
+      setSuccessMessage('Đã tải lại dữ liệu mới nhất từ máy chủ.');
     } catch {
       setMessage('Không thể tải lại dữ liệu. Vui lòng làm mới trang (F5).');
     } finally {
@@ -291,10 +299,6 @@ export default function RecipeForm({
           body: uploadData,
         });
         uploadedImages = uploaded.map((image) => ({ url: image.url, altText: title }));
-      }
-
-      if (recipeId && !etag) {
-        throw new Error('Không nhận được phiên bản công thức (ETag). Hãy tải lại trang trước khi lưu.');
       }
 
       const requestPayload = {
@@ -340,29 +344,44 @@ export default function RecipeForm({
         );
       }
 
+      let activeEtag = etag;
+      if (recipeId && !activeEtag) {
+        activeEtag = await getRecipeEtag(recipeId, initialRecipe?.slug);
+        setEtag(activeEtag);
+      }
+
       const response = recipeId
-        ? await updateRecipe(recipeId, validation.data, etag)
+        ? await updateRecipe(recipeId, validation.data, activeEtag)
         : await createRecipe(validation.data);
 
-      const newEtag = response.headers.get('ETag') ?? etag;
+      const newEtag = getRecipeEtagFromResponse(response.headers, response.data.version, etag);
       setEtag(newEtag);
       setHasUnsavedChanges(false);
       setSuccessMessage(
         recipeId ? 'Đã lưu thay đổi công thức thành công!' : 'Đã tạo bản nháp công thức thành công!',
       );
+      onSuccess?.();
 
       if (!recipeId) {
         router.push('/recipes?tab=vault');
       }
     } catch (error: unknown) {
       const apiErr = error as ApiError;
-      if (apiErr.status === 409 || apiErr.message?.includes('409') || apiErr.message?.includes('thay đổi bởi một yêu cầu khác')) {
+      if (
+        apiErr.code === 'RECIPE_VERSION_CONFLICT' ||
+        apiErr.message?.includes('Recipe version is stale') ||
+        apiErr.message?.includes('thay đổi bởi một yêu cầu khác')
+      ) {
         setIs409Conflict(true);
         setMessage(
           'Xung đột phiên bản (409 Conflict): Công thức này đã bị thay đổi bởi phiên làm việc khác. Dữ liệu của bạn chưa được lưu. Hãy bấm "Tải lại dữ liệu" để xem phiên bản mới nhất.',
         );
       } else {
-        setMessage(apiErr.message || 'Không thể lưu công thức. Vui lòng thử lại.');
+        setMessage(
+          apiErr.code === 'RECIPE_SLUG_CONFLICT'
+            ? 'Tên công thức này tạo ra đường dẫn đã được sử dụng. Vui lòng đổi tên công thức rồi thử lại.'
+            : apiErr.message || 'Không thể lưu công thức. Vui lòng thử lại.',
+        );
       }
     } finally {
       setSaving(false);
@@ -371,7 +390,17 @@ export default function RecipeForm({
 
   // Change recipe lifecycle state
   async function changeStatus(action: RecipeLifecycleAction) {
-    if (!recipeId || !etag) {
+    let activeEtag = etag;
+    if (!activeEtag && recipeId) {
+      try {
+        activeEtag = await getRecipeEtag(recipeId, initialRecipe?.slug);
+        setEtag(activeEtag);
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!recipeId || !activeEtag) {
       setMessage('Không nhận được phiên bản công thức (ETag). Hãy tải lại trang trước khi thực hiện.');
       return;
     }
@@ -387,7 +416,7 @@ export default function RecipeForm({
     setIs409Conflict(false);
 
     try {
-      const { data, headers } = await changeRecipeStatus(recipeId, action, etag);
+      const { data, headers } = await changeRecipeStatus(recipeId, action, activeEtag);
       const newEtag = headers.get('ETag') ?? etag;
       setStatus(data.status);
       setEtag(newEtag);
@@ -403,7 +432,11 @@ export default function RecipeForm({
       setSuccessMessage(`Đã cập nhật trạng thái thành công: ${statusMap[data.status] || data.status}.`);
     } catch (error: unknown) {
       const apiErr = error as ApiError;
-      if (apiErr.status === 409 || apiErr.message?.includes('409')) {
+      if (
+        apiErr.code === 'RECIPE_VERSION_CONFLICT' ||
+        apiErr.message?.includes('Recipe version is stale') ||
+        apiErr.message?.includes('thay đổi bởi một yêu cầu khác')
+      ) {
         setIs409Conflict(true);
         setMessage(
           'Xung đột phiên bản (409 Conflict): Trạng thái công thức đã bị thay đổi bởi một yêu cầu khác. Hãy bấm "Tải lại dữ liệu".',
@@ -429,7 +462,11 @@ export default function RecipeForm({
       router.replace('/recipes');
     } catch (error: unknown) {
       const apiErr = error as ApiError;
-      if (apiErr.status === 409 || apiErr.message?.includes('409')) {
+      if (
+        apiErr.code === 'RECIPE_VERSION_CONFLICT' ||
+        apiErr.message?.includes('Recipe version is stale') ||
+        apiErr.message?.includes('thay đổi bởi một yêu cầu khác')
+      ) {
         setIs409Conflict(true);
         setMessage(
           'Xung đột phiên bản (409 Conflict): Công thức đã bị chỉnh sửa hoặc đã xóa trước đó.',
@@ -670,16 +707,7 @@ export default function RecipeForm({
         </p>
       )}
 
-      {/* Lifecycle Actions (Publish, Archive, Unpublish, Delete) */}
-      {recipeId && (
-        <RecipeActions
-          status={status}
-          disabled={saving}
-          onAction={changeStatus}
-          onDelete={deleteRecipe}
-          publishBlocker={publishBlocker}
-        />
-      )}
+
 
       {/* Form Submission Actions */}
       <div className="form-actions">

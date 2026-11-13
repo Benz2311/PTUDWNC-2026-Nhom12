@@ -5,7 +5,7 @@ const AUTH_STORAGE_KEYS = {
 
 export const AUTH_CHANGE_EVENT = 'culinary-auth-change';
 
-export type ApiError = Error & { status?: number };
+export type ApiError = Error & { status?: number; code?: string };
 
 type AuthPayload = { accessToken?: string; refreshToken?: string };
 
@@ -106,6 +106,10 @@ function toApiError(response: Response, payload: unknown): ApiError {
 
   const error = new Error(message) as ApiError;
   error.status = response.status;
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    const body = payload as Record<string, unknown>;
+    if (typeof body.code === 'string') error.code = body.code;
+  }
   return error;
 }
 
